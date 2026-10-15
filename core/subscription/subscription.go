@@ -141,13 +141,6 @@ func Fetch(ctx context.Context, req Request, rootCAs *x509.CertPool) (*Result, e
 
 	parsed, err := importer.Import(string(body))
 	if err != nil {
-		trimmed := strings.TrimSpace(string(body))
-		switch {
-		case strings.HasPrefix(trimmed, "{"):
-			return nil, errors.New("sing-box/JSON subscriptions are not supported yet")
-		case strings.Contains(trimmed, "proxies:"):
-			return nil, errors.New("Clash YAML subscriptions are not supported yet")
-		}
 		return nil, fmt.Errorf("parse subscription: %w", err)
 	}
 	return &Result{Result: *parsed, Info: parseInfo(resp.Header), FetchedAt: time.Now()}, nil

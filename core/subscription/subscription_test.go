@@ -89,7 +89,8 @@ func TestFetchRejectsBadInput(t *testing.T) {
 		w.Write([]byte("proxies:\n  - name: x\n"))
 	}))
 	defer srv.Close()
-	if _, err := Fetch(t.Context(), Request{URL: srv.URL}, nil); err == nil || !strings.Contains(err.Error(), "Clash") {
-		t.Fatalf("err = %v, want Clash not supported", err)
+	// A Clash config whose only proxy has no usable type yields an error, not an empty group.
+	if _, err := Fetch(t.Context(), Request{URL: srv.URL}, nil); err == nil || !strings.Contains(err.Error(), "unsupported proxy type") {
+		t.Fatalf("err = %v, want unsupported proxy type", err)
 	}
 }

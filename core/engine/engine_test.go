@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/base64"
+	"os"
 	"strconv"
 	"testing"
 
@@ -87,6 +88,29 @@ func TestSplitTunnelPassesSchema(t *testing.T) {
 		tun := cfg["inbounds"].([]any)[0].(map[string]any)
 		if _, inc := tun["include_package"]; inc == (len(opts.IncludePackages) == 0) {
 			t.Fatalf("include/exclude not applied: %+v", tun)
+		}
+	}
+}
+
+// Profiles imported from Clash YAML and sing-box JSON must produce configs sing-box accepts.
+func TestImportedFormatsPassSchema(t *testing.T) {
+	for _, file := range []string{"testdata/clash.yaml", "testdata/singbox.json"} {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err := importer.Import(string(data))
+		if err != nil {
+			t.Fatalf("%s: %v", file, err)
+		}
+		for _, p := range res.Profiles {
+			cfg, skipped, err := singbox.Build(p.AsSlice(), singbox.Options{})
+			if err != nil || len(skipped) > 0 {
+				t.Fatalf("%s/%s: build err=%v skipped=%v", file, p.Name, err, skipped)
+			}
+			if err := CheckConfig(cfg); err != nil {
+				t.Errorf("%s/%s: sing-box rejected config: %v", file, p.Name, err)
+			}
 		}
 	}
 }

@@ -279,7 +279,8 @@ omnitun/
 - [x] Engine: start/stop, live switching, traffic stats, real per-profile latency tests, warn/error log forwarding
 - [x] Desktop bridge: `omnitun-svc` daemon + control protocol, lease, parent-death exit
 - [x] Android bridge: gomobile `core/mobile` + Kotlin `VpnService` (minSdk 29)
-- [ ] Importer: Clash YAML, sing-box JSON, Xray JSON, `.ovpn`, SIP008, `naive+https://`, Tor bridge lines
+- [x] Importer: Clash / Clash.Meta YAML (`proxies:`), sing-box JSON (outbounds + WireGuard endpoints) — also as subscription bodies
+- [ ] Importer: Xray JSON, `.ovpn`, SIP008, `naive+https://`, Tor bridge lines
 - [ ] AmneziaWG engine (amneziawg-go; profiles import already, connecting is not wired)
 - [ ] Profile editor (create/edit a profile by hand) and export as link/QR
 

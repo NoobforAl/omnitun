@@ -1,0 +1,50 @@
+mixed-port: 7890
+proxies:
+  - name: "reality"
+    type: vless
+    server: r.example.com
+    port: 443
+    uuid: b831381d-6324-4d53-ad4f-8cda48b30811
+    network: tcp
+    tls: true
+    flow: xtls-rprx-vision
+    servername: www.microsoft.com
+    client-fingerprint: chrome
+    reality-opts:
+      public-key: jNXHt1yRo0vDuchQlIP6Z0ZvjT3KtzVI-T4E7RoLJS0
+      short-id: 12ab
+  - name: vmess-ws
+    type: vmess
+    server: v.example.com
+    port: 443
+    uuid: b831381d-6324-4d53-ad4f-8cda48b30811
+    alterId: 0
+    cipher: auto
+    tls: true
+    network: ws
+    ws-opts:
+      path: /ray
+      headers:
+        Host: cdn.example.com
+  - {name: trojan-grpc, type: trojan, server: t.example.com, port: 443, password: pw, sni: t.example.com, network: grpc, grpc-opts: {grpc-service-name: gun}}
+  - name: ss-obfs
+    type: ss
+    server: s.example.com
+    port: 8388
+    cipher: chacha20-ietf-poly1305
+    password: pw
+    plugin: obfs
+    plugin-opts: {mode: http, host: bing.com}
+  - {name: hy2, type: hysteria2, server: h.example.com, port: 443, password: pw, sni: h.example.com, skip-cert-verify: true, obfs: salamander, obfs-password: ob}
+  - {name: tuic, type: tuic, server: u.example.com, port: 443, uuid: b831381d-6324-4d53-ad4f-8cda48b30811, password: pw, congestion-controller: bbr, alpn: [h3]}
+  - name: wg
+    type: wireguard
+    server: w.example.com
+    port: 51820
+    ip: 10.0.0.2
+    private-key: yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+    public-key: xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=
+    reserved: [1, 2, 3]
+  - {name: snell, type: snell, server: x.example.com, port: 1, psk: x}
+proxy-groups:
+  - {name: auto, type: url-test, proxies: [reality, hy2]}

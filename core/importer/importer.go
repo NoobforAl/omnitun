@@ -29,6 +29,12 @@ func Import(text string) (*Result, error) {
 	if text == "" {
 		return nil, ErrUnsupported
 	}
+	if looksLikeJSON(text) {
+		return ImportSingBoxJSON(text)
+	}
+	if looksLikeClash(text) {
+		return ImportClash(text)
+	}
 	if looksLikeWireGuardConf(text) {
 		p, err := ParseWireGuardConf(text)
 		if err != nil {
