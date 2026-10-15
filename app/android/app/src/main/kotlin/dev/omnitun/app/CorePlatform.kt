@@ -47,6 +47,15 @@ class CorePlatform(context: Context) : Platform {
         }
     }
 
+    override fun startPlatformVPN(profileJSON: String) {
+        if (!Ikev2.supported) throw IllegalStateException("IKEv2 needs Android 11 or newer")
+        Ikev2.start(app, profileJSON)
+    }
+
+    override fun stopPlatformVPN() {
+        if (Ikev2.supported) Ikev2.stop(app)
+    }
+
     override fun interfaces(): String {
         val out = JSONArray()
         for (network in cm.allNetworks) {

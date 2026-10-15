@@ -109,6 +109,10 @@ func ParseLink(link string) (*profile.Profile, error) {
 		p, err = parseSSH(link)
 	case "naive+https", "naive+quic", "naive":
 		p, err = parseNaive(link)
+	case "ikev2":
+		p, err = parseIKEv2(link)
+	case "sstp":
+		p, err = parseSSTP(link)
 	default:
 		return nil, fmt.Errorf("%w: %s://", ErrUnsupported, scheme)
 	}

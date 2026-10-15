@@ -323,8 +323,9 @@ omnitun/
 - [ ] OpenVPN XOR/Stunnel obfuscation
 - [x] NordLynx: `nordvpn://<access token>?country=DE&limit=10` subscription → WireGuard profiles (key from `/v1/users/services/credentials`, servers from `/v1/servers/recommendations`); tested against a mock API (no NordVPN account to test live)
 - [ ] Stealth (WireGuard over TLS/WS): sing-box WireGuard `detour` through a TLS/WS outbound with UDP-over-TCP (needs a sing-box server), later a wstunnel-compatible Go client
-- [ ] SSTP: fork the pure-Go `veepin` sstp + PPP packages to run on our TUN fd (or port Open SSTP Client's Kotlin); MS-CHAPv2/PAP
-- [ ] Android IKEv2: platform `Ikev2VpnProfile` + `VpnManager` (API 30+, PSK / EAP-MSCHAPv2 / certificates; the OS owns that tunnel); `veepin` ikev2 later if it must go through the core
+- [x] SSTP and IKEv2 in the core on pure-Go `veepin` (patched copy in `third_party/veepin`, see PATCHES.md: app-supplied TUN; EAP with a certificate-authenticated server). `sstp://` and `ikev2://` links (IKEv2: PSK, EAP-MSCHAPv2, certificates, IKE over TCP/RFC 8229). The app's own sockets stay off the tunnel (`exclude_self`). Tests: in-process veepin servers (SSTP, IKEv2 PSK + EAP over TCP) with a ping through the tunnel; live SSTP handshake + ping against VPN Gate; on device: SSTP to a dev server (`tools/sstpdev`) with ping through the tunnel; VPN Gate SSTP connects but that public server routes replies to a stale session
+- [x] IKEv2 on the OS client (`system=1`, Android 11+ `Ikev2VpnProfile`) as an option — note many phones (e.g. Samsung A30s) lack `FEATURE_IPSEC_TUNNELS`, which is why the in-core engine is the default
+- [ ] IKEv2 with a certificate-authenticated server + EAP: implemented in the fork but not yet tested against a real strongSwan server
 - [ ] L2TP/IPsec: deferred (possible in userspace — TunnelForge does it — but low value)
 - [ ] Windows built-in VPN: IKEv2, L2TP/IPsec, SSTP (Windows phase)
 - [x] NaiveProxy via sing-box `with_naive_outbound` (Chromium cronet, statically linked on Android: +5 MB per APK): `naive+https://` / `naive+quic://` links, sing-box JSON with a pinned certificate; e2e test with real cronet on Windows (libcronet.dll); verified on device through omnitun-server
@@ -352,6 +353,8 @@ omnitun/
 ### Phase 9 — Polish & release
 - [ ] Translations (en, fa, ru, zh, ar) with right-to-left layout
 - [ ] Routing rules (geoip/geosite, bypass LAN, per-domain), IPv6 toggle, MTU
+- [x] Local networks bypass the VPN by default (Settings → "Bypass local network"): 10/8, 172.16/12, 192.168/16, link-local, multicast, broadcast and IPv6 ULA/link-local are left out of the VPN routes for every engine (sing-box `route_exclude_address`, AmneziaWG/SSTP/IKEv2 route ranges) and sent direct; a tunnel's own subnet, DNS and explicitly routed WireGuard subnets stay inside; verified on device (`ip route` on tun0)
+- [ ] Bypass list from a .txt file: the user imports (file picker / paste / URL) a list of domains, IPs and IP ranges that go direct instead of through the VPN — one entry per line: `example.com` (and its subdomains), `full:exact.example.com`, `keyword:bank`, `regexp:…`, `1.2.3.4`, `10.0.0.0/8`, `2001:db8::/32`; `#` comments; several named lists, each on/off; optional "proxy only these" mode (inverse list); mapped to sing-box route rules (`domain_suffix`, `domain`, `domain_keyword`, `domain_regex`, `ip_cidr` → direct), and on Android IP ranges are also excluded from the VPN routes
 - [ ] Signed releases on GitHub (APK, Windows installer, server binaries for Linux amd64/arm64), F-Droid
 - [ ] User docs
 

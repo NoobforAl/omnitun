@@ -2,6 +2,7 @@ package engine
 
 import (
 	"errors"
+	"net/netip"
 	"slices"
 	"strings"
 	"testing"
@@ -31,8 +32,29 @@ func TestAWGTunRequest(t *testing.T) {
 	}
 	req := awgTunRequest(res.Profiles[0], singbox.Options{ExcludePackages: []string{"com.android.chrome"}})
 	if req.MTU != 1400 || !slices.Equal(req.Inet4Address, []string{"10.8.0.2/32"}) ||
-		!slices.Equal(req.DNSServers, []string{"9.9.9.9"}) || !slices.Equal(req.Inet4RouteRange, []string{"0.0.0.0/0"}) {
+		!slices.Equal(req.DNSServers, []string{"9.9.9.9"}) {
 		t.Fatalf("request: %+v", req)
+	}
+	// Local networks bypass the VPN; the tunnel's own address stays routed.
+	routed := func(ip string) bool {
+		a := netip.MustParseAddr(ip)
+		for _, r := range singbox.ParsePrefixes(req.Inet4RouteRange) {
+			if r.Contains(a) {
+				return true
+			}
+		}
+		return false
+	}
+	for ip, want := range map[string]bool{"8.8.8.8": true, "9.9.9.9": true, "10.8.0.2": true,
+		"192.168.1.1": false, "10.0.0.5": false, "172.20.1.1": false, "169.254.1.1": false} {
+		if routed(ip) != want {
+			t.Errorf("%s routed=%v, want %v (routes %v)", ip, routed(ip), want, req.Inet4RouteRange)
+		}
+	}
+	// With "proxy private" on, everything goes through the tunnel.
+	all := awgTunRequest(res.Profiles[0], singbox.Options{ProxyPrivate: true})
+	if !slices.Equal(all.Inet4RouteRange, []string{"0.0.0.0/0"}) {
+		t.Fatalf("proxy private routes: %v", all.Inet4RouteRange)
 	}
 	// No IPv6 address, so IPv6 must not be routed into the tunnel.
 	if len(req.Inet6RouteRange) != 0 {

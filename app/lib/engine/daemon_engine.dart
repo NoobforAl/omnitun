@@ -202,6 +202,7 @@ class DaemonEngine implements VpnEngine {
         'system_proxy': options.systemProxy,
         if (options.dns.isNotEmpty) 'dns': options.dns,
         'failover': options.autoFailover,
+        if (!options.bypassLan) 'proxy_private': true,
         if (options.includePackages.isNotEmpty) 'include_packages': options.includePackages,
         if (options.excludePackages.isNotEmpty) 'exclude_packages': options.excludePackages,
       });

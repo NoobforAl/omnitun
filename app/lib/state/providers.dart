@@ -176,6 +176,7 @@ class ConnectionController extends Notifier<EngineState> {
         includePackages: settings.splitMode == 'include' ? settings.splitApps : const [],
         excludePackages: settings.splitMode == 'exclude' ? settings.splitApps : const [],
         autoFailover: settings.autoFailover,
+        bypassLan: settings.bypassLan,
       ),
     );
   }
@@ -208,6 +209,7 @@ class SettingsState {
     this.systemProxy = true,
     this.stopOnClose = true,
     this.autoFailover = true,
+    this.bypassLan = true,
     this.killSwitch = false,
     this.remoteDns = defaultRemoteDns,
     this.splitMode = 'off',
@@ -223,6 +225,9 @@ class SettingsState {
   final bool systemProxy;
   final bool stopOnClose;
   final bool autoFailover;
+
+  /// Local networks (LAN, link-local, multicast) don't go through the VPN.
+  final bool bypassLan;
   final bool killSwitch;
 
   /// Resolver used through the tunnel: https://, tls://, tcp://, udp:// or an IP.
@@ -238,6 +243,7 @@ class SettingsState {
     bool? systemProxy,
     bool? stopOnClose,
     bool? autoFailover,
+    bool? bypassLan,
     bool? killSwitch,
     String? remoteDns,
     String? splitMode,
@@ -248,6 +254,7 @@ class SettingsState {
         systemProxy: systemProxy ?? this.systemProxy,
         stopOnClose: stopOnClose ?? this.stopOnClose,
         autoFailover: autoFailover ?? this.autoFailover,
+        bypassLan: bypassLan ?? this.bypassLan,
         killSwitch: killSwitch ?? this.killSwitch,
         remoteDns: remoteDns ?? this.remoteDns,
         splitMode: splitMode ?? this.splitMode,
@@ -259,6 +266,7 @@ class SettingsState {
         'system_proxy': systemProxy,
         'stop_on_close': stopOnClose,
         'auto_failover': autoFailover,
+        'bypass_lan': bypassLan,
         'kill_switch': killSwitch,
         'remote_dns': remoteDns,
         'split_mode': splitMode,
@@ -271,6 +279,7 @@ class SettingsState {
         systemProxy: j['system_proxy'] as bool? ?? defaults.systemProxy,
         stopOnClose: j['stop_on_close'] as bool? ?? defaults.stopOnClose,
         autoFailover: j['auto_failover'] as bool? ?? defaults.autoFailover,
+        bypassLan: j['bypass_lan'] as bool? ?? defaults.bypassLan,
         killSwitch: j['kill_switch'] as bool? ?? defaults.killSwitch,
         remoteDns: j['remote_dns'] as String? ?? defaults.remoteDns,
         splitMode: j['split_mode'] as String? ?? defaults.splitMode,

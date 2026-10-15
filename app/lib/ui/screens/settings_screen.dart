@@ -37,6 +37,12 @@ class SettingsScreen extends ConsumerWidget {
             onChanged: (v) => ctrl.update((s) => s.copyWith(autoFailover: v)),
           ),
           SwitchListTile(
+            title: const Text('Bypass local network'),
+            subtitle: const Text('LAN devices and local addresses (192.168.x.x, 10.x.x.x, …) are reached directly, not through the VPN'),
+            value: s.bypassLan,
+            onChanged: (v) => ctrl.update((s) => s.copyWith(bypassLan: v)),
+          ),
+          SwitchListTile(
             title: const Text('Kill switch'),
             subtitle: const Text('Block traffic while the VPN is reconnecting'),
             value: s.killSwitch,

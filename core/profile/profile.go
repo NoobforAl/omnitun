@@ -28,6 +28,8 @@ const (
 	Hysteria    = "hysteria" // v1
 	AnyTLS      = "anytls"
 	SSH         = "ssh"
+	IKEv2       = "ikev2" // in-core (veepin); optionally the OS's IKEv2 client
+	SSTP        = "sstp"
 )
 
 // Profile is one connectable server configuration.
@@ -54,6 +56,7 @@ type Profile struct {
 	OpenVPN    *OVPN      `json:"openvpn,omitempty"`
 	SSH        *SSHOpts   `json:"ssh,omitempty"`
 	Naive      *NaiveOpts `json:"naive,omitempty"`
+	IKEv2      *IKEv2Opts `json:"ikev2,omitempty"`
 	Plugin     string     `json:"plugin,omitempty"` // shadowsocks SIP003 plugin
 	PluginOpts string     `json:"plugin_opts,omitempty"`
 
@@ -101,6 +104,27 @@ type WG struct {
 	Keepalive     int      `json:"keepalive,omitempty"`
 	// Amnezia holds AmneziaWG obfuscation parameters (Jc, Jmin, Jmax, S1, S2, H1-H4).
 	Amnezia map[string]string `json:"amnezia,omitempty"`
+}
+
+// IKEv2Opts holds IKEv2/IPsec settings for the OS's IKEv2 client.
+// Username/Password are used for EAP (MSCHAPv2) authentication.
+type IKEv2Opts struct {
+	// Auth is "eap" (username + password), "psk" (pre-shared key) or "cert".
+	Auth     string `json:"auth"`
+	PSK      string `json:"psk,omitempty"`
+	LocalID  string `json:"local_id,omitempty"`  // default: username, or the server address for PSK
+	RemoteID string `json:"remote_id,omitempty"` // default: the server address
+	// CACert (PEM) verifies the server for EAP and certificate auth; empty
+	// uses the system's trusted CAs.
+	CACert     string `json:"ca_cert,omitempty"`
+	ClientCert string `json:"client_cert,omitempty"` // PEM, for "cert"
+	ClientKey  string `json:"client_key,omitempty"`  // PEM PKCS#8, for "cert"
+	MTU        int    `json:"mtu,omitempty"`
+	// TCP carries IKE and ESP over TCP (RFC 8229) for networks that block UDP.
+	TCP bool `json:"tcp,omitempty"`
+	// System uses the OS's IKEv2 client (Android 11+ with IPsec support)
+	// instead of the built-in one.
+	System bool `json:"system,omitempty"`
 }
 
 // NaiveOpts holds NaiveProxy options. User and password are in Username/Password.
@@ -201,6 +225,28 @@ func (p *Profile) Validate() error {
 	case TUIC:
 		if p.UUID == "" {
 			return fmt.Errorf("profile %q: missing uuid", p.Name)
+		}
+	case SSTP:
+		if p.Username == "" || p.Password == "" {
+			return fmt.Errorf("profile %q: missing SSTP username or password", p.Name)
+		}
+	case IKEv2:
+		o := p.IKEv2
+		if o == nil {
+			return fmt.Errorf("profile %q: missing IKEv2 settings", p.Name)
+		}
+		switch o.Auth {
+		case "psk":
+			if o.PSK == "" {
+				return fmt.Errorf("profile %q: missing IKEv2 pre-shared key", p.Name)
+			}
+		case "eap":
+		case "cert":
+			if o.ClientCert == "" || o.ClientKey == "" {
+				return fmt.Errorf("profile %q: missing IKEv2 client certificate or key", p.Name)
+			}
+		default:
+			return fmt.Errorf("profile %q: unknown IKEv2 auth %q", p.Name, o.Auth)
 		}
 	case Naive:
 		if p.Username == "" || p.Password == "" {

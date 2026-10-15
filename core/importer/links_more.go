@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"errors"
 	"net/url"
 	"strconv"
 	"strings"
@@ -130,4 +131,73 @@ func parseNaive(link string) (*profile.Profile, error) {
 		p.Naive = o
 	}
 	return p, nil
+}
+
+// ikev2://[user:password@]host[:port]?auth=eap|psk|cert&psk=..&remote_id=..&local_id=..&ca=<PEM>&tcp=1&system=1#name
+// tcp=1 carries IKE/ESP over TCP (RFC 8229, port = the TCP port); system=1
+// uses the OS's IKEv2 client instead of the built-in one.
+func parseIKEv2(link string) (*profile.Profile, error) {
+	u, err := url.Parse(link)
+	if err != nil {
+		return nil, err
+	}
+	if u.Hostname() == "" {
+		return nil, errMissingServer
+	}
+	q := u.Query()
+	port := 500
+	if v := u.Port(); v != "" {
+		if port, err = strconv.Atoi(v); err != nil {
+			return nil, err
+		}
+	}
+	password, _ := u.User.Password()
+	o := &profile.IKEv2Opts{
+		Auth:     strings.ToLower(q.Get("auth")),
+		PSK:      q.Get("psk"),
+		LocalID:  q.Get("local_id"),
+		RemoteID: q.Get("remote_id"),
+		CACert:   q.Get("ca"),
+		TCP:      truthy(q.Get("tcp")),
+		System:   truthy(q.Get("system")),
+	}
+	o.MTU, _ = strconv.Atoi(q.Get("mtu"))
+	if o.Auth == "" {
+		o.Auth = "eap"
+		if o.PSK != "" {
+			o.Auth = "psk"
+		}
+	}
+	return &profile.Profile{
+		Name: fragmentName(u), Protocol: profile.IKEv2, Server: u.Hostname(), Port: port,
+		Username: u.User.Username(), Password: password, IKEv2: o,
+	}, nil
+}
+
+var errMissingServer = errors.New("missing server address")
+
+// sstp://user:password@host[:port]?insecure=1#name  (port 443 by default)
+func parseSSTP(link string) (*profile.Profile, error) {
+	u, err := url.Parse(link)
+	if err != nil {
+		return nil, err
+	}
+	if u.Hostname() == "" {
+		return nil, errMissingServer
+	}
+	port := 443
+	if v := u.Port(); v != "" {
+		if port, err = strconv.Atoi(v); err != nil {
+			return nil, err
+		}
+	}
+	password, _ := u.User.Password()
+	q := u.Query()
+	return &profile.Profile{
+		Name: fragmentName(u), Protocol: profile.SSTP, Server: u.Hostname(), Port: port,
+		Username: u.User.Username(), Password: password,
+		// SSTP servers mostly use self-signed certificates; MS-CHAPv2 still
+		// authenticates the server (it must know the password).
+		TLS: &profile.TLS{Enabled: true, Insecure: q.Get("insecure") != "0"},
+	}, nil
 }

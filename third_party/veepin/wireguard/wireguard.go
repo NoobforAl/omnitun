@@ -1,0 +1,853 @@
+// Package wireguard is the public entry point to this module's WireGuard
+// implementation: an initiator that performs the Noise_IKpsk2 handshake and runs
+// a userspace transport data path over a TUN device.
+//
+// Like every protocol here, Dial installs no addresses, routes or DNS. It
+// returns the negotiated client.Result and the caller applies it — the veepin
+// command hands it to dataplane's router, and the NetworkManager plugin hands it
+// to NM.
+//
+// Importing this package registers "wireguard" with the client registry, so a
+// caller that dials by name only needs the blank import:
+//
+//	import _ "github.com/xen0bit/veepin/wireguard"
+//
+//	sess, res, err := client.Dial(ctx, "wireguard", opts)
+//
+// The protocol internals (the message codec, the handshake, and the transport
+// crypto) live in internal/wireguard; this package is the supported surface.
+//
+// This package provides both roles: Dial is the initiator (below), and Server
+// (see server.go) is the multi-peer responder that `veepin serve wireguard`
+// runs.
+//
+// # Scope
+//
+// A client rekeys: it re-runs the handshake every rekeyAfterTime and rotates the
+// fresh keypair in, so a tunnel stays up indefinitely rather than going quiet at
+// the key's rejection age (~180s). Rekey is client-initiated only — the server
+// answers new initiations but does not start its own — and neither role answers
+// cookie replies, so a peer under load will refuse the handshake. Both are
+// deliberate boundaries, not silent gaps: an idle peer that never rekeys and a
+// peer under load both surface as a refused or absent handshake.
+package wireguard
+
+import (
+	"context"
+	"encoding/base64"
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"net"
+	"net/netip"
+	"sync"
+	"time"
+
+	"github.com/xen0bit/veepin/client"
+	"github.com/xen0bit/veepin/dataplane"
+	"github.com/xen0bit/veepin/internal/vlog"
+	"github.com/xen0bit/veepin/internal/wireguard/noise"
+	"github.com/xen0bit/veepin/internal/wireguard/transport"
+	"github.com/xen0bit/veepin/internal/wireguard/wire"
+)
+
+func init() { client.Register("wireguard", parseOptions) }
+
+// Default inner MTU, derived rather than asserted. WireGuard's conventional
+// 1420 is exactly a 1500-octet path less the *IPv6* outer header, the UDP
+// header, and WireGuard's own transport framing — the larger of the two IP
+// families, so one MTU is safe over either. That is why every WireGuard
+// implementation ships the same slightly-conservative number, and computing it
+// here says so rather than leaving 1420 to look arbitrary.
+//
+// Config.MTU overrides it.
+const defaultMTU = dataplane.DefaultPathMTU - dataplane.OuterUDP6 - wire.Overhead
+
+// Handshake retransmission, from the protocol paper §6.1. An initiation is
+// resent every rekeyTimeout until a response arrives or the overall attempt
+// budget is spent. The initial handshake uses maxAttempts as its budget; a
+// rekey, which runs against a live tunnel, retries for rekeyAttemptTime instead
+// (§6.1's REKEY_ATTEMPT_TIME) so it keeps trying for nearly the whole rejection
+// window before giving the tunnel up.
+const (
+	rekeyTimeout     = 5 * time.Second
+	maxAttempts      = 5
+	rekeyAttemptTime = 90 * time.Second
+)
+
+// Option keys accepted by client.Dial(ctx, "wireguard", opts). OptConfig points
+// at a wg-quick file; the rest override individual fields, so the CLI can take a
+// file, a set of flags, or both.
+const (
+	OptConfig       = "config"               // path to a wg-quick config file
+	OptPrivateKey   = "private-key"          // our static private key, base64
+	OptAddress      = "address"              // our tunnel address(es), CIDR
+	OptDNS          = "dns"                  // DNS servers
+	OptMTU          = "mtu"                  // inner MTU
+	OptListenPort   = "listen-port"          // local UDP port to bind (0 = ephemeral)
+	OptRekeySeconds = "rekey-seconds"        // client rekey interval (0 = default)
+	OptPublicKey    = "public-key"           // peer static public key, base64
+	OptPresharedKey = "preshared-key"        // optional preshared key, base64
+	OptEndpoint     = "endpoint"             // peer host:port
+	OptAllowedIPs   = "allowed-ips"          // inner destinations for the peer
+	OptKeepalive    = "persistent-keepalive" // keepalive seconds
+	OptTUNName      = "tun"                  // desired TUN interface name
+	OptShape        = "shape"                // per-flow shaping budget in bytes (0 = off)
+)
+
+// parseOptions turns string-keyed options into a Dialer: it loads the -config
+// file if given, then layers the individual options over it. It is what the
+// registry calls for client.Dial(ctx, "wireguard", opts).
+func parseOptions(opts map[string]string) (client.Dialer, error) {
+	cfg := &Config{}
+	if path := opts[OptConfig]; path != "" {
+		loaded, err := ParseConfigFile(path)
+		if err != nil {
+			return nil, err
+		}
+		cfg = loaded
+	}
+	if err := cfg.applyOverrides(opts); err != nil {
+		return nil, err
+	}
+	if _, err := cfg.resolve(); err != nil {
+		return nil, err
+	}
+	return dialer{cfg}, nil
+}
+
+// Validate reports whether a Config has everything a dial needs, running the
+// same checks parseOptions runs and discarding what they build.
+//
+// It is exported for amneziawg, which fills this exact struct from its own
+// option map and had no way to reach resolve(). The result was that its four
+// Required flags claimed something nothing enforced: an entirely empty
+// amneziawg profile saved and listed cleanly and failed only at dial.
+func (c *Config) Validate() error {
+	_, err := c.resolve()
+	return err
+}
+
+// dialer adapts a Config to client.Dialer.
+type dialer struct{ cfg *Config }
+
+func (d dialer) Dial(ctx context.Context) (client.Session, client.Result, error) {
+	return Dial(ctx, *d.cfg)
+}
+
+// resolved is a Config decoded and validated into the concrete types Dial needs:
+// keys as bytes, addresses as prefixes, the endpoint as a UDP address. Doing it
+// once, up front, means a malformed key is a config error rather than a
+// mid-handshake surprise.
+type resolved struct {
+	noiseCfg   noise.Config
+	endpoint   *net.UDPAddr
+	address    netip.Prefix   // our tunnel address
+	address6   netip.Prefix   // our tunnel IPv6 address; zero when there is none
+	allowedIPs []netip.Prefix // routed to the peer
+	dns        []net.IP
+	mtu        int
+	tunName    string
+	keepalive  time.Duration
+	rekey      time.Duration // how often to re-run the handshake
+}
+
+// resolve decodes and validates cfg as a client config: exactly one peer, with
+// an endpoint to dial. It is called both by parseOptions (to reject bad input
+// early) and by Dial.
+func (c *Config) resolve() (*resolved, error) {
+	priv, err := decodeKey(c.PrivateKey, OptPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+	switch len(c.Peers) {
+	case 1:
+		// ok
+	case 0:
+		return nil, fmt.Errorf("%s is required", OptPublicKey)
+	default:
+		return nil, fmt.Errorf("a client takes one peer, got %d", len(c.Peers))
+	}
+	peer := c.Peers[0]
+
+	pub, err := decodeKey(peer.PublicKey, OptPublicKey)
+	if err != nil {
+		return nil, err
+	}
+	if peer.Endpoint == "" {
+		return nil, fmt.Errorf("%s is required", OptEndpoint)
+	}
+	if len(c.Address) == 0 {
+		return nil, fmt.Errorf("%s is required", OptAddress)
+	}
+	if len(peer.AllowedIPs) == 0 {
+		return nil, fmt.Errorf("%s is required", OptAllowedIPs)
+	}
+
+	r := &resolved{
+		noiseCfg: noise.Config{LocalStatic: priv, RemoteStatic: pub},
+		mtu:      c.MTU,
+		tunName:  c.TUNName,
+	}
+	if peer.PresharedKey != "" {
+		psk, err := decodeKey(peer.PresharedKey, OptPresharedKey)
+		if err != nil {
+			return nil, err
+		}
+		r.noiseCfg.PresharedKey = psk
+	}
+	// mac1 is computed over the message type, so the noise layer needs H1/H2
+	// rather than having them stamped on afterwards by the obfuscation layer.
+	r.noiseCfg.TypeInitiation = c.Obfuscation.TypeInitiation
+	r.noiseCfg.TypeResponse = c.Obfuscation.TypeResponse
+	if r.mtu == 0 {
+		r.mtu = defaultMTU
+	}
+	if peer.Keepalive > 0 {
+		r.keepalive = time.Duration(peer.Keepalive) * time.Second
+	}
+	r.rekey = rekeyAfterTime
+	if c.RekeySeconds > 0 {
+		r.rekey = time.Duration(c.RekeySeconds) * time.Second
+	}
+
+	// wg-quick's Address line is a list, and a dual-stack interface writes both
+	// families on it. Taking addrs[0] and dropping the rest meant a config
+	// naming `10.0.0.2/24, fd00::2/64` came up IPv4-only with nothing said —
+	// the v6 address was parsed, validated, and thrown away.
+	addrs, err := prefixes(c.Address)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", OptAddress, err)
+	}
+	if r.address, r.address6, err = splitPrefixFamilies(addrs); err != nil {
+		return nil, fmt.Errorf("%s: %w", OptAddress, err)
+	}
+
+	r.allowedIPs, err = prefixes(peer.AllowedIPs)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", OptAllowedIPs, err)
+	}
+
+	r.endpoint, err = net.ResolveUDPAddr("udp", peer.Endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("%s %q: %w", OptEndpoint, peer.Endpoint, err)
+	}
+
+	for _, s := range c.DNS {
+		ip := net.ParseIP(s)
+		if ip == nil {
+			return nil, fmt.Errorf("%s: bad address %q", OptDNS, s)
+		}
+		r.dns = append(r.dns, ip)
+	}
+	return r, nil
+}
+
+// Dial performs the handshake, opens the TUN, and starts the transport data
+// path, returning a running session and the Result the caller must apply. It
+// installs no routes or addresses. On error nothing is left running.
+//
+// The context bounds the handshake; once Dial returns, use the session's
+// Wait/Close for the tunnel lifetime.
+func Dial(ctx context.Context, cfg Config) (client.Session, client.Result, error) {
+	r, err := cfg.resolve()
+	if err != nil {
+		return nil, client.Result{}, fmt.Errorf("wireguard: %w", err)
+	}
+	logger := vlog.From(cfg.Logger)
+
+	// A connected socket: the kernel filters to the endpoint, and every send
+	// implicitly addresses it, so the road-warrior return-address handling the
+	// server side needs does not arise here.
+	conn, err := net.DialUDP("udp", nil, r.endpoint)
+	if err != nil {
+		return nil, client.Result{}, fmt.Errorf("wireguard: dial %s: %w", r.endpoint, err)
+	}
+
+	kp, err := handshake(ctx, conn, r.noiseCfg, logger, cfg.Obfuscation)
+	if err != nil {
+		conn.Close()
+		if errors.Is(err, noise.ErrDecrypt) {
+			return nil, client.Result{}, fmt.Errorf("wireguard: %w: %w", client.ErrAuth, err)
+		}
+		return nil, client.Result{}, fmt.Errorf("wireguard: handshake: %w", err)
+	}
+
+	sess, err := transport.NewSession(kp.Send, kp.Recv, kp.Local, kp.Remote)
+	if err != nil {
+		conn.Close()
+		return nil, client.Result{}, fmt.Errorf("wireguard: transport keys: %w", err)
+	}
+
+	// GSO: the kernel may hand the pump TCP super-frames to segment and batch
+	// (doc/scaling-the-data-path.md); falls back to a plain TUN transparently.
+	tun, err := dataplane.OpenTUNGSO(r.tunName)
+	if err != nil {
+		conn.Close()
+		return nil, client.Result{}, fmt.Errorf("wireguard: open TUN: %w", err)
+	}
+
+	tunnel := newTunnel(sess, r.allowedIPs, r.endpoint, false)
+
+	s := &session{
+		conn:          conn,
+		tun:           tun,
+		tunnel:        tunnel,
+		logger:        logger,
+		noiseCfg:      r.noiseCfg,
+		rekeyInterval: r.rekey,
+		obfCfg:        cfg.Obfuscation,
+		done:          make(chan struct{}),
+		stop:          make(chan struct{}),
+	}
+
+	// The socket is connected, so the destination is implicit and the pump's
+	// PeerAddr is ignored.
+	obf := cfg.Obfuscation
+	send := func(pkt []byte, _ *net.UDPAddr) {
+		pkt = obfuscateSend(pkt, obf)
+		if _, werr := conn.Write(pkt); werr != nil {
+			logger.Warnf("wireguard: send error: %v", werr)
+		}
+	}
+	// Outbound TUN traffic is routed to the peer by longest-prefix match over its
+	// AllowedIPs; inbound transport packets demux on our receiver index.
+	pump := dataplane.NewPump(tun, send, wire.Demux, logger.Slog())
+	if cfg.Shape > 0 {
+		pump.SetShaper(dataplane.NewShaper(dataplane.ShapeConfig{Bytes: cfg.Shape}))
+		logger.Printf("wireguard: outbound shaping on, %d bytes per flow", cfg.Shape)
+	}
+	// GSO bursts flush with one sendmmsg on the connected socket. This
+	// BatchConn is the pump goroutine's own; readLoop has another.
+	sendBC := dataplane.NewBatchConn(conn)
+	pump.SetBatchSender(func(pkts [][]byte, _ *net.UDPAddr) {
+		for i := range pkts {
+			pkts[i] = obfuscateSend(pkts[i], obf)
+		}
+		if _, werr := sendBC.WriteBatch(pkts, nil); werr != nil {
+			logger.Warnf("wireguard: batch send error: %v", werr)
+		}
+	})
+	pump.SetInnerMTU(r.mtu)
+	pump.AddTunnel(tunnel)
+	s.pump = pump
+	go pump.Run()
+
+	go s.readLoop()
+	s.startKeepalive(r.keepalive)
+	go s.rekeyLoop()
+
+	out := client.Result{
+		TUNName: tun.Name(),
+		Gateway: r.endpoint.IP,
+		DNS:     r.dns,
+		MTU:     r.mtu,
+	}
+	if r.address.IsValid() {
+		out.AssignedIP = net.IP(r.address.Addr().AsSlice())
+		out.Netmask = prefixNetmask(r.address)
+	}
+	if r.address6.IsValid() {
+		out.AssignedIP6 = net.IP(r.address6.Addr().AsSlice())
+		out.Prefix6 = r.address6.Bits()
+	}
+	logger.Printf("wireguard: tunnel up on %s, internal IP %s%s, peer %s",
+		out.TUNName, addrOrNone(out.AssignedIP), also(out.AssignedIP6), r.endpoint)
+	return s, out, nil
+}
+
+// handshake sends the initiation and waits for the response, retransmitting a
+// fresh initiation every rekeyTimeout until one is answered, the attempt budget
+// is spent, or ctx is cancelled. Each attempt uses a new Initiator, since an
+// initiation — and its ephemeral key — is single-use.
+//
+// obf, if non-zero, applies AmneziaWG wire transforms to the initiation and
+// response, and emits Jc junk datagrams ahead of each initiation.
+func handshake(ctx context.Context, conn *net.UDPConn, cfg noise.Config, logger *vlog.Logger, obf ObfuscationConfig) (*noise.Keypair, error) {
+	// The response arrives padded by S2, so the buffer must have room for it;
+	// sizing it to the stock 92 bytes silently truncates an obfuscated response
+	// and the handshake fails with a parse error that names the wrong cause.
+	buf := make([]byte, wire.SizeHandshakeResponse+obf.PadResponse)
+	for attempt := 1; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		init, err := noise.NewInitiator(cfg)
+		if err != nil {
+			return nil, err
+		}
+		msg, err := init.Initiation()
+		if err != nil {
+			return nil, err
+		}
+		// Junk first: the point is that the first datagram of the flow is not a
+		// 148-byte initiation. Failures are ignored — junk is advisory, and a
+		// peer that never sees it is no worse off.
+		for _, j := range junkPackets(obf) {
+			_, _ = conn.Write(j)
+		}
+		if _, err := conn.Write(obfuscateSend(msg, obf)); err != nil {
+			return nil, fmt.Errorf("send initiation: %w", err)
+		}
+
+		deadline := time.Now().Add(rekeyTimeout)
+		if dl, ok := ctx.Deadline(); ok && dl.Before(deadline) {
+			deadline = dl
+		}
+		_ = conn.SetReadDeadline(deadline)
+		var n int
+		for {
+			n, err = conn.Read(buf)
+			if err != nil {
+				break
+			}
+			recv := deobfuscateRecv(buf[:n], obf)
+			if recv != nil {
+				n = copy(buf, recv)
+				break
+			}
+			// Junk or a stray datagram: neither an error nor a response. Read
+			// again against the same deadline rather than burning a handshake
+			// attempt or parsing it as a response.
+		}
+		if err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				if attempt >= maxAttempts {
+					return nil, fmt.Errorf("no response after %d attempts", maxAttempts)
+				}
+				logger.Warnf("wireguard: handshake attempt %d timed out, retrying", attempt)
+				continue
+			}
+			return nil, err
+		}
+
+		kp, err := init.Consume(buf[:n])
+		if err != nil {
+			// A cookie reply (message type 3) lands here as a parse failure: the
+			// responder is under load and demands a cookie this build does not
+			// send. Retrying will not help until that is implemented.
+			if errors.Is(err, noise.ErrDecrypt) {
+				return nil, err
+			}
+			logger.Printf("wireguard: discarding unexpected handshake reply: %v", err)
+			if attempt >= maxAttempts {
+				return nil, fmt.Errorf("no valid response after %d attempts", maxAttempts)
+			}
+			continue
+		}
+		_ = conn.SetReadDeadline(time.Time{}) // clear for the steady-state loop
+		return kp, nil
+	}
+}
+
+// session is a running WireGuard tunnel: the UDP socket, the TUN device, the
+// transport pump, and the single peer tunnel whose keys it rotates. It
+// implements client.Session.
+type session struct {
+	conn   *net.UDPConn
+	tun    *dataplane.TUN
+	pump   *dataplane.Pump
+	tunnel *wgTunnel
+	logger *vlog.Logger
+
+	// noiseCfg is kept so the rekey loop can start fresh handshakes, and
+	// rekeyInterval is how often it does.
+	noiseCfg      noise.Config
+	rekeyInterval time.Duration
+
+	// hsMu guards pending, the in-flight rekey handshake awaiting its response.
+	// The initial handshake does not use it: it runs before readLoop starts, so
+	// there is no dispatch to arbitrate.
+	hsMu    sync.Mutex
+	pending *pendingHandshake
+	// hsExchMu serializes whole handshake exchanges (periodic rekey vs. a
+	// liveness Probe) so only one runs at a time.
+	hsExchMu sync.Mutex
+
+	// obfCfg is the AmneziaWG obfuscation config (zero = stock WireGuard).
+	obfCfg ObfuscationConfig
+
+	closeOnce sync.Once
+	closeErr  error
+	done      chan struct{} // closed when the inbound loop exits
+	stop      chan struct{} // stops the keepalive and rekey goroutines
+}
+
+// pendingHandshake links an in-flight rekey initiation to the goroutine awaiting
+// its response. readLoop matches an inbound response's receiver index against
+// localIdx and hands the packet over on ch.
+type pendingHandshake struct {
+	localIdx uint32
+	ch       chan []byte
+}
+
+// readLoop reads datagrams off the socket and dispatches by message type:
+// transport-data packets go to the pump for the tunnel, and handshake responses
+// go to a waiting rekey (there is no other reason to receive one on an
+// established client tunnel). Everything else — stray initiations, cookie
+// replies — is dropped. It exits when the socket is closed.
+func (s *session) readLoop() {
+	defer close(s.done)
+	// Reads are batched (dataplane.BatchConn over the connected socket): one
+	// recvmmsg drains up to readBatch datagrams under load and blocks like a
+	// plain read when idle.
+	const readBatch = 16
+	bc := dataplane.NewBatchConn(s.conn)
+	bufs := make([][]byte, readBatch)
+	for i := range bufs {
+		bufs[i] = make([]byte, 65535)
+	}
+	sizes := make([]int, readBatch)
+	data := make([][]byte, 0, readBatch)
+	for {
+		n, err := bc.ReadBatch(bufs, sizes)
+		data = data[:0]
+		for i := range n {
+			pkt := deobfuscateRecv(bufs[i][:sizes[i]], s.obfCfg)
+			if pkt == nil {
+				continue
+			}
+			t, ok := wire.Type(pkt)
+			if !ok {
+				continue
+			}
+			switch t {
+			case wire.TypeTransportData:
+				// Collected without a copy: the whole batch goes to the pump
+				// at once so inbound TCP can coalesce (GRO); the pump decrypts
+				// in place and writes the TUN before returning — bufs[i] is
+				// not touched again until the next ReadBatch.
+				data = append(data, pkt)
+			case wire.TypeHandshakeResponse:
+				// Copied: a delivered response is handed to the rekey goroutine
+				// and outlives this batch's buffers.
+				s.deliverResponse(append([]byte(nil), pkt...))
+			default:
+				// A stray initiation or a cookie reply: nothing an established
+				// client tunnel acts on.
+			}
+		}
+		if len(data) > 0 {
+			s.pump.HandleInboundBatch(data, nil)
+		}
+		if err != nil {
+			return
+		}
+	}
+}
+
+// deliverResponse hands a handshake response to the rekey goroutine waiting for
+// it, matched on the receiver index the response is addressed to. A response for
+// no pending handshake — a duplicate, or one that arrived after the waiter gave
+// up — is dropped.
+func (s *session) deliverResponse(pkt []byte) {
+	if len(pkt) != wire.SizeHandshakeResponse {
+		return
+	}
+	receiver := binary.LittleEndian.Uint32(pkt[8:12])
+	s.hsMu.Lock()
+	p := s.pending
+	s.hsMu.Unlock()
+	if p == nil || p.localIdx != receiver {
+		return
+	}
+	// Buffered channel of one; a second response for the same index is dropped.
+	select {
+	case p.ch <- pkt:
+	default:
+	}
+}
+
+func (s *session) setPending(p *pendingHandshake) {
+	s.hsMu.Lock()
+	s.pending = p
+	s.hsMu.Unlock()
+}
+
+func (s *session) clearPending() {
+	s.hsMu.Lock()
+	s.pending = nil
+	s.hsMu.Unlock()
+}
+
+// rekeyLoop re-runs the handshake every rekeyInterval, rotating a fresh keypair
+// into the tunnel so traffic never reaches the key's rejection age. It is the
+// initiator half of the protocol's rekey timing (§6.1); the server responds to
+// each new initiation as it would a first one.
+func (s *session) rekeyLoop() {
+	if s.rekeyInterval <= 0 {
+		return
+	}
+	tick := time.NewTicker(s.rekeyInterval)
+	defer tick.Stop()
+	for {
+		select {
+		case <-s.stop:
+			return
+		case <-tick.C:
+			s.rekey()
+		}
+	}
+}
+
+// rekey runs one handshake and installs its keypair as the tunnel's current one.
+// A failure leaves the existing keys in place: the next tick tries again, and
+// Encapsulate refuses only once the current key passes rejectAfterTime.
+func (s *session) rekey() {
+	ctx, cancel := context.WithTimeout(context.Background(), rekeyAttemptTime)
+	defer cancel()
+	// Abandon the attempt promptly if the session is closing.
+	go func() {
+		select {
+		case <-s.stop:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	if err := s.handshakeOnce(ctx); err != nil {
+		s.logger.Warnf("wireguard: rekey failed: %v", err)
+	}
+}
+
+// handshakeOnce runs a single handshake, installs the resulting keypair as the
+// tunnel's current one, registers the new receiver index with the pump and
+// retires the keypair that fell out. It is serialized (hsExchMu) so the periodic
+// rekey and a liveness Probe never drive two handshakes at once — both share
+// this one path, since in WireGuard a successful handshake is both the liveness
+// signal and a rekey.
+func (s *session) handshakeOnce(ctx context.Context) error {
+	s.hsExchMu.Lock()
+	defer s.hsExchMu.Unlock()
+
+	kp, err := s.doHandshake(ctx)
+	if err != nil {
+		return err
+	}
+	sess, err := transport.NewSession(kp.Send, kp.Recv, kp.Local, kp.Remote)
+	if err != nil {
+		return fmt.Errorf("transport keys: %w", err)
+	}
+	evicted := s.tunnel.install(sess)
+	s.pump.AddInboundKey(sess.LocalIndex(), s.tunnel)
+	if evicted != nil {
+		s.pump.RemoveInboundKey(evicted.LocalIndex())
+	}
+	// Prime the new key's return path: the responder holds off sending under a
+	// fresh keypair until it has received something under it.
+	s.sendKeepalive(s.tunnel)
+	s.logger.Printf("wireguard: rekeyed, session index %#x", sess.LocalIndex())
+	return nil
+}
+
+// wgLivenessIdle is how much authenticated silence must pass before a probe
+// bothers to handshake: below it, recent traffic (or the peer's keepalives) is
+// itself proof of life, so the probe is free.
+const wgLivenessIdle = 20 * time.Second
+
+// Probe implements client.Prober. Recent authenticated traffic is proof enough,
+// so a probe first consults the pump's idle clock and does nothing while the
+// tunnel is active — which keeps it out of the way of the data path entirely.
+// Only after a stretch of silence does it fall back to WireGuard's real liveness
+// check: a fresh handshake the peer must answer. A dead peer never responds and
+// doHandshake times out, tearing the tunnel down after the monitor's threshold;
+// a live-but-idle peer answers, so the probe doubles as a rekey.
+func (s *session) Probe(ctx context.Context) error {
+	if s.pump.IdleFor() < wgLivenessIdle {
+		return nil
+	}
+	return s.handshakeOnce(ctx)
+}
+
+// LivenessConfig implements client.LivenessTuner. A WireGuard probe may run a
+// full DH handshake, so it is spaced generously and given a longer per-probe
+// budget (doHandshake retransmits every rekeyTimeout until answered).
+func (s *session) LivenessConfig() client.LivenessConfig {
+	return client.LivenessConfig{
+		Interval:    30 * time.Second,
+		Timeout:     3 * rekeyTimeout,
+		MaxFailures: 2,
+	}
+}
+
+// doHandshake runs a rekey handshake dispatched through readLoop: it sends an
+// initiation, waits for readLoop to deliver the matching response, and
+// retransmits a fresh initiation every rekeyTimeout until one is answered or ctx
+// (bounded by rekeyAttemptTime) is spent. Each attempt is a new Initiator, since
+// an initiation and its ephemeral key are single-use.
+//
+// It is separate from the initial handshake, which reads the socket directly
+// because readLoop is not running yet; here readLoop owns the socket, so the
+// response must be handed over rather than read.
+func (s *session) doHandshake(ctx context.Context) (*noise.Keypair, error) {
+	defer s.clearPending()
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		init, err := noise.NewInitiator(s.noiseCfg)
+		if err != nil {
+			return nil, err
+		}
+		msg, err := init.Initiation()
+		if err != nil {
+			return nil, err
+		}
+		ch := make(chan []byte, 1)
+		s.setPending(&pendingHandshake{localIdx: init.LocalIndex(), ch: ch})
+		// Obfuscated like the first initiation. Missing this is the kind of bug
+		// that passes every test that only watches a tunnel come up: the
+		// session establishes and then dies at the first rekey.
+		if _, err := s.conn.Write(obfuscateSend(msg, s.obfCfg)); err != nil {
+			return nil, fmt.Errorf("send initiation: %w", err)
+		}
+
+		timer := time.NewTimer(rekeyTimeout)
+		select {
+		case resp := <-ch:
+			timer.Stop()
+			kp, err := init.Consume(resp)
+			if err != nil {
+				if errors.Is(err, noise.ErrDecrypt) {
+					return nil, err
+				}
+				s.logger.Printf("wireguard: rekey: discarding unexpected reply: %v", err)
+				continue
+			}
+			return kp, nil
+		case <-timer.C:
+			s.logger.Warnf("wireguard: rekey attempt timed out, retrying")
+			continue
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, ctx.Err()
+		}
+	}
+}
+
+// startKeepalive primes the peer's return path and, if a persistent-keepalive
+// interval is configured, holds it open. WireGuard's responder will not send
+// transport data on a fresh session until it has received some, so an initial
+// keepalive makes the tunnel usable in both directions immediately rather than
+// only after our first outbound packet.
+func (s *session) startKeepalive(interval time.Duration) {
+	s.sendKeepalive(s.tunnel)
+	if interval <= 0 {
+		return
+	}
+	go func() {
+		tick := time.NewTicker(interval)
+		defer tick.Stop()
+		for {
+			select {
+			case <-s.stop:
+				return
+			case <-tick.C:
+				s.sendKeepalive(s.tunnel)
+			}
+		}
+	}()
+}
+
+func (s *session) sendKeepalive(t *wgTunnel) {
+	pkt, err := t.Encapsulate(nil)
+	if err != nil {
+		s.logger.Printf("wireguard: keepalive: %v", err)
+		return
+	}
+	if _, err := s.conn.Write(obfuscateSend(pkt, s.obfCfg)); err != nil {
+		s.logger.Printf("wireguard: keepalive send: %v", err)
+	}
+}
+
+// Wait blocks until the session is closed or ctx is cancelled.
+func (s *session) Wait(ctx context.Context) error {
+	select {
+	case <-s.done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// Close tears down the pump, socket and TUN. It is idempotent and safe to call
+// from any goroutine.
+func (s *session) Close() error {
+	s.closeOnce.Do(func() {
+		close(s.stop)
+		if s.pump != nil {
+			s.pump.Close()
+		}
+		if s.tun != nil {
+			s.tun.Close()
+		}
+		// Closing the socket unblocks the inbound read loop.
+		if s.conn != nil {
+			s.closeErr = s.conn.Close()
+		}
+	})
+	return s.closeErr
+}
+
+// decodeKey decodes a 32-octet base64 WireGuard key, naming the option so a bad
+// value points at the field that carried it.
+func decodeKey(s, name string) ([32]byte, error) {
+	var k [32]byte
+	if s == "" {
+		return k, fmt.Errorf("%s is required", name)
+	}
+	raw, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return k, fmt.Errorf("%s: not base64: %w", name, err)
+	}
+	if len(raw) != len(k) {
+		return k, fmt.Errorf("%s: %d octets, want 32", name, len(raw))
+	}
+	copy(k[:], raw)
+	return k, nil
+}
+
+// prefixNetmask returns the IPv4 netmask of a prefix as a net.IP, for the
+// Result the client router applies.
+// splitPrefixFamilies sorts a wg-quick Address list into its IPv4 and IPv6
+// entry. Either may be absent — a v6-only tunnel is legitimate — but a second
+// address of the same family is an error rather than a silent choice, because
+// the caller installs exactly one per family and quietly ignoring the rest is
+// how a config that looks right stops working.
+func splitPrefixFamilies(addrs []netip.Prefix) (v4, v6 netip.Prefix, err error) {
+	for _, a := range addrs {
+		slot := &v6
+		family := "IPv6"
+		if a.Addr().Is4() {
+			slot, family = &v4, "IPv4"
+		}
+		if slot.IsValid() {
+			return netip.Prefix{}, netip.Prefix{},
+				fmt.Errorf("two %s addresses (%s and %s); an interface takes one per family", family, *slot, a)
+		}
+		*slot = a
+	}
+	if !v4.IsValid() && !v6.IsValid() {
+		return netip.Prefix{}, netip.Prefix{}, errors.New("no address")
+	}
+	return v4, v6, nil
+}
+
+// addrOrNone and also render the two families for one log line without
+// printing "<nil>" for the half a single-stack tunnel does not have.
+func addrOrNone(ip net.IP) string {
+	if ip == nil {
+		return "none"
+	}
+	return ip.String()
+}
+
+func also(ip net.IP) string {
+	if ip == nil {
+		return ""
+	}
+	return " + " + ip.String()
+}
+
+func prefixNetmask(p netip.Prefix) net.IP {
+	return net.IP(net.CIDRMask(p.Bits(), p.Addr().BitLen()))
+}

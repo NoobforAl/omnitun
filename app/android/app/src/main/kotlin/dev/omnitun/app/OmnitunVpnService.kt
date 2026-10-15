@@ -73,6 +73,9 @@ class OmnitunVpnService : VpnService() {
             include.forEach { runCatching { builder.addAllowedApplication(it) } }
         } else {
             exclude.forEach { runCatching { builder.addDisallowedApplication(it) } }
+            // Engines whose sockets can't be protected one by one (SSTP, IKEv2)
+            // keep the whole app out of the VPN instead.
+            if (cfg.optBoolean("exclude_self")) runCatching { builder.addDisallowedApplication(packageName) }
         }
 
         cfg.optJSONObject("http_proxy")?.let { proxy ->

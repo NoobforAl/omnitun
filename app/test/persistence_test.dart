@@ -27,7 +27,7 @@ void main() {
     first.read(profilesProvider.notifier).reorder(2, 0); // c, a, b
     first.read(selectedProfileIdProvider.notifier).select('b');
     first.read(settingsProvider.notifier).update((s) =>
-        s.copyWith(remoteDns: 'tls://1.1.1.1', autoFailover: false, splitMode: 'exclude', splitApps: ['com.android.chrome']));
+        s.copyWith(remoteDns: 'tls://1.1.1.1', autoFailover: false, bypassLan: false, splitMode: 'exclude', splitApps: ['com.android.chrome']));
     first.dispose();
 
     final second = _container(store);
@@ -40,6 +40,8 @@ void main() {
     expect(second.read(settingsProvider).remoteDns, 'tls://1.1.1.1');
     expect(second.read(settingsProvider).autoFailover, isFalse);
     expect(second.read(settingsProvider).splitMode, 'exclude');
+    expect(second.read(settingsProvider).bypassLan, isFalse);
+    expect(const SettingsState().bypassLan, isTrue); // local networks bypass the VPN by default
     expect(second.read(settingsProvider).splitApps, ['com.android.chrome']);
   });
 

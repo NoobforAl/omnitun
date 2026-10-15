@@ -2,6 +2,7 @@ package engine
 
 import (
 	"encoding/base64"
+	"net/netip"
 	"os"
 	"strconv"
 	"testing"
@@ -112,5 +113,41 @@ func TestImportedFormatsPassSchema(t *testing.T) {
 				t.Errorf("%s/%s: sing-box rejected config: %v", file, p.Name, err)
 			}
 		}
+	}
+}
+
+// Local networks are excluded from the TUN routes and sent direct, except
+// ranges a WireGuard profile routes on purpose and the TUN's own DNS subnet.
+func TestLocalBypassConfig(t *testing.T) {
+	res, err := importer.Import("[Interface]\nPrivateKey = yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=\nAddress = 10.9.0.2/32\n\n" +
+		"[Peer]\nPublicKey = xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=\nAllowedIPs = 0.0.0.0/0, 10.50.0.0/16\nEndpoint = 203.0.113.9:51820\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, err := singbox.Build(res.Profiles, singbox.Options{Mode: singbox.ModeTUN})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckConfig(cfg); err != nil {
+		t.Fatal(err)
+	}
+	tun := cfg["inbounds"].([]any)[0].(map[string]any)
+	excl := singbox.ParsePrefixes(tun["route_exclude_address"].([]string))
+	excluded := func(ip string) bool {
+		for _, p := range excl {
+			if p.Contains(netip.MustParseAddr(ip)) {
+				return true
+			}
+		}
+		return false
+	}
+	for ip, want := range map[string]bool{"192.168.1.10": true, "10.1.2.3": true, "10.50.1.1": false, "172.19.0.2": false, "8.8.8.8": false} {
+		if excluded(ip) != want {
+			t.Errorf("%s excluded=%v, want %v", ip, excluded(ip), want)
+		}
+	}
+	cfg, _, _ = singbox.Build(res.Profiles, singbox.Options{Mode: singbox.ModeTUN, ProxyPrivate: true})
+	if _, ok := cfg["inbounds"].([]any)[0].(map[string]any)["route_exclude_address"]; ok {
+		t.Fatal("proxy private still excludes local routes")
 	}
 }

@@ -143,7 +143,21 @@ class CoreEngine implements VpnEngine {
       // The system consent dialog must be accepted before the core can open a TUN.
       const permission = ConnectProgress('permission', 5);
       _states.add(EngineState(status: ConnStatus.connecting, activeProfileId: profile.id, progress: permission));
-      final granted = await _channel.invokeMethod<bool>('prepareVpn') ?? false;
+      // IKEv2 on the system's own client has its own consent dialog.
+      final bool granted;
+      try {
+        granted = profile.protocol == 'ikev2' && (profile.raw['ikev2'] as Map?)?['system'] == true
+            ? await _channel.invokeMethod<bool>('prepareIkev2', jsonEncode(profile.raw)) ?? false
+            : await _channel.invokeMethod<bool>('prepareVpn') ?? false;
+      } on PlatformException catch (e) {
+        _states.add(EngineState(
+          status: ConnStatus.error,
+          activeProfileId: profile.id,
+          error: e.message ?? e.code,
+          progress: permission,
+        ));
+        return;
+      }
       if (!granted) {
         _states.add(EngineState(
           status: ConnStatus.error,

@@ -43,8 +43,8 @@ type Options struct {
 	// https://host/path (DoH), tls://host (DoT), tcp://host, udp://host or a bare IP (UDP).
 	// Default https://1.1.1.1/dns-query.
 	DNS string
-	// ProxyPrivate also sends LAN/private addresses through the tunnel
-	// (by default they bypass it).
+	// ProxyPrivate also sends local addresses (LocalPrefixes) through the
+	// tunnel; by default they bypass it and aren't routed into the VPN.
 	ProxyPrivate bool
 	// SystemProxy points the OS proxy settings at the local port while
 	// running (proxy mode only); sing-box restores them on stop.
@@ -157,11 +157,15 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 		tun := obj{
 			"type":         "tun",
 			"tag":          "tun-in",
-			"address":      []string{"172.19.0.1/30", "fdfe:dcba:9876::1/126"},
+			"address":      tunAddresses,
 			"mtu":          9000,
 			"auto_route":   true,
 			"strict_route": true,
 			"stack":        "mixed",
+		}
+		// Local networks don't enter the VPN at all (unless ProxyPrivate).
+		if !opts.ProxyPrivate {
+			tun["route_exclude_address"] = prefixStrings(BypassPrefixes(profileKeep(profiles)))
 		}
 		// Per-app split tunneling (Android): include wins over exclude.
 		if len(opts.IncludePackages) > 0 {
@@ -186,7 +190,9 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 		obj{"protocol": "dns", "action": "hijack-dns"},
 	}
 	if !opts.ProxyPrivate {
-		rules = append(rules, obj{"ip_is_private": true, "outbound": TagDirect})
+		// Local addresses go direct (proxy mode, and anything that still
+		// reaches the TUN); ranges a profile routes on purpose stay proxied.
+		rules = append(rules, obj{"ip_cidr": prefixStrings(BypassPrefixes(profileKeep(profiles))), "outbound": TagDirect})
 	}
 
 	cfg := obj{
@@ -381,6 +387,8 @@ func convertProfile(p *profile.Profile, tag string) (out obj, isEndpoint bool, e
 		return ep, true, nil, err
 	case profile.AmneziaWG:
 		return nil, false, nil, fmt.Errorf("amneziawg runs on the dedicated AWG engine (not sing-box)")
+	case profile.IKEv2, profile.SSTP:
+		return nil, false, nil, fmt.Errorf("%s runs on the built-in classic VPN engine (not sing-box)", p.Protocol)
 	default:
 		return nil, false, nil, fmt.Errorf("protocol %q is not supported by the sing-box engine", p.Protocol)
 	}

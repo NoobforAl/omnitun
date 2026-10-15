@@ -97,6 +97,16 @@ func awgTunRequest(p *profile.Profile, opts singbox.Options) TunRequest {
 	if len(req.DNSServers) == 0 {
 		req.DNSServers = []string{"1.1.1.1"}
 	}
+	if !opts.ProxyPrivate {
+		// Private ranges named explicitly in AllowedIPs are routed on purpose.
+		var keep []netip.Prefix
+		for _, a := range singbox.ParsePrefixes(allowed) {
+			if a.Bits() > 0 {
+				keep = append(keep, a)
+			}
+		}
+		applyLocalBypass(&req, keep)
+	}
 	return req
 }
 

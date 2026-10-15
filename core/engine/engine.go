@@ -81,6 +81,8 @@ type Config struct {
 	// Tun opens TUN devices for engines other than sing-box (AmneziaWG).
 	// Provided on Android by core/mobile; nil elsewhere.
 	Tun TunProvider
+	// PlatformVPN runs OS-implemented tunnels (Android IKEv2); nil elsewhere.
+	PlatformVPN PlatformVPN
 }
 
 // TunRequest describes the VPN interface to open (JSON sent to the platform).
@@ -96,7 +98,10 @@ type TunRequest struct {
 	Inet6RouteExclude []string `json:"inet6_route_exclude"`
 	IncludePackage    []string `json:"include_package"`
 	ExcludePackage    []string `json:"exclude_package"`
-	HTTPProxy         *struct {
+	// ExcludeSelf keeps this app's own traffic out of the VPN (engines whose
+	// sockets can't be protected one by one, e.g. SSTP/IKEv2).
+	ExcludeSelf bool `json:"exclude_self,omitempty"`
+	HTTPProxy   *struct {
 		Server       string   `json:"server"`
 		Port         uint16   `json:"port"`
 		BypassDomain []string `json:"bypass_domain"`
@@ -119,6 +124,10 @@ type Engine struct {
 	state    State
 	// awgRun is the running AmneziaWG tunnel when the selected profile uses it.
 	awgRun *awgRun
+	// platformRun is the OS-owned tunnel (IKEv2) when one is running.
+	platformRun *platformRun
+	// classicRun is the SSTP/IKEv2 tunnel run in the core.
+	classicRun *classicRun
 	// carryFailover is reported once the next connection succeeds (a failover
 	// that had to restart the engine, e.g. from AmneziaWG to sing-box).
 	carryFailover *FailoverEvent
@@ -268,6 +277,12 @@ func (e *Engine) startLocked(profiles []*profile.Profile, opts singbox.Options) 
 	}
 
 	e.setState(State{Status: StatusStarting, Selected: selected, Progress: progress(StagePrepare, "")})
+	if sel := findProfile(profiles, selected); sel != nil && usesClassic(sel) {
+		return e.startClassicLocked(sel, profiles, opts)
+	}
+	if sel := findProfile(profiles, selected); sel != nil && isPlatformProtocol(sel.Protocol) {
+		return e.startPlatformLocked(sel, profiles, opts)
+	}
 	// AmneziaWG has its own engine (sing-box doesn't support it).
 	if sel := findProfile(profiles, selected); sel != nil && sel.Protocol == profile.AmneziaWG {
 		if opts.Mode != singbox.ModeTUN || e.cfg.Tun == nil {
@@ -361,7 +376,8 @@ func (e *Engine) Select(tag string) error {
 	defer e.mu.Unlock()
 	// AmneziaWG runs outside sing-box, so switching to or from it restarts the tunnel.
 	target := findProfile(e.profiles, tag)
-	if e.awgRun != nil || (e.instance != nil && target != nil && target.Protocol == profile.AmneziaWG) {
+	if e.awgRun != nil || e.platformRun != nil || e.classicRun != nil ||
+		(e.instance != nil && target != nil && (target.Protocol == profile.AmneziaWG || isPlatformProtocol(target.Protocol) || usesClassic(target))) {
 		if tag != singbox.TagAuto && target == nil {
 			return fmt.Errorf("unknown profile %q", tag)
 		}
@@ -392,6 +408,12 @@ func (e *Engine) Selected() string {
 	defer e.mu.Unlock()
 	if e.awgRun != nil {
 		return e.awgRun.profile.ID
+	}
+	if e.platformRun != nil {
+		return e.platformRun.profile.ID
+	}
+	if e.classicRun != nil {
+		return e.classicRun.profile.ID
 	}
 	if e.instance == nil {
 		return ""
@@ -439,7 +461,7 @@ func (e *Engine) Stop() error {
 }
 
 func (e *Engine) stopLocked() error {
-	if e.instance == nil && e.awgRun == nil {
+	if e.instance == nil && e.awgRun == nil && e.platformRun == nil && e.classicRun == nil {
 		return nil
 	}
 	err := e.teardownLocked()
@@ -450,6 +472,17 @@ func (e *Engine) stopLocked() error {
 
 // teardownLocked closes the running tunnel without reporting a state.
 func (e *Engine) teardownLocked() error {
+	if run := e.classicRun; run != nil {
+		e.classicRun = nil
+		run.stop()
+	}
+	if run := e.platformRun; run != nil {
+		if run.timer != nil {
+			run.timer.Stop()
+		}
+		e.platformRun = nil
+		e.cfg.PlatformVPN.StopPlatformVPN()
+	}
 	if e.awgRun != nil {
 		e.awgRun.stop()
 		e.awgRun = nil

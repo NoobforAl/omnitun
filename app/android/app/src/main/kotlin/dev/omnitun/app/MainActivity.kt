@@ -18,6 +18,7 @@ import java.util.concurrent.Executors
  * Bridges Flutter to the core over the "omnitun/core" channel:
  *  - start: launch the in-process core, returns {"addr","token"} for the control protocol
  *  - prepareVpn: show the system VPN consent dialog if needed, returns true when granted
+ *  - prepareIkev2: register an IKEv2 profile with the system (its own consent dialog)
  *  - requestNotifications: ask for POST_NOTIFICATIONS (Android 13+)
  */
 class MainActivity : FlutterActivity() {
@@ -44,6 +45,23 @@ class MainActivity : FlutterActivity() {
                         pendingVpn = result
                         @Suppress("DEPRECATION")
                         startActivityForResult(intent, REQUEST_VPN)
+                    }
+                }
+                "prepareIkev2" -> {
+                    // The system asks once to allow this app's IKEv2 VPN profile.
+                    if (!Ikev2.supported) {
+                        result.error("UNSUPPORTED", "IKEv2 needs Android 11 or newer", null)
+                    } else {
+                        val intent = runCatching { Ikev2.provision(this, call.arguments as String) }
+                            .getOrElse { result.error("BAD_PROFILE", it.message, null); return@setMethodCallHandler }
+                        if (intent == null) {
+                            result.success(true)
+                        } else {
+                            pendingVpn?.success(false)
+                            pendingVpn = result
+                            @Suppress("DEPRECATION")
+                            startActivityForResult(intent, REQUEST_VPN)
+                        }
                     }
                 }
                 "listApps" -> io.execute {

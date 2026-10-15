@@ -47,8 +47,9 @@ class ProfileInfo {
         raw: raw,
       );
 
-  /// OpenVPN profiles with `auth-user-pass` need a username and password.
-  bool get needsCredentials => (raw['openvpn'] as Map?)?['needs_auth'] == true;
+  /// OpenVPN profiles with `auth-user-pass` and IKEv2 EAP profiles need a username and password.
+  bool get needsCredentials =>
+      (raw['openvpn'] as Map?)?['needs_auth'] == true || (protocol == 'ikev2' && (raw['ikev2'] as Map?)?['auth'] == 'eap');
 
   bool get hasCredentials =>
       (raw['username'] as String? ?? '').isNotEmpty && (raw['password'] as String? ?? '').isNotEmpty;
@@ -79,6 +80,7 @@ class ConnectOptions {
     this.listenPort = 2080,
     this.dns = '',
     this.autoFailover = true,
+    this.bypassLan = true,
     this.includePackages = const [],
     this.excludePackages = const [],
   });
@@ -95,6 +97,9 @@ class ConnectOptions {
 
   /// Switch to the next working profile when the selected one stops responding.
   final bool autoFailover;
+
+  /// Keep local networks (LAN, link-local, multicast) out of the VPN.
+  final bool bypassLan;
 
   /// Android split tunneling: only these apps use the VPN (wins over [excludePackages]).
   final List<String> includePackages;

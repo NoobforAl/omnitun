@@ -11,8 +11,9 @@ require (
 	github.com/sagernet/sing-box v1.14.2
 	github.com/sagernet/sing-tun v0.9.6-0.20260924001923-ddaa4ca25e3b
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
+	github.com/xen0bit/veepin v0.9.6
 	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/crypto v0.54.0
+	golang.org/x/crypto v0.56.0
 	golang.org/x/sys v0.47.0
 )
 
@@ -193,14 +194,14 @@ require (
 	go4.org/mem v0.0.0-20240501181205-ae6ca9944745 // indirect
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
-	golang.org/x/mod v0.37.0 // indirect
+	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.47.0 // indirect
+	golang.org/x/tools v0.48.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
 	golang.zx2c4.com/wireguard/windows v0.5.3 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
@@ -215,3 +216,5 @@ tool (
 	github.com/sagernet/gomobile/cmd/gobind
 	github.com/sagernet/gomobile/cmd/gomobile
 )
+
+replace github.com/xen0bit/veepin => ./third_party/veepin

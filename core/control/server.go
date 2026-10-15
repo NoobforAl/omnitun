@@ -56,6 +56,8 @@ type ServerConfig struct {
 	Platform adapter.PlatformInterface
 	// Tun is passed to the engine (mobile only; AmneziaWG).
 	Tun engine.TunProvider
+	// PlatformVPN is passed to the engine (mobile only; IKEv2).
+	PlatformVPN engine.PlatformVPN
 	// OnState is called on every engine state change, after clients are notified.
 	OnState func(engine.State)
 }
@@ -110,6 +112,7 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 		DataDir:          cfg.DataDir,
 		Platform:         cfg.Platform,
 		Tun:              cfg.Tun,
+		PlatformVPN:      cfg.PlatformVPN,
 		CertificateStore: cfg.CertificateStore,
 		SkipHandshake:    cfg.SkipHandshake,
 		OnState: func(st engine.State) {
