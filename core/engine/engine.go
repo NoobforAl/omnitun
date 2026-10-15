@@ -149,9 +149,14 @@ func (e *Engine) setState(s State) {
 	} else {
 		s.ProfileName = ""
 	}
-	if e.carryFailover != nil && s.Status == StatusRunning {
+	if e.carryFailover != nil && (s.Status == StatusRunning || s.Failover != nil) {
 		if s.Failover == nil {
 			s.Failover = e.carryFailover
+		} else {
+			// Later hops failed too: report the switch from the profile the user picked.
+			f := *s.Failover
+			f.From, f.Reason = e.carryFailover.From, e.carryFailover.Reason
+			s.Failover = &f
 		}
 		e.carryFailover = nil
 	}

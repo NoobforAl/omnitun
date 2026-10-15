@@ -281,7 +281,7 @@ omnitun/
 - [x] Android bridge: gomobile `core/mobile` + Kotlin `VpnService` (minSdk 29)
 - [x] Importer: Clash / Clash.Meta YAML (`proxies:`), sing-box JSON (outbounds + WireGuard endpoints) — also as subscription bodies
 - [ ] Importer: Xray JSON, `.ovpn`, SIP008, `naive+https://`, Tor bridge lines
-- [x] AmneziaWG engine on Android (amneziawg-go 1.x params Jc/Jmin/Jmax/S1/S2/H1-H4; handshake check, traffic, failover to the next profile; dev server `tools/awgdev`) — on-device test pending
+- [x] AmneziaWG engine on Android (amneziawg-go 1.x params Jc/Jmin/Jmax/S1/S2/H1-H4; handshake check, traffic, failover to the next profile; dev server `tools/awgdev`) — verified on device: handshake, ping through tunnel, notification speed, failover to the next profile
 - [ ] AmneziaWG 2.0 params (S3/S4, I1-I5) — reported as unsupported for now; AmneziaWG on desktop (Windows phase)
 - [ ] Profile editor (create/edit a profile by hand) and export as link/QR
 

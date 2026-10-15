@@ -71,3 +71,20 @@ func TestAWGNeedsVPNMode(t *testing.T) {
 		t.Fatalf("state: %+v", last)
 	}
 }
+
+// A failover that had to restart the engine is reported from the profile the
+// user picked, even when later hops failed too.
+func TestCarriedFailoverKeepsOrigin(t *testing.T) {
+	var last State
+	e := New(Config{OnState: func(s State) { last = s }})
+	e.mu.Lock()
+	e.carryFailover = &FailoverEvent{From: "awg", To: "dead", Reason: "no handshake"}
+	e.setState(State{Status: StatusStarting, Selected: "vless", Failover: &FailoverEvent{From: "dead", To: "vless", Reason: "refused"}})
+	e.mu.Unlock()
+	if f := last.Failover; f == nil || f.From != "awg" || f.To != "vless" || f.Reason != "no handshake" {
+		t.Fatalf("failover = %+v", last.Failover)
+	}
+	if e.carryFailover != nil {
+		t.Fatal("carried failover not consumed")
+	}
+}
