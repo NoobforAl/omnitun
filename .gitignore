@@ -1,0 +1,23 @@
+# Go
+/bin/
+/dist/
+*.exe
+*.dll
+*.so
+*.dylib
+*.aar
+*.test
+coverage.out
+
+# Rust
+/tor/target/
+
+# Flutter (app/.gitignore covers the rest)
+/app/build/
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

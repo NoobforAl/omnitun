@@ -1,0 +1,15 @@
+[package]
+name = "omnitun-tor"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Tor client (Arti) for Omnitun, exposed through a C ABI"
+
+[lib]
+crate-type = ["rlib", "staticlib", "cdylib"]
+
+[dependencies]
+
+[features]
+# Enables the real Arti client (Phase 6). Without it the ABI returns NOT_IMPLEMENTED.
+arti = []
