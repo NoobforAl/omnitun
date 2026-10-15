@@ -78,6 +78,35 @@ type Config struct {
 	// SkipHandshake reports "connected" as soon as the tunnel is up, without
 	// first reaching a server through it (tests with unreachable servers).
 	SkipHandshake bool
+	// Tun opens TUN devices for engines other than sing-box (AmneziaWG).
+	// Provided on Android by core/mobile; nil elsewhere.
+	Tun TunProvider
+}
+
+// TunRequest describes the VPN interface to open (JSON sent to the platform).
+type TunRequest struct {
+	MTU               uint32   `json:"mtu"`
+	Inet4Address      []string `json:"inet4_address"`
+	Inet6Address      []string `json:"inet6_address"`
+	DNSServers        []string `json:"dns_servers"`
+	AutoRoute         bool     `json:"auto_route"`
+	Inet4RouteRange   []string `json:"inet4_route_range"`
+	Inet6RouteRange   []string `json:"inet6_route_range"`
+	Inet4RouteExclude []string `json:"inet4_route_exclude"`
+	Inet6RouteExclude []string `json:"inet6_route_exclude"`
+	IncludePackage    []string `json:"include_package"`
+	ExcludePackage    []string `json:"exclude_package"`
+	HTTPProxy         *struct {
+		Server       string   `json:"server"`
+		Port         uint16   `json:"port"`
+		BypassDomain []string `json:"bypass_domain"`
+	} `json:"http_proxy,omitempty"`
+}
+
+// TunProvider opens an OS VPN interface and protects sockets from it.
+type TunProvider interface {
+	OpenTun(req TunRequest) (fd int, err error)
+	Protect(fd int) error
 }
 
 // Engine owns at most one running sing-box instance.
@@ -88,6 +117,15 @@ type Engine struct {
 	instance *box.Box
 	cancel   context.CancelFunc
 	state    State
+	// awgRun is the running AmneziaWG tunnel when the selected profile uses it.
+	awgRun *awgRun
+	// carryFailover is reported once the next connection succeeds (a failover
+	// that had to restart the engine, e.g. from AmneziaWG to sing-box).
+	carryFailover *FailoverEvent
+	// profiles and opts are what the current tunnel was started with, for
+	// restarts when switching to or from an AmneziaWG profile.
+	profiles []*profile.Profile
+	opts     singbox.Options
 	// names maps profile IDs to display names for log messages.
 	names map[string]string
 }
@@ -110,6 +148,12 @@ func (e *Engine) setState(s State) {
 		s.ProfileName = e.name(s.Selected)
 	} else {
 		s.ProfileName = ""
+	}
+	if e.carryFailover != nil && s.Status == StatusRunning {
+		if s.Failover == nil {
+			s.Failover = e.carryFailover
+		}
+		e.carryFailover = nil
 	}
 	e.state = s
 	if e.cfg.OnState != nil {
@@ -192,7 +236,15 @@ func (e *Engine) newBox(cfg map[string]any) (*box.Box, context.Context, context.
 func (e *Engine) Start(profiles []*profile.Profile, opts singbox.Options) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.stopLocked()
+	e.carryFailover = nil
+	return e.startLocked(profiles, opts)
+}
+
+// startLocked replaces whatever is running. e.mu must be held. It doesn't
+// report "disconnected" in between, which on Android would stop the VPN service.
+func (e *Engine) startLocked(profiles []*profile.Profile, opts singbox.Options) error {
+	e.teardownLocked()
+	e.profiles, e.opts = profiles, opts
 
 	selected := opts.Selected
 	if selected == "" {
@@ -211,6 +263,13 @@ func (e *Engine) Start(profiles []*profile.Profile, opts singbox.Options) error 
 	}
 
 	e.setState(State{Status: StatusStarting, Selected: selected, Progress: progress(StagePrepare, "")})
+	// AmneziaWG has its own engine (sing-box doesn't support it).
+	if sel := findProfile(profiles, selected); sel != nil && sel.Protocol == profile.AmneziaWG {
+		if opts.Mode != singbox.ModeTUN || e.cfg.Tun == nil {
+			return fail(StagePrepare, errors.New("AmneziaWG works in VPN mode on Android (desktop support comes later)"))
+		}
+		return e.startAWGLocked(sel, profiles, opts)
+	}
 	cfg, skipped, err := singbox.Build(profiles, opts)
 	if err != nil {
 		return fail(StagePrepare, err)
@@ -295,6 +354,17 @@ func (e *Engine) trafficLoop(ctx context.Context, instance *box.Box) {
 func (e *Engine) Select(tag string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	// AmneziaWG runs outside sing-box, so switching to or from it restarts the tunnel.
+	target := findProfile(e.profiles, tag)
+	if e.awgRun != nil || (e.instance != nil && target != nil && target.Protocol == profile.AmneziaWG) {
+		if tag != singbox.TagAuto && target == nil {
+			return fmt.Errorf("unknown profile %q", tag)
+		}
+		opts := e.opts
+		opts.Selected = tag
+		e.carryFailover = nil
+		return e.startLocked(e.profiles, opts)
+	}
 	return e.selectLocked(tag, nil)
 }
 
@@ -315,6 +385,9 @@ func (e *Engine) applySelectionLocked(tag string) error {
 func (e *Engine) Selected() string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if e.awgRun != nil {
+		return e.awgRun.profile.ID
+	}
 	if e.instance == nil {
 		return ""
 	}
@@ -356,18 +429,32 @@ func (e *Engine) selectLocked(tag string, failover *FailoverEvent) error {
 func (e *Engine) Stop() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	e.carryFailover = nil
 	return e.stopLocked()
 }
 
 func (e *Engine) stopLocked() error {
+	if e.instance == nil && e.awgRun == nil {
+		return nil
+	}
+	err := e.teardownLocked()
+	e.setState(State{Status: StatusStopped})
+	e.logf("info", "stopped")
+	return err
+}
+
+// teardownLocked closes the running tunnel without reporting a state.
+func (e *Engine) teardownLocked() error {
+	if e.awgRun != nil {
+		e.awgRun.stop()
+		e.awgRun = nil
+	}
 	if e.instance == nil {
 		return nil
 	}
 	err := e.instance.Close()
 	e.cancel()
 	e.instance, e.cancel = nil, nil
-	e.setState(State{Status: StatusStopped})
-	e.logf("info", "stopped")
 	if err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}

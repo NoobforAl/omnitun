@@ -13,7 +13,10 @@ import (
 // amneziaKeys are the AmneziaWG obfuscation fields in the [Interface] section.
 var amneziaKeys = map[string]bool{
 	"jc": true, "jmin": true, "jmax": true, "s1": true, "s2": true,
-	"h1": true, "h2": true, "h3": true, "h4": true,
+	"h1": true, "h2": true, "h3": true, "h4": true, "itime": true,
+	// AmneziaWG 2.0 (captured so they can be reported if unsupported)
+	"s3": true, "s4": true, "i1": true, "i2": true, "i3": true, "i4": true, "i5": true,
+	"j1": true, "j2": true, "j3": true,
 }
 
 func looksLikeWireGuardConf(text string) bool {

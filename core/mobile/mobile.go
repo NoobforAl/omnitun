@@ -60,6 +60,7 @@ func Start(dataDir string, platform Platform) (string, error) {
 		// nothing; the VPN service stops the tunnel when the task is removed.
 		Grace:    -1,
 		Platform: newPlatformWrapper(platform),
+		Tun:      tunProvider{platform},
 		// Go cannot read the Android system CA store; use the embedded Mozilla bundle.
 		CertificateStore: "mozilla",
 		OnState: func(st engine.State) {
@@ -109,3 +110,17 @@ type notifyState struct {
 	UpBps   int64  `json:"up_bps"`
 	DownBps int64  `json:"down_bps"`
 }
+
+// tunProvider opens the VPN interface for engines other than sing-box (AmneziaWG).
+type tunProvider struct{ p Platform }
+
+func (t tunProvider) OpenTun(req engine.TunRequest) (int, error) {
+	raw, err := json.Marshal(req)
+	if err != nil {
+		return -1, err
+	}
+	fd, err := t.p.OpenTun(string(raw))
+	return int(fd), err
+}
+
+func (t tunProvider) Protect(fd int) error { return t.p.Protect(int32(fd)) }

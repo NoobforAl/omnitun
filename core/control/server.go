@@ -54,6 +54,8 @@ type ServerConfig struct {
 	SkipHandshake bool
 	// Platform is passed to the engine (mobile only).
 	Platform adapter.PlatformInterface
+	// Tun is passed to the engine (mobile only; AmneziaWG).
+	Tun engine.TunProvider
 	// OnState is called on every engine state change, after clients are notified.
 	OnState func(engine.State)
 }
@@ -107,6 +109,7 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	s.engine = engine.New(engine.Config{
 		DataDir:          cfg.DataDir,
 		Platform:         cfg.Platform,
+		Tun:              cfg.Tun,
 		CertificateStore: cfg.CertificateStore,
 		SkipHandshake:    cfg.SkipHandshake,
 		OnState: func(st engine.State) {
