@@ -3,8 +3,12 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../engine/engine.dart';
 import '../engine/core_engine.dart';
+import '../engine/engine.dart';
+import 'store.dart';
+
+/// Overridden in main() with the store loaded from disk.
+final storeProvider = Provider<AppStore>((ref) => AppStore.memory());
 
 final engineProvider = Provider<VpnEngine>((ref) {
   final engine = CoreEngine();
@@ -12,21 +16,48 @@ final engineProvider = Provider<VpnEngine>((ref) {
   return engine;
 });
 
-/// Imported profiles. Persistence (drift/SQLite) comes in a later phase.
+/// Imported profiles, persisted as the core's raw profile JSON.
 class ProfilesController extends Notifier<List<ProfileInfo>> {
+  static const _key = 'profiles';
+
   @override
-  List<ProfileInfo> build() => const [];
+  List<ProfileInfo> build() {
+    final saved = ref.read(storeProvider).read<List<dynamic>>(_key) ?? const [];
+    final out = <ProfileInfo>[];
+    for (final raw in saved) {
+      try {
+        out.add(ProfileInfo.fromJson(Map<String, dynamic>.from(raw as Map)));
+      } catch (_) {
+        // Skip entries written by an incompatible version.
+      }
+    }
+    return out;
+  }
+
+  void _save(List<ProfileInfo> next) {
+    state = next;
+    ref.read(storeProvider).write(_key, [for (final p in next) p.raw]);
+  }
 
   /// Adds profiles, skipping ones whose ID is already present.
   int addAll(Iterable<ProfileInfo> profiles) {
     final known = {for (final p in state) p.id};
     final fresh = profiles.where((p) => known.add(p.id)).toList();
-    state = [...state, ...fresh];
+    if (fresh.isNotEmpty) _save([...state, ...fresh]);
     return fresh.length;
   }
 
-  void remove(String id) => state = state.where((p) => p.id != id).toList();
+  void remove(String id) => _save(state.where((p) => p.id != id).toList());
 
+  /// Moves a profile to [to] (index after removal); the order is the failover priority.
+  void reorder(int from, int to) {
+    final next = [...state];
+    final p = next.removeAt(from);
+    next.insert(to, p);
+    _save(next);
+  }
+
+  // Latency is transient and not persisted.
   void setLatency(String id, int ms) =>
       state = [for (final p in state) p.id == id ? p.copyWith(latencyMs: ms) : p];
 }
@@ -35,10 +66,15 @@ final profilesProvider =
     NotifierProvider<ProfilesController, List<ProfileInfo>>(ProfilesController.new);
 
 class SelectedProfileController extends Notifier<String?> {
-  @override
-  String? build() => null;
+  static const _key = 'selected';
 
-  void select(String? id) => state = id;
+  @override
+  String? build() => ref.read(storeProvider).read<String>(_key);
+
+  void select(String? id) {
+    state = id;
+    ref.read(storeProvider).write(_key, id);
+  }
 }
 
 final selectedProfileIdProvider =
@@ -56,13 +92,20 @@ class ConnectionController extends Notifier<EngineState> {
   @override
   EngineState build() {
     final engine = ref.watch(engineProvider);
-    final sub = engine.states.listen((s) => state = s);
+    final sub = engine.states.listen((s) {
+      state = s;
+      // Follow automatic switches so the UI shows the profile actually in use.
+      final active = s.activeProfileId;
+      if (s.failover != null && active != null && active != ref.read(selectedProfileIdProvider)) {
+        ref.read(selectedProfileIdProvider.notifier).select(active);
+      }
+    });
     ref.onDispose(sub.cancel);
     return const EngineState();
   }
 
   bool get isActive => switch (state.status) {
-        ConnStatus.connected || ConnStatus.connecting => true,
+        ConnStatus.connected || ConnStatus.connecting || ConnStatus.noInternet => true,
         _ => false,
       };
 
@@ -74,7 +117,10 @@ class ConnectionController extends Notifier<EngineState> {
     }
     final profile = ref.read(selectedProfileProvider);
     if (profile == null) return;
-    final others = ref.read(profilesProvider).where((p) => p.id != profile.id).toList();
+    // Fallbacks follow the list order after the selected profile.
+    final all = ref.read(profilesProvider);
+    final i = all.indexWhere((p) => p.id == profile.id);
+    final others = [...all.skip(i + 1), ...all.take(i)];
     final settings = ref.read(settingsProvider);
     await engine.connect(
       profile,
@@ -83,6 +129,7 @@ class ConnectionController extends Notifier<EngineState> {
         tunMode: settings.tunMode,
         systemProxy: settings.systemProxy,
         dns: settings.remoteDns,
+        autoFailover: settings.autoFailover,
       ),
     );
   }
@@ -149,14 +196,50 @@ class SettingsState {
         killSwitch: killSwitch ?? this.killSwitch,
         remoteDns: remoteDns ?? this.remoteDns,
       );
+
+  Map<String, dynamic> toJson() => {
+        'tun_mode': tunMode,
+        'system_proxy': systemProxy,
+        'stop_on_close': stopOnClose,
+        'auto_failover': autoFailover,
+        'kill_switch': killSwitch,
+        'remote_dns': remoteDns,
+      };
+
+  /// Missing keys keep the values from [defaults].
+  factory SettingsState.fromJson(Map<String, dynamic> j, SettingsState defaults) => SettingsState(
+        tunMode: j['tun_mode'] as bool? ?? defaults.tunMode,
+        systemProxy: j['system_proxy'] as bool? ?? defaults.systemProxy,
+        stopOnClose: j['stop_on_close'] as bool? ?? defaults.stopOnClose,
+        autoFailover: j['auto_failover'] as bool? ?? defaults.autoFailover,
+        killSwitch: j['kill_switch'] as bool? ?? defaults.killSwitch,
+        remoteDns: j['remote_dns'] as String? ?? defaults.remoteDns,
+      );
 }
 
 class SettingsController extends Notifier<SettingsState> {
-  @override
-  // Android captures all traffic by default; desktop starts in proxy mode (TUN needs admin rights there).
-  SettingsState build() => SettingsState(tunMode: Platform.isAndroid);
+  static const _key = 'settings';
 
-  void update(SettingsState Function(SettingsState) f) => state = f(state);
+  @override
+  SettingsState build() {
+    // Android captures all traffic by default; desktop starts in proxy mode (TUN needs admin rights there).
+    final defaults = SettingsState(tunMode: Platform.isAndroid);
+    final saved = ref.read(storeProvider).read<Map<String, dynamic>>(_key);
+    final s = saved == null ? defaults : SettingsState.fromJson(saved, defaults);
+    // The native side needs this to act when the OS closes the app.
+    final engine = ref.read(engineProvider);
+    Future.microtask(() => engine.setStopOnClose(s.stopOnClose));
+    return s;
+  }
+
+  void update(SettingsState Function(SettingsState) f) {
+    final before = state;
+    state = f(state);
+    ref.read(storeProvider).write(_key, state.toJson());
+    if (state.stopOnClose != before.stopOnClose) {
+      ref.read(engineProvider).setStopOnClose(state.stopOnClose);
+    }
+  }
 }
 
 final settingsProvider = NotifierProvider<SettingsController, SettingsState>(SettingsController.new);

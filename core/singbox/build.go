@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/NoobforAl/omnitun/core/profile"
 )
@@ -48,6 +49,11 @@ type Options struct {
 	// SystemProxy points the OS proxy settings at the local port while
 	// running (proxy mode only); sing-box restores them on stop.
 	SystemProxy bool
+
+	// Failover and FailoverInterval are used by the engine, not the config:
+	// when a pinned profile stops responding, switch to the next working one.
+	Failover         bool
+	FailoverInterval time.Duration
 }
 
 func (o *Options) defaults() {

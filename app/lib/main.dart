@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'state/providers.dart';
+import 'state/store.dart';
 import 'ui/app_shell.dart';
 import 'ui/theme.dart';
 
-void main() {
-  runApp(const ProviderScope(child: OmnitunApp()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final store = await AppStore.open();
+  runApp(ProviderScope(
+    overrides: [storeProvider.overrideWithValue(store)],
+    child: const OmnitunApp(),
+  ));
 }
 
 class OmnitunApp extends ConsumerWidget {

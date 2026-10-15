@@ -42,6 +42,10 @@ class MainActivity : FlutterActivity() {
                         startActivityForResult(intent, REQUEST_VPN)
                     }
                 }
+                "setStopOnClose" -> {
+                    OmnitunVpnService.setStopOnClose(this, call.arguments as? Boolean ?: true)
+                    result.success(null)
+                }
                 "requestNotifications" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                         checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED

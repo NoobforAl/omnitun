@@ -34,7 +34,8 @@ const (
 type ServerConfig struct {
 	// DataDir is passed to the engine.
 	DataDir string
-	// Grace is how long the tunnel survives with no UI connected. Zero means 5s.
+	// Grace is how long the tunnel survives with no UI connected. Zero means 5s;
+	// negative disables the lease (mobile: the OS reports app closure instead).
 	Grace time.Duration
 	// Token authenticates clients. Empty generates a random one.
 	Token string
@@ -225,7 +226,7 @@ func (s *Server) removeClient(c *client) {
 		return
 	}
 	delete(s.clients, c)
-	if len(s.clients) > 0 || s.closed {
+	if len(s.clients) > 0 || s.closed || s.cfg.Grace < 0 {
 		return
 	}
 	s.graceTimer = time.AfterFunc(s.cfg.Grace, func() {
@@ -374,6 +375,7 @@ func (s *Server) dispatch(req Request) (any, error) {
 			ProxyPrivate: p.ProxyPrivate,
 			SystemProxy:  p.SystemProxy,
 			DNS:          p.DNS,
+			Failover:     p.Failover,
 			TestURL:      p.TestURL,
 		}
 		if err := s.engine.Start(p.Profiles, opts); err != nil {

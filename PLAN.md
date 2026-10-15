@@ -47,6 +47,8 @@ Decision (2026-10-15): dependencies are chosen on technical merit; license compa
 | Windows RAS / Android `Ikev2VpnProfile` | IKEv2, L2TP, SSTP (OS-native) |
 | strongSwan / xl2tpd / accel-ppp (server) | Installed as system packages by the server CLI |
 
+Omnitun is **not tied to one core** (it doesn't use Xray at all): each protocol maps to an engine adapter (sing-box, amneziawg-go, Arti, OS-native VPN, external binary). Adding a protocol beyond the list above means adding an importer + an adapter; the UI, profiles, failover and control protocol stay the same.
+
 IKEv2, L2TP/IPsec and SSTP on **Windows** use the built-in RAS VPN client (no third-party code). On **Android**: IKEv2 uses the platform `Ikev2VpnProfile` (Android 11+); SSTP uses a Kotlin port of Open SSTP Client (MIT — verify before use); **L2TP is not available** (Android 12 removed it) — the UI shows "not supported on this device".
 
 ### 1.3 Language split
@@ -131,6 +133,19 @@ Everything is normalized into one internal **Profile** model (`protocol`, `serve
 3. On failure: handshake timeout, auth error, probe failure ×N, or the tunnel dropping → mark the profile unhealthy (with backoff) and try the next one in the group by strategy. The UI shows a toast: "Switched to X (Y failed: reason)".
 4. Periodic background probes while connected; network change (Wi-Fi ↔ mobile) triggers a reconnect, not a failover.
 5. Error codes are typed (`NO_NETWORK`, `DNS_FAIL`, `HANDSHAKE_TIMEOUT`, `AUTH_FAILED`, `TLS_ERROR`, `BLOCKED_SUSPECTED`, `PERMISSION_DENIED`, `UNSUPPORTED_ON_PLATFORM`), and each has a human-readable, translatable message.
+6. **Connection progress 0 → 100 %** — the core reports real stages, not a fake timer, and the UI shows a progress ring around the connect button plus the current step's label, so the user sees exactly where a connection is (or where it got stuck):
+
+   | Stage | % | Shown as |
+   |---|---|---|
+   | `permission` (Android consent / Windows elevation) | 5 | "Waiting for VPN permission" |
+   | `network_check` (is the device online?) | 15 | "Checking internet connection" |
+   | `prepare` (build config for the selected profiles) | 25 | "Preparing configuration" |
+   | `engine_start` (sing-box / AWG / Tor start) | 45 | "Starting engine" |
+   | `tunnel_up` (TUN opened / proxy port listening) | 65 | "Opening tunnel" |
+   | `handshake` (first URL test through the profile) | 85 | "Contacting server" |
+   | `connected` (probe passed) | 100 | "Connected" |
+
+   On failover the ring restarts at `handshake` with "Trying <next profile>". Each stage has a timeout; on failure the ring stops at that stage, turns red, and the error names the stage (e.g. "Contacting server failed: TLS error"). Stages are sent as `state.progress {stage, percent, profile}` events on the control protocol; Tor adds its bootstrap percentage inside `engine_start`.
 
 ### 3.4 Permissions and lifecycle
 
@@ -185,7 +200,7 @@ Split tunneling (per-app on Android, per-route on Windows), bypass LAN, geoip/ge
 
 | Screen | Content |
 |---|---|
-| Home | Big connect button, current profile chip (tap to change), status text + timer, ↑/↓ speed, IP/location after connect, failover toasts |
+| Home | Big connect button with a 0–100 % progress ring and step label while connecting (see 3.3 #6), current profile chip (tap to change), status text + timer, ↑/↓ speed, IP/location after connect, failover toasts |
 | Profiles | Groups as sections; each row: flag, name, protocol badge, latency (colored), health dot; ⋮ menu: edit, share/QR, test, delete; FAB "+" → Import (file / clipboard / QR / URL / manual) |
 | Subscription editor | URL, auth type selector (none/basic/bearer/headers/mTLS), refresh interval, usage/expiry bar |
 | Profile editor | Protocol-specific form generated from a schema; Advanced section collapsed |
@@ -239,7 +254,7 @@ omnitun/
 | **1. Core MVP** 🚧 | First tunnels | ✅ importer (share links, subscriptions, WG/AWG `.conf`); ✅ profile → sing-box config; ✅ in-process engine + dev CLI; ✅ desktop bridge (daemon); ✅ latency tests, live switching, traffic stats, system proxy; ✅ Android bridge (gomobile `core/mobile` + Kotlin VpnService, minSdk 29) — tested on Samsung A30s (Android 11): consent dialog, VPN traffic via tunnel, notification Disconnect, swipe-away stop, process-kill stop; ⬜ AmneziaWG engine |
 | **2. Android MVP** | Real app on a phone | VpnService + permission flow, foreground notification, lifecycle stop rules, Home/Profiles/Import screens, QR scan |
 | **3. Windows MVP** | Real app on desktop | ✅ `omnitun-svc` daemon + control protocol + lease + parent-death exit; ✅ Flutter DaemonEngine; ⬜ run as SYSTEM service for TUN, tray, MSIX/MSI installer |
-| **4. Groups and failover** | Reliability | Groups, subscriptions with auth, health checks, no-internet detection, failover strategies, typed errors |
+| **4. Groups and failover** 🚧 | Reliability | ✅ saved profiles/settings, ✅ import from QR / file / clipboard, ✅ priority failover with health checks + no-internet detection (list order = priority, drag to reorder), ✅ Android: VPN survives backgrounding, stops on swipe-away; ⬜ connection progress 0–100 % (3.3 #6), ⬜ groups, ⬜ subscriptions with auth, ⬜ more failover strategies, ⬜ typed error codes |
 | **5. More protocols** | Coverage | Stealth-WG, NordLynx, Windows RAS (IKEv2/L2TP/SSTP), Android IKEv2 + SSTP |
 | **6. Tor** | Censorship resistance | Rust Arti lib, obfs4/snowflake/webtunnel PTs, bridge import |
 | **7. Add-ons** | GPL-family protocols | OpenVPN (UDP/TCP, XOR, TLS-wrapped), NaiveProxy, Lightway as separately downloaded add-ons |

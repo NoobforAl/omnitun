@@ -114,15 +114,25 @@ class DaemonEngine implements VpnEngine {
   }
 
   void _onClosed() {
+    if (_closed.isCompleted) return;
     for (final c in _pending.values) {
       c.completeError(EngineException('DISCONNECTED', 'lost connection to the core'));
     }
     _pending.clear();
     _ping?.cancel();
-    _emit(const EngineState(status: ConnStatus.error, error: 'Lost connection to the core service'));
+    // CoreEngine reconnects; it reports an error only if that keeps failing.
+    _closed.complete();
   }
 
+  final _closed = Completer<void>();
+
+  /// Completes when the control connection is lost.
+  Future<void> get closed => _closed.future;
+
   Future<dynamic> _call(String method, [Object? params]) {
+    if (_closed.isCompleted) {
+      return Future.error(EngineException('DISCONNECTED', 'lost connection to the core'));
+    }
     final id = ++_nextId;
     final c = Completer<dynamic>();
     _pending[id] = c;
@@ -137,6 +147,8 @@ class DaemonEngine implements VpnEngine {
 
   void _applyState(Map<String, dynamic> s) {
     final status = switch (s['status']) {
+      // Still connected, but the device itself has no internet.
+      'connected' when s['no_network'] == true => ConnStatus.noInternet,
       'connected' => ConnStatus.connected,
       'connecting' => ConnStatus.connecting,
       'error' => ConnStatus.error,
@@ -144,6 +156,7 @@ class DaemonEngine implements VpnEngine {
     };
     final since = s['since'] as String?;
     final selected = s['selected'] as String?;
+    final f = s['failover'] as Map<String, dynamic>?;
     _emit(EngineState(
       status: status,
       activeProfileId: selected ?? _state.activeProfileId,
@@ -151,6 +164,14 @@ class DaemonEngine implements VpnEngine {
       error: s['error'] as String?,
       upBps: (s['up_bps'] as num?)?.toInt() ?? 0,
       downBps: (s['down_bps'] as num?)?.toInt() ?? 0,
+      failover: f == null
+          ? null
+          : FailoverInfo(
+              from: f['from'] as String,
+              to: f['to'] as String,
+              reason: f['reason'] as String,
+              at: DateTime.parse(f['at'] as String).toLocal(),
+            ),
     ));
   }
 
@@ -178,6 +199,7 @@ class DaemonEngine implements VpnEngine {
         'listen_port': options.listenPort,
         'system_proxy': options.systemProxy,
         if (options.dns.isNotEmpty) 'dns': options.dns,
+        'failover': options.autoFailover,
       });
     } on EngineException catch (e) {
       _emit(EngineState(
@@ -215,6 +237,10 @@ class DaemonEngine implements VpnEngine {
     }) as List;
     return ((res.first as Map<String, dynamic>)['ms'] as num).toInt();
   }
+
+  /// Desktop: the daemon follows the app's lifetime (lease + parent-pid).
+  @override
+  Future<void> setStopOnClose(bool value) async {}
 
   @override
   void dispose() {

@@ -114,3 +114,24 @@ func TestTunnelStopsWhenUIDisconnects(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 }
+
+// With the lease disabled (mobile), the tunnel keeps running without a UI.
+func TestNoLeaseKeepsTunnel(t *testing.T) {
+	s, addr := newTestServer(t, ServerConfig{Grace: -1})
+	c, err := Dial(t.Context(), addr, s.Token())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var res importer.Result
+	if err := c.Call(t.Context(), "import", ImportParams{Text: "trojan://pw@example.com:443#t"}, &res); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Call(t.Context(), "start", StartParams{Profiles: res.Profiles, ListenPort: freePort(t)}, nil); err != nil {
+		t.Fatal(err)
+	}
+	c.Close()
+	time.Sleep(500 * time.Millisecond)
+	if st := s.Engine().State().Status; st != engine.StatusRunning {
+		t.Fatalf("status = %s, want running", st)
+	}
+}

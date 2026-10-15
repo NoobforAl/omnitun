@@ -76,7 +76,9 @@ type StartParams struct {
 	ProxyPrivate bool               `json:"proxy_private,omitempty"`
 	SystemProxy  bool               `json:"system_proxy,omitempty"`
 	DNS          string             `json:"dns,omitempty"` // remote resolver URL, see singbox.Options.DNS
-	TestURL      string             `json:"test_url,omitempty"`
+	// Failover switches to the next working profile (in list order) when the selected one fails.
+	Failover bool   `json:"failover,omitempty"`
+	TestURL  string `json:"test_url,omitempty"`
 }
 
 // SelectParams switches the active profile.

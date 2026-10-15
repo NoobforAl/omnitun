@@ -21,6 +21,17 @@ class HomeScreen extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
 
+    // Tell the user when the core switched profiles on its own, and why.
+    ref.listen(connectionProvider.select((s) => s.failover), (prev, next) {
+      if (next == null || next.at == prev?.at) return;
+      final profiles = ref.read(profilesProvider);
+      String name(String id) => profiles.where((p) => p.id == id).firstOrNull?.name ?? id;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(seconds: 6),
+        content: Text('Switched to ${name(next.to)} — ${name(next.from)} stopped responding'),
+      ));
+    });
+
     return SafeArea(
       child: Center(
         child: SingleChildScrollView(

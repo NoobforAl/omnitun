@@ -21,6 +21,7 @@ import (
 	sjson "github.com/sagernet/sing/common/json"
 	"github.com/sagernet/sing/service"
 
+	"github.com/NoobforAl/omnitun/core/netcheck"
 	"github.com/NoobforAl/omnitun/core/profile"
 	"github.com/NoobforAl/omnitun/core/singbox"
 )
@@ -47,6 +48,10 @@ type State struct {
 	DownBps   int64  `json:"down_bps"`
 	UpTotal   int64  `json:"up_total"`
 	DownTotal int64  `json:"down_total"`
+	// NoNetwork is set while connected but the device has no internet at all.
+	NoNetwork bool `json:"no_network,omitempty"`
+	// Failover describes the most recent automatic switch, if any.
+	Failover *FailoverEvent `json:"failover,omitempty"`
 }
 
 // Config sets up an engine.
@@ -63,6 +68,9 @@ type Config struct {
 	// CertificateStore overrides sing-box's CA store ("system", "mozilla", "chrome").
 	// Android needs "mozilla": Go cannot read the system store there.
 	CertificateStore string
+	// NetCheck reports whether the device is online, dialing through dial
+	// (the tunnel's direct outbound). Nil uses netcheck.OnlineDial.
+	NetCheck func(ctx context.Context, dial netcheck.DialFunc) error
 }
 
 // Engine owns at most one running sing-box instance.
@@ -73,6 +81,8 @@ type Engine struct {
 	instance *box.Box
 	cancel   context.CancelFunc
 	state    State
+	// names maps profile IDs to display names for log messages.
+	names map[string]string
 }
 
 // New returns an idle engine.
@@ -121,6 +131,11 @@ type logWriter struct{ e *Engine }
 var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
 func (w logWriter) WriteMessage(level log.Level, message string) {
+	// sing-box hands the platform writer every level, including per-connection
+	// info/debug lines; forward only warnings and errors so the UI log stays readable.
+	if level > log.LevelWarn {
+		return
+	}
 	if w.e.cfg.OnLog != nil {
 		w.e.cfg.OnLog(log.FormatLevel(level), ansiEscape.ReplaceAllString(message, ""))
 	}
@@ -188,8 +203,15 @@ func (e *Engine) Start(profiles []*profile.Profile, opts singbox.Options) error 
 	if err == nil {
 		if err = instance.Start(); err == nil {
 			e.instance, e.cancel = instance, cancel
+			e.names = map[string]string{singbox.TagAuto: "auto"}
+			for _, p := range profiles {
+				e.names[p.ID] = p.DisplayName()
+			}
 			e.setState(State{Status: StatusRunning, Since: time.Now(), Skipped: skippedMsgs, Selected: selected})
 			go e.trafficLoop(ctx, instance)
+			if opts.Failover {
+				go e.failoverLoop(ctx, instance, profileOrder(profiles), opts)
+			}
 			return nil
 		}
 		instance.Close()
@@ -242,6 +264,11 @@ func (e *Engine) trafficLoop(ctx context.Context, instance *box.Box) {
 func (e *Engine) Select(tag string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	return e.selectLocked(tag, nil)
+}
+
+// selectLocked switches the selector; failover, when set, is recorded in the state.
+func (e *Engine) selectLocked(tag string, failover *FailoverEvent) error {
 	if e.instance == nil {
 		return errors.New("not running")
 	}
@@ -255,8 +282,12 @@ func (e *Engine) Select(tag string) error {
 	}
 	s := e.state
 	s.Selected = tag
+	s.Error, s.NoNetwork = "", false
+	if failover != nil {
+		s.Failover = failover
+	}
 	e.setState(s)
-	e.logf("info", "switched to %s", tag)
+	e.logf("info", "switched to %s", e.name(tag))
 	return nil
 }
 

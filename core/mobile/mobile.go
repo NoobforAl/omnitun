@@ -8,7 +8,6 @@ package mobile
 import (
 	"encoding/json"
 	"sync"
-	"time"
 
 	"github.com/NoobforAl/omnitun/core/control"
 	"github.com/NoobforAl/omnitun/core/engine"
@@ -54,8 +53,10 @@ func Start(dataDir string, platform Platform) (string, error) {
 		return info, nil
 	}
 	s, err := control.NewServer(control.ServerConfig{
-		DataDir:  dataDir,
-		Grace:    5 * time.Second,
+		DataDir: dataDir,
+		// Android pauses apps in the background, so a quiet UI connection means
+		// nothing; the VPN service stops the tunnel when the task is removed.
+		Grace:    -1,
 		Platform: newPlatformWrapper(platform),
 		// Go cannot read the Android system CA store; use the embedded Mozilla bundle.
 		CertificateStore: "mozilla",

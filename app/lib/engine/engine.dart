@@ -54,7 +54,13 @@ class ProfileInfo {
 
 /// How a connection should be made.
 class ConnectOptions {
-  const ConnectOptions({this.tunMode = false, this.systemProxy = true, this.listenPort = 2080, this.dns = ''});
+  const ConnectOptions({
+    this.tunMode = false,
+    this.systemProxy = true,
+    this.listenPort = 2080,
+    this.dns = '',
+    this.autoFailover = true,
+  });
 
   /// Capture all traffic (needs VPN permission / admin). Otherwise proxy mode.
   final bool tunMode;
@@ -65,6 +71,19 @@ class ConnectOptions {
 
   /// Remote resolver URL (https://, tls://, tcp://, udp://). Empty = core default.
   final String dns;
+
+  /// Switch to the next working profile when the selected one stops responding.
+  final bool autoFailover;
+}
+
+/// An automatic switch made by the core.
+class FailoverInfo {
+  const FailoverInfo({required this.from, required this.to, required this.reason, required this.at});
+
+  final String from;
+  final String to;
+  final String reason;
+  final DateTime at;
 }
 
 class EngineState {
@@ -75,6 +94,7 @@ class EngineState {
     this.error,
     this.upBps = 0,
     this.downBps = 0,
+    this.failover,
   });
 
   final ConnStatus status;
@@ -83,6 +103,9 @@ class EngineState {
   final String? error;
   final int upBps;
   final int downBps;
+
+  /// The most recent automatic switch during this connection, if any.
+  final FailoverInfo? failover;
 
   EngineState copyWith({
     ConnStatus? status,
@@ -99,6 +122,7 @@ class EngineState {
         error: error ?? this.error,
         upBps: upBps ?? this.upBps,
         downBps: downBps ?? this.downBps,
+        failover: failover,
       );
 }
 
@@ -128,6 +152,9 @@ abstract class VpnEngine {
 
   /// Returns latency in ms, or -1 if unreachable.
   Future<int> testLatency(ProfileInfo profile);
+
+  /// "Stop VPN when app is closed". Used where the OS reports app closure (Android).
+  Future<void> setStopOnClose(bool value);
 
   void dispose();
 }

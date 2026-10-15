@@ -12,26 +12,50 @@ import (
 // ErrOffline means no probe succeeded.
 var ErrOffline = errors.New("no internet connection")
 
-// probes mixes anycast resolvers and a DNS lookup through the system resolver,
-// so a network where some public IPs are blocked still counts as online.
-var probes = []func(ctx context.Context) error{
-	dialProbe("1.1.1.1:443"),
-	dialProbe("8.8.8.8:443"),
-	dialProbe("9.9.9.9:443"),
-	dialProbe("208.67.222.222:443"),
-	lookupProbe("www.microsoft.com"),
-	lookupProbe("www.apple.com"),
+// DialFunc dials a TCP address.
+type DialFunc func(ctx context.Context, network, addr string) (net.Conn, error)
+
+// dialTargets mixes several anycast resolvers so a network where some public
+// IPs are blocked still counts as online.
+var dialTargets = []string{
+	"1.1.1.1:443",
+	"8.8.8.8:443",
+	"9.9.9.9:443",
+	"208.67.222.222:443",
+	"1.1.1.1:853",
 }
 
-func dialProbe(addr string) func(context.Context) error {
-	return func(ctx context.Context) error {
-		var d net.Dialer
-		conn, err := d.DialContext(ctx, "tcp", addr)
-		if err == nil {
-			conn.Close()
-		}
-		return err
+var lookupHosts = []string{"www.microsoft.com", "www.apple.com"}
+
+// Online checks with the system dialer and resolver. Use it before a tunnel
+// exists; once one is up, use OnlineDial with a dialer that bypasses it.
+func Online(ctx context.Context) error {
+	var d net.Dialer
+	probes := dialProbes(d.DialContext)
+	for _, h := range lookupHosts {
+		probes = append(probes, lookupProbe(h))
 	}
+	return run(ctx, probes)
+}
+
+// OnlineDial checks by dialing through dial only (no DNS), for use while a
+// tunnel is running.
+func OnlineDial(ctx context.Context, dial DialFunc) error {
+	return run(ctx, dialProbes(dial))
+}
+
+func dialProbes(dial DialFunc) []func(context.Context) error {
+	probes := make([]func(context.Context) error, 0, len(dialTargets))
+	for _, addr := range dialTargets {
+		probes = append(probes, func(ctx context.Context) error {
+			conn, err := dial(ctx, "tcp", addr)
+			if err == nil {
+				conn.Close()
+			}
+			return err
+		})
+	}
+	return probes
 }
 
 func lookupProbe(host string) func(context.Context) error {
@@ -44,9 +68,9 @@ func lookupProbe(host string) func(context.Context) error {
 	}
 }
 
-// Online returns nil as soon as any probe succeeds, or ErrOffline when all fail
+// run returns nil as soon as any probe succeeds, or ErrOffline when all fail
 // or ctx expires. Probes run in parallel with a 4s cap.
-func Online(ctx context.Context) error {
+func run(ctx context.Context, probes []func(context.Context) error) error {
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
 	results := make(chan error, len(probes))

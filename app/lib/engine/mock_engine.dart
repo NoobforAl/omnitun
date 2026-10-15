@@ -96,6 +96,9 @@ class MockEngine implements VpnEngine {
   }
 
   @override
+  Future<void> setStopOnClose(bool value) async {}
+
+  @override
   void dispose() {
     _traffic?.cancel();
     _states.close();

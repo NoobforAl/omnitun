@@ -101,6 +101,16 @@ class OmnitunVpnService : VpnService() {
         stopSelf()
     }
 
+    /** The user swiped the app away from Recents. */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (stopOnClose(this)) {
+            Log.i(TAG, "app task removed, stopping VPN")
+            Thread { Mobile.stopTunnel() }.start()
+            stopVpn()
+        }
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onRevoke() {
         // Another VPN took over or the user revoked us in system settings.
         Log.i(TAG, "VPN revoked by the system")
@@ -158,9 +168,20 @@ class OmnitunVpnService : VpnService() {
         private const val NOTIFICATION_ID = 1
         private const val ACTION_DISCONNECT = "dev.omnitun.app.DISCONNECT"
 
+        private const val PREFS = "omnitun"
+        private const val KEY_STOP_ON_CLOSE = "stop_on_close"
+
         @Volatile
         var instance: OmnitunVpnService? = null
             private set
+
+        /** "Stop VPN when app is closed", mirrored from the Flutter settings. */
+        fun stopOnClose(context: Context): Boolean =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_STOP_ON_CLOSE, true)
+
+        fun setStopOnClose(context: Context, value: Boolean) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_STOP_ON_CLOSE, value).apply()
+        }
 
         @Volatile
         private var ready = CountDownLatch(1)
