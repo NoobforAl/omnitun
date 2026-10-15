@@ -1,0 +1,108 @@
+package tui
+
+import (
+	"strings"
+	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/NoobforAl/omnitun/server/store"
+)
+
+func keys(m *model, ks ...string) {
+	for _, k := range ks {
+		var msg tea.KeyMsg
+		switch k {
+		case "enter":
+			msg = tea.KeyMsg{Type: tea.KeyEnter}
+		case "esc":
+			msg = tea.KeyMsg{Type: tea.KeyEsc}
+		case "down":
+			msg = tea.KeyMsg{Type: tea.KeyDown}
+		case "right":
+			msg = tea.KeyMsg{Type: tea.KeyRight}
+		case " ":
+			msg = tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}}
+		default:
+			msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
+		}
+		m.Update(msg)
+	}
+}
+
+func newTestModel(t *testing.T) (*model, *store.Store) {
+	t.Helper()
+	s := store.Open(t.TempDir())
+	st, err := store.Init(s, store.InitOptions{PublicHost: "203.0.113.7", Name: "Lab"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return newModel(s, st), s
+}
+
+func TestAddToggleDeleteUser(t *testing.T) {
+	m, s := newTestModel(t)
+	keys(m, "a", "b", "o", "b", "enter", "3", "0", "enter")
+	st, _ := s.Load()
+	bob := st.User("bob")
+	if bob == nil || bob.ExpiresAt == nil {
+		t.Fatalf("bob not added with expiry: %+v", bob)
+	}
+	if !strings.Contains(m.View(), "bob") {
+		t.Fatal("table does not show bob")
+	}
+
+	keys(m, "e") // disable
+	st, _ = s.Load()
+	if st.User("bob").Enabled {
+		t.Fatal("bob still enabled")
+	}
+
+	keys(m, "d", "n") // cancelled
+	st, _ = s.Load()
+	if st.User("bob") == nil {
+		t.Fatal("deleted without confirmation")
+	}
+	keys(m, "d", "y")
+	st, _ = s.Load()
+	if st.User("bob") != nil {
+		t.Fatal("bob not deleted")
+	}
+}
+
+func TestUserViewShowsQRAndLinks(t *testing.T) {
+	m, s := newTestModel(t)
+	if err := s.Update(func(st *store.State) error { _, err := store.AddUser(st, "alice"); return err }); err != nil {
+		t.Fatal(err)
+	}
+	m.loaded = m.loaded.Add(-1) // force reload
+	m.reload()
+	keys(m, "enter")
+	view := m.View()
+	if !strings.Contains(view, "subscription") || !strings.Contains(view, "http://203.0.113.7:2096/") {
+		t.Fatalf("subscription not shown:\n%s", view)
+	}
+	if !strings.Contains(view, "█") {
+		t.Fatal("no QR code rendered")
+	}
+	keys(m, "right")
+	if !strings.Contains(m.View(), "vless://") {
+		t.Fatal("second target is not the VLESS link")
+	}
+}
+
+func TestProtocolToggleAndPort(t *testing.T) {
+	m, s := newTestModel(t)
+	keys(m, "p", " ")
+	st, _ := s.Load()
+	if st.Server.Protocols[store.VLESSReality].Enabled {
+		t.Fatal("vless-reality not disabled")
+	}
+	keys(m, "down", "enter")
+	m.input.SetValue("9999")
+	keys(m, "enter")
+	st, _ = s.Load()
+	if st.Server.Protocols[store.Shadowsocks].Port != 9999 {
+		t.Fatalf("port = %d", st.Server.Protocols[store.Shadowsocks].Port)
+	}
+}

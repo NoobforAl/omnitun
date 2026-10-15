@@ -17,6 +17,7 @@ See [PLAN.md](PLAN.md) for the architecture and roadmap.
 | `core/mobile` | gomobile entry point for Android: runs the control server in-process and plugs `VpnService` into sing-box |
 | `cmd/omnitun-svc` | Core daemon the desktop app launches (exits when the app dies) |
 | `cmd/omnitun` | Developer CLI for the core |
+| `cmd/omnitun-server` + `server/` | VPN server: users, 5 protocols, subscriptions, TUI (`omnitun-server help`) |
 | `tools/devserver` | Local Shadowsocks server for manual tests (e.g. phone over `adb reverse tcp:8388 tcp:8388`) |
 | `tor/` | Rust Tor module (Arti) with a C ABI |
 
