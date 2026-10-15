@@ -164,6 +164,8 @@ class ConnectionController extends Notifier<EngineState> {
         tunMode: settings.tunMode,
         systemProxy: settings.systemProxy,
         dns: settings.remoteDns,
+        includePackages: settings.splitMode == 'include' ? settings.splitApps : const [],
+        excludePackages: settings.splitMode == 'exclude' ? settings.splitApps : const [],
         autoFailover: settings.autoFailover,
       ),
     );
@@ -199,6 +201,8 @@ class SettingsState {
     this.autoFailover = true,
     this.killSwitch = false,
     this.remoteDns = defaultRemoteDns,
+    this.splitMode = 'off',
+    this.splitApps = const [],
   });
 
   static const defaultRemoteDns = 'https://1.1.1.1/dns-query';
@@ -215,6 +219,11 @@ class SettingsState {
   /// Resolver used through the tunnel: https://, tls://, tcp://, udp:// or an IP.
   final String remoteDns;
 
+  /// Split tunneling (Android): 'off', 'include' (only [splitApps] use the VPN)
+  /// or 'exclude' ([splitApps] bypass the VPN).
+  final String splitMode;
+  final List<String> splitApps;
+
   SettingsState copyWith({
     bool? tunMode,
     bool? systemProxy,
@@ -222,6 +231,8 @@ class SettingsState {
     bool? autoFailover,
     bool? killSwitch,
     String? remoteDns,
+    String? splitMode,
+    List<String>? splitApps,
   }) =>
       SettingsState(
         tunMode: tunMode ?? this.tunMode,
@@ -230,6 +241,8 @@ class SettingsState {
         autoFailover: autoFailover ?? this.autoFailover,
         killSwitch: killSwitch ?? this.killSwitch,
         remoteDns: remoteDns ?? this.remoteDns,
+        splitMode: splitMode ?? this.splitMode,
+        splitApps: splitApps ?? this.splitApps,
       );
 
   Map<String, dynamic> toJson() => {
@@ -239,6 +252,8 @@ class SettingsState {
         'auto_failover': autoFailover,
         'kill_switch': killSwitch,
         'remote_dns': remoteDns,
+        'split_mode': splitMode,
+        'split_apps': splitApps,
       };
 
   /// Missing keys keep the values from [defaults].
@@ -249,6 +264,8 @@ class SettingsState {
         autoFailover: j['auto_failover'] as bool? ?? defaults.autoFailover,
         killSwitch: j['kill_switch'] as bool? ?? defaults.killSwitch,
         remoteDns: j['remote_dns'] as String? ?? defaults.remoteDns,
+        splitMode: j['split_mode'] as String? ?? defaults.splitMode,
+        splitApps: [for (final a in (j['split_apps'] as List? ?? const [])) a as String],
       );
 }
 

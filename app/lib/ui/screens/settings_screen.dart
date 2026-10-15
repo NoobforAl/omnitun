@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../state/providers.dart';
+import 'split_tunnel_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -39,6 +42,18 @@ class SettingsScreen extends ConsumerWidget {
             value: s.killSwitch,
             onChanged: (v) => ctrl.update((s) => s.copyWith(killSwitch: v)),
           ),
+          if (Platform.isAndroid)
+            ListTile(
+              title: const Text('Split tunneling'),
+              subtitle: Text(switch (s.splitMode) {
+                'include' => 'Only ${s.splitApps.length} selected app(s) use the VPN',
+                'exclude' => '${s.splitApps.length} app(s) bypass the VPN',
+                _ => 'All apps use the VPN',
+              }),
+              trailing: const Icon(Icons.chevron_right),
+              enabled: s.tunMode,
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SplitTunnelScreen())),
+            ),
           ListTile(
             title: const Text('Remote DNS'),
             subtitle: Text(s.remoteDns),

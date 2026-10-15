@@ -69,6 +69,8 @@ class ConnectOptions {
     this.listenPort = 2080,
     this.dns = '',
     this.autoFailover = true,
+    this.includePackages = const [],
+    this.excludePackages = const [],
   });
 
   /// Capture all traffic (needs VPN permission / admin). Otherwise proxy mode.
@@ -83,6 +85,12 @@ class ConnectOptions {
 
   /// Switch to the next working profile when the selected one stops responding.
   final bool autoFailover;
+
+  /// Android split tunneling: only these apps use the VPN (wins over [excludePackages]).
+  final List<String> includePackages;
+
+  /// Android split tunneling: these apps bypass the VPN.
+  final List<String> excludePackages;
 }
 
 /// One connection stage (see PLAN.md 3.3 #6). [percent] runs 0-100.

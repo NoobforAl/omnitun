@@ -26,7 +26,8 @@ void main() {
     first.read(profilesProvider.notifier).addAll([_profile('a'), _profile('b'), _profile('c')]);
     first.read(profilesProvider.notifier).reorder(2, 0); // c, a, b
     first.read(selectedProfileIdProvider.notifier).select('b');
-    first.read(settingsProvider.notifier).update((s) => s.copyWith(remoteDns: 'tls://1.1.1.1', autoFailover: false));
+    first.read(settingsProvider.notifier).update((s) =>
+        s.copyWith(remoteDns: 'tls://1.1.1.1', autoFailover: false, splitMode: 'exclude', splitApps: ['com.android.chrome']));
     first.dispose();
 
     final second = _container(store);
@@ -38,6 +39,8 @@ void main() {
     expect(second.read(selectedProfileProvider)?.id, 'b');
     expect(second.read(settingsProvider).remoteDns, 'tls://1.1.1.1');
     expect(second.read(settingsProvider).autoFailover, isFalse);
+    expect(second.read(settingsProvider).splitMode, 'exclude');
+    expect(second.read(settingsProvider).splitApps, ['com.android.chrome']);
   });
 
   test('duplicate imports are skipped and corrupt entries ignored', () {

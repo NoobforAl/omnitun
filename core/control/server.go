@@ -380,14 +380,16 @@ func (s *Server) dispatch(req Request) (any, error) {
 			return nil, &Error{Code: CodeNoNetwork, Message: err.Error()}
 		}
 		opts := singbox.Options{
-			Mode:         singbox.Mode(p.Mode),
-			ListenPort:   p.ListenPort,
-			Selected:     p.Selected,
-			ProxyPrivate: p.ProxyPrivate,
-			SystemProxy:  p.SystemProxy,
-			DNS:          p.DNS,
-			Failover:     p.Failover,
-			TestURL:      p.TestURL,
+			Mode:            singbox.Mode(p.Mode),
+			ListenPort:      p.ListenPort,
+			Selected:        p.Selected,
+			ProxyPrivate:    p.ProxyPrivate,
+			SystemProxy:     p.SystemProxy,
+			DNS:             p.DNS,
+			Failover:        p.Failover,
+			IncludePackages: p.IncludePackages,
+			ExcludePackages: p.ExcludePackages,
+			TestURL:         p.TestURL,
 		}
 		if err := s.engine.Start(p.Profiles, opts); err != nil {
 			return nil, &Error{Code: CodeStartFailed, Message: err.Error()}

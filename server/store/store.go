@@ -195,7 +195,15 @@ func (s *Store) Save(st *State) error {
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return err
 	}
-	return os.Rename(tmp, s.path())
+	// On Windows the rename fails while another process (a reader, antivirus)
+	// briefly has the file open; retry for up to ~1 s.
+	for attempt := 0; ; attempt++ {
+		err = os.Rename(tmp, s.path())
+		if err == nil || attempt == 20 {
+			return err
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 // Update loads, applies f and saves.

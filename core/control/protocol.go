@@ -81,6 +81,9 @@ type StartParams struct {
 	// Failover switches to the next working profile (in list order) when the selected one fails.
 	Failover bool   `json:"failover,omitempty"`
 	TestURL  string `json:"test_url,omitempty"`
+	// Android per-app split tunneling (package names); include wins over exclude.
+	IncludePackages []string `json:"include_packages,omitempty"`
+	ExcludePackages []string `json:"exclude_packages,omitempty"`
 }
 
 // SelectParams switches the active profile.

@@ -46,7 +46,7 @@ func TestAddToggleDeleteUser(t *testing.T) {
 	st, _ := s.Load()
 	bob := st.User("bob")
 	if bob == nil || bob.ExpiresAt == nil {
-		t.Fatalf("bob not added with expiry: %+v", bob)
+		t.Fatalf("bob not added with expiry: %+v (tui error: %v)", bob, m.err)
 	}
 	if !strings.Contains(m.View(), "bob") {
 		t.Fatal("table does not show bob")
@@ -55,7 +55,7 @@ func TestAddToggleDeleteUser(t *testing.T) {
 	keys(m, "e") // disable
 	st, _ = s.Load()
 	if st.User("bob").Enabled {
-		t.Fatal("bob still enabled")
+		t.Fatalf("bob still enabled (tui error: %v)", m.err)
 	}
 
 	keys(m, "d", "n") // cancelled
@@ -66,7 +66,7 @@ func TestAddToggleDeleteUser(t *testing.T) {
 	keys(m, "d", "y")
 	st, _ = s.Load()
 	if st.User("bob") != nil {
-		t.Fatal("bob not deleted")
+		t.Fatalf("bob not deleted (tui error: %v)", m.err)
 	}
 }
 

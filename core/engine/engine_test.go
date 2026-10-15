@@ -67,3 +67,26 @@ func TestDNSVariantsPassSchema(t *testing.T) {
 		t.Error("expected error for unsupported scheme")
 	}
 }
+
+func TestSplitTunnelPassesSchema(t *testing.T) {
+	p, err := importer.ParseLink("trojan://pw@example.com:443#t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, opts := range []singbox.Options{
+		{Mode: singbox.ModeTUN, IncludePackages: []string{"org.telegram.messenger"}},
+		{Mode: singbox.ModeTUN, ExcludePackages: []string{"com.android.chrome", "ir.mci.ecareapp"}},
+	} {
+		cfg, _, err := singbox.Build(p.AsSlice(), opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := CheckConfig(cfg); err != nil {
+			t.Fatalf("sing-box rejected split-tunnel config: %v", err)
+		}
+		tun := cfg["inbounds"].([]any)[0].(map[string]any)
+		if _, inc := tun["include_package"]; inc == (len(opts.IncludePackages) == 0) {
+			t.Fatalf("include/exclude not applied: %+v", tun)
+		}
+	}
+}

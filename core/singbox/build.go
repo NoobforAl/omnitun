@@ -52,6 +52,11 @@ type Options struct {
 
 	// Failover and FailoverInterval are used by the engine, not the config:
 	// when a pinned profile stops responding, switch to the next working one.
+	// IncludePackages, when set, sends only these Android apps through the
+	// VPN; otherwise ExcludePackages bypass it. TUN mode only.
+	IncludePackages []string
+	ExcludePackages []string
+
 	Failover         bool
 	FailoverInterval time.Duration
 }
@@ -147,7 +152,7 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 		}
 		inbounds = append(inbounds, mixed)
 	case ModeTUN:
-		inbounds = append(inbounds, obj{
+		tun := obj{
 			"type":         "tun",
 			"tag":          "tun-in",
 			"address":      []string{"172.19.0.1/30", "fdfe:dcba:9876::1/126"},
@@ -155,7 +160,14 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 			"auto_route":   true,
 			"strict_route": true,
 			"stack":        "mixed",
-		})
+		}
+		// Per-app split tunneling (Android): include wins over exclude.
+		if len(opts.IncludePackages) > 0 {
+			tun["include_package"] = opts.IncludePackages
+		} else if len(opts.ExcludePackages) > 0 {
+			tun["exclude_package"] = opts.ExcludePackages
+		}
+		inbounds = append(inbounds, tun)
 	default:
 		return nil, skipped, fmt.Errorf("unknown mode %q", opts.Mode)
 	}
