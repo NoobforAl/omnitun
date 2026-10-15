@@ -290,7 +290,8 @@ omnitun/
 - [x] Stop when swiped away (`onTaskRemoved`, honours the setting); VPN survives backgrounding; process kill tears it down
 - [x] Traffic exits through the tunnel (verified with a browser); DNS through the tunnel
 - [x] Import from QR camera / file / clipboard (QR and file need a manual on-device check)
-- [ ] Release build: R8/minify, signing config, smaller per-ABI APKs/AAB
+- [x] Release build: R8/minify with keep rules for the Go bindings, release signing (key.properties), per-ABI APKs with compressed native libs (~30 MB each, was 71 MB); verified on device
+- [ ] AAB for Google Play (needs a Play signing decision)
 - [x] Per-app split tunneling ("only selected" / "bypass selected", app picker with icons) — verified: bypassed Chrome showed the phone's own IP while the VPN was up
 - [ ] Always-on VPN / start on boot
 - [x] Notification shows profile name and live speed (verified on device)

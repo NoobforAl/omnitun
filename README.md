@@ -33,6 +33,9 @@ See [PLAN.md](PLAN.md) for the architecture and roadmap.
 
 # Android core (.aar) — from Git Bash; needs Android SDK/NDK + JDK 17
 scripts/build-android-core.sh            # all ABIs; or: scripts/build-android-core.sh android/arm64
+# Signed release APKs, one per ABI (~30 MB each); creates a keystore on first run —
+# back up app/android/omnitun-release.jks and key.properties
+scripts/build-android-release.sh         # add --skip-core to reuse the existing .aar
 
 # Rust
 cd tor && cargo test
@@ -42,7 +45,7 @@ cd app && flutter test && flutter run -d windows
 ```
 
 On desktop the app launches `bin/omnitun-svc(.exe)` (or `OMNITUN_SVC`, or the copy next to the app executable), so build it first:
-`./scripts/go.ps1 build -o bin/ ./cmd/...`. Without it — and on Android until the mobile bridge lands — the app falls back to a preview engine and says so in Logs.
+`./scripts/go.ps1 build -o bin/ ./cmd/...`. Without it — the app falls back to a preview engine and says so in Logs.
 
 ## License
 
