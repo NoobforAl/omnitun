@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -16,11 +17,15 @@ import (
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/common/certificate"
+	"github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing/common/logger"
 
 	"github.com/NoobforAl/omnitun/core/engine"
 	"github.com/NoobforAl/omnitun/core/importer"
 	"github.com/NoobforAl/omnitun/core/netcheck"
 	"github.com/NoobforAl/omnitun/core/singbox"
+	"github.com/NoobforAl/omnitun/core/subscription"
 )
 
 const (
@@ -62,6 +67,7 @@ type Server struct {
 	clients    map[*client]struct{}
 	graceTimer *time.Timer
 	ln         net.Listener
+	pool       *x509.CertPool
 	closed     bool
 }
 
@@ -398,6 +404,22 @@ func (s *Server) dispatch(req Request) (any, error) {
 			return nil, &Error{Code: CodeNotRunning, Message: err.Error()}
 		}
 		return s.engine.State(), nil
+	case "subscribe":
+		p, err := decode[subscription.Request](req.Params)
+		if err != nil {
+			return nil, err
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+		defer cancel()
+		res, err := subscription.Fetch(ctx, p, s.rootPool())
+		if err != nil {
+			code := CodeSubscriptionFailed
+			if errors.Is(err, subscription.ErrAuth) {
+				code = CodeAuthFailed
+			}
+			return nil, &Error{Code: code, Message: err.Error()}
+		}
+		return res, nil
 	case "test":
 		p, err := decode[TestParams](req.Params)
 		if err != nil {
@@ -409,4 +431,23 @@ func (s *Server) dispatch(req Request) (any, error) {
 	default:
 		return nil, &Error{Code: CodeUnknownMethod, Message: fmt.Sprintf("unknown method %q", req.Method)}
 	}
+}
+
+// rootPool returns the CA pool for HTTPS requests the server makes itself
+// (subscriptions): the configured sing-box store, or nil for the system pool.
+func (s *Server) rootPool() *x509.CertPool {
+	if s.cfg.CertificateStore == "" || s.cfg.CertificateStore == "system" {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.pool == nil {
+		store, err := certificate.NewStore(context.Background(), logger.NOP(), option.CertificateOptions{Store: s.cfg.CertificateStore})
+		if err != nil {
+			s.cfg.Logf("certificate store %q: %v", s.cfg.CertificateStore, err)
+			return nil
+		}
+		s.pool = store.Pool()
+	}
+	return s.pool
 }

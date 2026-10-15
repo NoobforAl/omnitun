@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -53,5 +54,45 @@ void main() {
     expect(states.last.error, startsWith('Contacting server failed'));
 
     expect(await engine.testLatency(dead.profiles.single), -1);
+  }, skip: exe == null ? 'omnitun-svc not built' : false, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('fetches an authenticated subscription through omnitun-svc', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((req) {
+      if (req.headers.value('authorization') != 'Bearer s3cret') {
+        req.response.statusCode = HttpStatus.unauthorized;
+      } else {
+        req.response.headers.set('subscription-userinfo', 'upload=10; download=20; total=100; expire=1893456000');
+        req.response.write(base64.encode(utf8.encode('trojan://pw@a.example.com:443#A\nhy2://pw@b.example.com:443#B')));
+      }
+      req.response.close();
+    });
+
+    final dir = await Directory.systemTemp.createTemp('omnitun-test');
+    final engine = await DaemonEngine.launch(exe!, controlFile: '${dir.path}${Platform.pathSeparator}control.json');
+    addTearDown(() async {
+      engine.dispose();
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await dir.delete(recursive: true).catchError((_) => dir);
+    });
+
+    final url = 'http://127.0.0.1:${server.port}/sub';
+    final res = await engine.fetchSubscription({
+      'url': url,
+      'auth': {'type': 'bearer', 'token': 's3cret'},
+    });
+    expect(res.profiles.map((p) => p.name), ['A', 'B']);
+    expect(res.info.used, 30);
+    expect(res.info.total, 100);
+    expect(res.info.expire?.year, 2030);
+
+    await expectLater(
+      engine.fetchSubscription({
+        'url': url,
+        'auth': {'type': 'bearer', 'token': 'wrong'},
+      }),
+      throwsA(isA<EngineException>().having((e) => e.code, 'code', 'AUTH_FAILED')),
+    );
   }, skip: exe == null ? 'omnitun-svc not built' : false, timeout: const Timeout(Duration(seconds: 60)));
 }

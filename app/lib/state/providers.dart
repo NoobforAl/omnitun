@@ -49,6 +49,35 @@ class ProfilesController extends Notifier<List<ProfileInfo>> {
 
   void remove(String id) => _save(state.where((p) => p.id != id).toList());
 
+  /// Replaces the profiles of [group] (a subscription refresh), keeping the
+  /// group's position in the list. IDs are stable, so the selection survives.
+  void replaceGroup(String group, List<ProfileInfo> profiles) {
+    final at = state.indexWhere((p) => p.group == group);
+    final rest = state.where((p) => p.group != group).toList();
+    final fresh = <String>{};
+    final incoming = [
+      for (final p in profiles)
+        if (fresh.add(p.id)) p.inGroup(group),
+    ];
+    // A profile also imported manually stays in its manual group.
+    final manual = {for (final p in rest) p.id};
+    incoming.removeWhere((p) => manual.contains(p.id));
+    final insertAt = at < 0 ? rest.length : rest.where((p) => state.indexOf(p) < at).length;
+    _save([...rest.take(insertAt), ...incoming, ...rest.skip(insertAt)]);
+  }
+
+  void removeGroup(String group) => _save(state.where((p) => p.group != group).toList());
+
+  /// Moves a profile within its group; [from]/[to] are positions inside the
+  /// group ([to] already adjusted for the removed item).
+  void reorderInGroup(String group, int from, int to) {
+    final members = state.where((p) => p.group == group).toList();
+    final moved = members.removeAt(from);
+    members.insert(to, moved);
+    var i = 0;
+    _save([for (final p in state) p.group == group ? members[i++] : p]);
+  }
+
   /// Moves a profile to [to] (index after removal); the order is the failover priority.
   void reorder(int from, int to) {
     final next = [...state];
@@ -117,10 +146,16 @@ class ConnectionController extends Notifier<EngineState> {
     }
     final profile = ref.read(selectedProfileProvider);
     if (profile == null) return;
-    // Fallbacks follow the list order after the selected profile.
+    // Fallbacks: the rest of the selected profile's group in list order,
+    // then all other profiles.
     final all = ref.read(profilesProvider);
-    final i = all.indexWhere((p) => p.id == profile.id);
-    final others = [...all.skip(i + 1), ...all.take(i)];
+    final group = all.where((p) => p.group == profile.group).toList();
+    final i = group.indexWhere((p) => p.id == profile.id);
+    final others = [
+      ...group.skip(i + 1),
+      ...group.take(i),
+      ...all.where((p) => p.group != profile.group),
+    ];
     final settings = ref.read(settingsProvider);
     await engine.connect(
       profile,

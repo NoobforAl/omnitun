@@ -28,6 +28,9 @@ class ScriptedEngine implements VpnEngine {
   @override
   Future<int> testLatency(ProfileInfo profile) async => 0;
   @override
+  Future<SubscriptionResult> fetchSubscription(Map<String, dynamic> request) async =>
+      const SubscriptionResult([], [], SubscriptionInfo());
+  @override
   Future<void> setStopOnClose(bool value) async {}
   @override
   void dispose() => controller.close();

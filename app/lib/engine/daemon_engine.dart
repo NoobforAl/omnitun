@@ -233,6 +233,16 @@ class DaemonEngine implements VpnEngine {
   }
 
   @override
+  Future<SubscriptionResult> fetchSubscription(Map<String, dynamic> request) async {
+    final res = await _call('subscribe', request) as Map<String, dynamic>;
+    return SubscriptionResult(
+      [for (final p in (res['profiles'] as List? ?? const [])) ProfileInfo.fromJson(p as Map<String, dynamic>)],
+      [for (final e in (res['errors'] as List? ?? const [])) e as String],
+      SubscriptionInfo.fromJson(res['info'] as Map<String, dynamic>? ?? const {}),
+    );
+  }
+
+  @override
   Future<int> testLatency(ProfileInfo profile) async {
     final res = await _call('test', {
       'profiles': [profile.raw],

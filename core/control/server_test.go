@@ -3,11 +3,14 @@ package control
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/NoobforAl/omnitun/core/engine"
 	"github.com/NoobforAl/omnitun/core/importer"
+	"github.com/NoobforAl/omnitun/core/subscription"
 )
 
 func newTestServer(t *testing.T, cfg ServerConfig) (*Server, string) {
@@ -134,5 +137,43 @@ func TestNoLeaseKeepsTunnel(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	if st := s.Engine().State().Status; st != engine.StatusRunning {
 		t.Fatalf("status = %s, want running", st)
+	}
+}
+
+func TestSubscribe(t *testing.T) {
+	sub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer good" {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		w.Header().Set("Subscription-Userinfo", "upload=1; download=2; total=3")
+		w.Write([]byte("trojan://pw@a.example.com:443#A\ntrojan://pw@b.example.com:443#B"))
+	}))
+	defer sub.Close()
+
+	s, addr := newTestServer(t, ServerConfig{})
+	c, err := Dial(t.Context(), addr, s.Token())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	var res subscription.Result
+	err = c.Call(t.Context(), "subscribe", subscription.Request{
+		URL: sub.URL, Auth: subscription.Auth{Type: subscription.AuthBearer, Token: "good"},
+	}, &res)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Profiles) != 2 || res.Info.Total != 3 {
+		t.Fatalf("result: %+v", res)
+	}
+
+	var ce *Error
+	err = c.Call(t.Context(), "subscribe", subscription.Request{
+		URL: sub.URL, Auth: subscription.Auth{Type: subscription.AuthBearer, Token: "bad"},
+	}, nil)
+	if !errors.As(err, &ce) || ce.Code != CodeAuthFailed {
+		t.Fatalf("err = %v, want AUTH_FAILED", err)
 	}
 }

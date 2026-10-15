@@ -167,6 +167,10 @@ class CoreEngine implements VpnEngine {
   Future<int> testLatency(ProfileInfo profile) async => (await _ready).testLatency(profile);
 
   @override
+  Future<SubscriptionResult> fetchSubscription(Map<String, dynamic> request) async =>
+      (await _ready).fetchSubscription(request);
+
+  @override
   Future<void> setStopOnClose(bool value) async {
     if (Platform.isAndroid) {
       await _channel.invokeMethod<void>('setStopOnClose', value);

@@ -40,13 +40,15 @@ type Event struct {
 
 // Error codes shown to the user through translated messages.
 const (
-	CodeUnauthorized  = "UNAUTHORIZED"
-	CodeBadRequest    = "BAD_REQUEST"
-	CodeUnknownMethod = "UNKNOWN_METHOD"
-	CodeImportFailed  = "IMPORT_FAILED"
-	CodeStartFailed   = "START_FAILED"
-	CodeNoNetwork     = "NO_NETWORK"
-	CodeNotRunning    = "NOT_RUNNING"
+	CodeUnauthorized       = "UNAUTHORIZED"
+	CodeBadRequest         = "BAD_REQUEST"
+	CodeUnknownMethod      = "UNKNOWN_METHOD"
+	CodeImportFailed       = "IMPORT_FAILED"
+	CodeStartFailed        = "START_FAILED"
+	CodeNoNetwork          = "NO_NETWORK"
+	CodeNotRunning         = "NOT_RUNNING"
+	CodeSubscriptionFailed = "SUBSCRIPTION_FAILED"
+	CodeAuthFailed         = "AUTH_FAILED"
 )
 
 // Error is a typed failure.

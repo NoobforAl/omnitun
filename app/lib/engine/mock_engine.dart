@@ -99,6 +99,10 @@ class MockEngine implements VpnEngine {
   }
 
   @override
+  Future<SubscriptionResult> fetchSubscription(Map<String, dynamic> request) async =>
+      throw StateError('Subscriptions need the Omnitun core (not available in preview mode)');
+
+  @override
   Future<int> testLatency(ProfileInfo profile) async {
     await Future<void>.delayed(Duration(milliseconds: 200 + _rng.nextInt(400)));
     return _rng.nextInt(10) == 0 ? -1 : 40 + _rng.nextInt(260);

@@ -13,16 +13,21 @@ class ProfileInfo {
     required this.protocol,
     required this.server,
     required this.port,
-    this.group = 'Default',
+    this.group = defaultGroup,
     this.latencyMs,
     this.raw = const {},
   });
+
+  /// Group of manually imported profiles; subscriptions use their own ID.
+  static const defaultGroup = 'default';
 
   final String id;
   final String name;
   final String protocol;
   final String server;
   final int port;
+
+  /// [defaultGroup] or the ID of the subscription the profile came from.
   final String group;
 
   /// Last measured latency; null = not tested, -1 = unreachable.
@@ -42,12 +47,16 @@ class ProfileInfo {
         raw: raw,
       );
 
+  /// The same profile assigned to [group] (kept in [raw] so it is persisted).
+  ProfileInfo inGroup(String group) => ProfileInfo.fromJson({...raw, 'group': group});
+
   factory ProfileInfo.fromJson(Map<String, dynamic> j) => ProfileInfo(
         id: j['id'] as String,
         name: (j['name'] as String?)?.isNotEmpty == true ? j['name'] as String : '${j['server']}:${j['port']}',
         protocol: j['protocol'] as String,
         server: j['server'] as String,
         port: j['port'] as int,
+        group: j['group'] as String? ?? defaultGroup,
         raw: j,
       );
 }
@@ -154,6 +163,57 @@ class ImportResult {
   final List<String> errors;
 }
 
+/// Provider metadata from a subscription response (all optional).
+class SubscriptionInfo {
+  const SubscriptionInfo({
+    this.upload = 0,
+    this.download = 0,
+    this.total = 0,
+    this.expire,
+    this.updateIntervalHours = 0,
+    this.title = '',
+  });
+
+  final int upload;
+  final int download;
+
+  /// Data cap in bytes; 0 = unlimited/unknown.
+  final int total;
+  final DateTime? expire;
+  final int updateIntervalHours;
+  final String title;
+
+  int get used => upload + download;
+
+  factory SubscriptionInfo.fromJson(Map<String, dynamic> j) {
+    final expire = (j['expire'] as num?)?.toInt() ?? 0;
+    return SubscriptionInfo(
+      upload: (j['upload'] as num?)?.toInt() ?? 0,
+      download: (j['download'] as num?)?.toInt() ?? 0,
+      total: (j['total'] as num?)?.toInt() ?? 0,
+      expire: expire > 0 ? DateTime.fromMillisecondsSinceEpoch(expire * 1000) : null,
+      updateIntervalHours: (j['update_interval_hours'] as num?)?.toInt() ?? 0,
+      title: j['title'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'upload': upload,
+        'download': download,
+        'total': total,
+        if (expire != null) 'expire': expire!.millisecondsSinceEpoch ~/ 1000,
+        'update_interval_hours': updateIntervalHours,
+        'title': title,
+      };
+}
+
+class SubscriptionResult {
+  const SubscriptionResult(this.profiles, this.errors, this.info);
+  final List<ProfileInfo> profiles;
+  final List<String> errors;
+  final SubscriptionInfo info;
+}
+
 abstract class VpnEngine {
   /// Status, traffic and failover updates.
   Stream<EngineState> get states;
@@ -174,6 +234,10 @@ abstract class VpnEngine {
 
   /// Returns latency in ms, or -1 if unreachable.
   Future<int> testLatency(ProfileInfo profile);
+
+  /// Downloads a subscription. [request] is {"url", "auth": {...}, "user_agent"}
+  /// (see core/subscription). Throws an exception with a user-facing message on failure.
+  Future<SubscriptionResult> fetchSubscription(Map<String, dynamic> request);
 
   /// "Stop VPN when app is closed". Used where the OS reports app closure (Android).
   Future<void> setStopOnClose(bool value);
