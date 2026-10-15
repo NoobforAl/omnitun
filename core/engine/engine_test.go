@@ -45,3 +45,25 @@ func testLinks() []string {
 		"wireguard://yAnz5TF%2BlXXJte14tji3zlMNq%2Bhd2rYUIgJBgB3fBmk%3D@wg.example.com:51820?publickey=xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg%3D&address=10.0.0.2%2F32&reserved=1,2,3#wg",
 	}
 }
+
+func TestDNSVariantsPassSchema(t *testing.T) {
+	p, err := importer.ParseLink("trojan://pw@example.com:443#t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, dns := range []string{
+		"", "https://1.1.1.1/dns-query", "https://dns.example.com/custom", "tls://1.1.1.1",
+		"tcp://1.1.1.1", "udp://8.8.8.8:53", "9.9.9.9",
+	} {
+		cfg, _, err := singbox.Build(p.AsSlice(), singbox.Options{DNS: dns})
+		if err != nil {
+			t.Fatalf("%q: %v", dns, err)
+		}
+		if err := CheckConfig(cfg); err != nil {
+			t.Errorf("%q: sing-box rejected config: %v", dns, err)
+		}
+	}
+	if _, _, err := singbox.Build(p.AsSlice(), singbox.Options{DNS: "ftp://x"}); err == nil {
+		t.Error("expected error for unsupported scheme")
+	}
+}

@@ -57,7 +57,9 @@ func Start(dataDir string, platform Platform) (string, error) {
 		DataDir:  dataDir,
 		Grace:    5 * time.Second,
 		Platform: newPlatformWrapper(platform),
-		OnState:  func(st engine.State) { platform.StateChanged(string(st.Status)) },
+		// Go cannot read the Android system CA store; use the embedded Mozilla bundle.
+		CertificateStore: "mozilla",
+		OnState:          func(st engine.State) { platform.StateChanged(string(st.Status)) },
 	})
 	if err != nil {
 		return "", err

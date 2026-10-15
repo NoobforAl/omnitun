@@ -3,6 +3,7 @@ package singbox
 
 import (
 	"fmt"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -37,7 +38,9 @@ type Options struct {
 	LogLevel string
 	// TestURL is probed by the auto group, default https://www.gstatic.com/generate_204.
 	TestURL string
-	// DNS is the remote DoH server, default 1.1.1.1.
+	// DNS is the remote resolver used through the tunnel, as a URL:
+	// https://host/path (DoH), tls://host (DoT), tcp://host, udp://host or a bare IP (UDP).
+	// Default https://1.1.1.1/dns-query.
 	DNS string
 	// ProxyPrivate also sends LAN/private addresses through the tunnel
 	// (by default they bypass it).
@@ -64,7 +67,7 @@ func (o *Options) defaults() {
 		o.TestURL = "https://www.gstatic.com/generate_204"
 	}
 	if o.DNS == "" {
-		o.DNS = "1.1.1.1"
+		o.DNS = "https://1.1.1.1/dns-query"
 	}
 	if o.Selected == "" {
 		o.Selected = TagAuto
@@ -151,6 +154,13 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 		return nil, skipped, fmt.Errorf("unknown mode %q", opts.Mode)
 	}
 
+	remoteDNS, err := dnsServer(opts.DNS)
+	if err != nil {
+		return nil, skipped, err
+	}
+	remoteDNS["tag"] = "remote"
+	remoteDNS["detour"] = TagSelect
+
 	rules := []any{
 		obj{"action": "sniff"},
 		obj{"protocol": "dns", "action": "hijack-dns"},
@@ -163,7 +173,7 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 		"log": obj{"level": opts.LogLevel, "timestamp": true},
 		"dns": obj{
 			"servers": []any{
-				obj{"type": "https", "tag": "remote", "server": opts.DNS, "detour": TagSelect},
+				remoteDNS,
 				obj{"type": "local", "tag": "local"},
 			},
 			"final":    "remote",
@@ -363,6 +373,37 @@ func addTransport(out obj, t *profile.Transport) {
 		}
 		out["transport"] = tr
 	}
+}
+
+// dnsServer converts a resolver URL into a sing-box DNS server.
+func dnsServer(raw string) (obj, error) {
+	if !strings.Contains(raw, "://") {
+		raw = "udp://" + raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Hostname() == "" {
+		return nil, fmt.Errorf("invalid DNS server %q", raw)
+	}
+	server := obj{"server": u.Hostname()}
+	if p := u.Port(); p != "" {
+		port, err := strconv.Atoi(p)
+		if err != nil {
+			return nil, fmt.Errorf("invalid DNS server port %q", p)
+		}
+		server["server_port"] = port
+	}
+	switch u.Scheme {
+	case "https":
+		server["type"] = "https"
+		if u.Path != "" && u.Path != "/dns-query" {
+			server["path"] = u.Path
+		}
+	case "tls", "tcp", "udp":
+		server["type"] = u.Scheme
+	default:
+		return nil, fmt.Errorf("unsupported DNS scheme %q (use https, tls, tcp or udp)", u.Scheme)
+	}
+	return server, nil
 }
 
 func tlsOrDefault(t *profile.TLS) *profile.TLS {

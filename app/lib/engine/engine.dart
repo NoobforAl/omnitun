@@ -54,7 +54,7 @@ class ProfileInfo {
 
 /// How a connection should be made.
 class ConnectOptions {
-  const ConnectOptions({this.tunMode = false, this.systemProxy = true, this.listenPort = 2080});
+  const ConnectOptions({this.tunMode = false, this.systemProxy = true, this.listenPort = 2080, this.dns = ''});
 
   /// Capture all traffic (needs VPN permission / admin). Otherwise proxy mode.
   final bool tunMode;
@@ -62,6 +62,9 @@ class ConnectOptions {
   /// In proxy mode, point the OS proxy settings at the local port.
   final bool systemProxy;
   final int listenPort;
+
+  /// Remote resolver URL (https://, tls://, tcp://, udp://). Empty = core default.
+  final String dns;
 }
 
 class EngineState {

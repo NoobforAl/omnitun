@@ -236,7 +236,7 @@ omnitun/
 | Phase | Goal | Deliverables |
 |---|---|---|
 | **0. Bootstrap** ✅ | Toolchain and skeleton | Monorepo (single Go module at root), Rust `tor` crate, Flutter app shell with mock engine, CI, LICENSE (MIT) |
-| **1. Core MVP** 🚧 | First tunnels | ✅ importer (share links, subscriptions, WG/AWG `.conf`); ✅ profile → sing-box config; ✅ in-process engine + dev CLI; ✅ desktop bridge (daemon); ✅ latency tests, live switching, traffic stats, system proxy; ✅ Android bridge (gomobile `core/mobile` + Kotlin VpnService, minSdk 29) — not yet tested on a device; ⬜ AmneziaWG engine |
+| **1. Core MVP** 🚧 | First tunnels | ✅ importer (share links, subscriptions, WG/AWG `.conf`); ✅ profile → sing-box config; ✅ in-process engine + dev CLI; ✅ desktop bridge (daemon); ✅ latency tests, live switching, traffic stats, system proxy; ✅ Android bridge (gomobile `core/mobile` + Kotlin VpnService, minSdk 29) — tested on Samsung A30s (Android 11): consent dialog, VPN traffic via tunnel, notification Disconnect, swipe-away stop, process-kill stop; ⬜ AmneziaWG engine |
 | **2. Android MVP** | Real app on a phone | VpnService + permission flow, foreground notification, lifecycle stop rules, Home/Profiles/Import screens, QR scan |
 | **3. Windows MVP** | Real app on desktop | ✅ `omnitun-svc` daemon + control protocol + lease + parent-death exit; ✅ Flutter DaemonEngine; ⬜ run as SYSTEM service for TUN, tray, MSIX/MSI installer |
 | **4. Groups and failover** | Reliability | Groups, subscriptions with auth, health checks, no-internet detection, failover strategies, typed errors |

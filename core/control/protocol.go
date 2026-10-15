@@ -75,6 +75,7 @@ type StartParams struct {
 	Selected     string             `json:"selected,omitempty"` // profile ID or "auto"
 	ProxyPrivate bool               `json:"proxy_private,omitempty"`
 	SystemProxy  bool               `json:"system_proxy,omitempty"`
+	DNS          string             `json:"dns,omitempty"` // remote resolver URL, see singbox.Options.DNS
 	TestURL      string             `json:"test_url,omitempty"`
 }
 

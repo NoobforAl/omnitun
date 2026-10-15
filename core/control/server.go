@@ -42,6 +42,8 @@ type ServerConfig struct {
 	Logf func(format string, args ...any)
 	// NetCheck reports whether the underlying network is up. Nil uses netcheck.Online.
 	NetCheck func(ctx context.Context) error
+	// CertificateStore is passed to the engine (see engine.Config).
+	CertificateStore string
 	// Platform is passed to the engine (mobile only).
 	Platform adapter.PlatformInterface
 	// OnState is called on every engine state change, after clients are notified.
@@ -94,8 +96,9 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	}
 	s := &Server{cfg: cfg, clients: map[*client]struct{}{}}
 	s.engine = engine.New(engine.Config{
-		DataDir:  cfg.DataDir,
-		Platform: cfg.Platform,
+		DataDir:          cfg.DataDir,
+		Platform:         cfg.Platform,
+		CertificateStore: cfg.CertificateStore,
 		OnState: func(st engine.State) {
 			s.broadcast(Event{Event: "state", Data: st})
 			if cfg.OnState != nil {
@@ -370,6 +373,7 @@ func (s *Server) dispatch(req Request) (any, error) {
 			Selected:     p.Selected,
 			ProxyPrivate: p.ProxyPrivate,
 			SystemProxy:  p.SystemProxy,
+			DNS:          p.DNS,
 			TestURL:      p.TestURL,
 		}
 		if err := s.engine.Start(p.Profiles, opts); err != nil {

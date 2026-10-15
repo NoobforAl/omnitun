@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"sync"
 	"time"
 
@@ -59,6 +60,9 @@ type Config struct {
 	// Platform provides TUN, socket protection and interface monitoring on
 	// mobile OSes (see core/mobile). Nil on desktop.
 	Platform adapter.PlatformInterface
+	// CertificateStore overrides sing-box's CA store ("system", "mozilla", "chrome").
+	// Android needs "mozilla": Go cannot read the system store there.
+	CertificateStore string
 }
 
 // Engine owns at most one running sing-box instance.
@@ -113,9 +117,12 @@ func parseOptions(ctx context.Context, cfg map[string]any) (option.Options, erro
 
 type logWriter struct{ e *Engine }
 
+// ansiEscape matches terminal color codes, which sing-box adds to log lines.
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
 func (w logWriter) WriteMessage(level log.Level, message string) {
 	if w.e.cfg.OnLog != nil {
-		w.e.cfg.OnLog(log.FormatLevel(level), message)
+		w.e.cfg.OnLog(log.FormatLevel(level), ansiEscape.ReplaceAllString(message, ""))
 	}
 }
 
@@ -128,6 +135,9 @@ func (e *Engine) dataDir() string {
 
 // newBox builds and creates (but does not start) a sing-box instance.
 func (e *Engine) newBox(cfg map[string]any) (*box.Box, context.Context, context.CancelFunc, error) {
+	if e.cfg.CertificateStore != "" {
+		cfg["certificate"] = map[string]any{"store": e.cfg.CertificateStore}
+	}
 	cfg["experimental"] = map[string]any{
 		"cache_file": map[string]any{"enabled": true, "path": filepath.Join(e.dataDir(), "cache.db")},
 	}
@@ -290,8 +300,12 @@ func (e *Engine) TestLatency(ctx context.Context, profiles []*profile.Profile, t
 	delete(cfg, "inbounds")
 	delete(cfg, "dns")
 	delete(cfg, "route")
-	tmp := New(Config{DataDir: filepath.Join(e.dataDir(), "latency"), Platform: e.cfg.Platform})
-	instance, _, cancel, err := tmp.newBox(cfg)
+	tmp := New(Config{
+		DataDir:          filepath.Join(e.dataDir(), "latency"),
+		Platform:         e.cfg.Platform,
+		CertificateStore: e.cfg.CertificateStore,
+	})
+	instance, boxCtx, cancel, err := tmp.newBox(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +328,10 @@ func (e *Engine) TestLatency(ctx context.Context, profiles []*profile.Profile, t
 		wg.Add(1)
 		go func(r *LatencyResult) {
 			defer wg.Done()
-			tctx, tcancel := context.WithTimeout(ctx, 8*time.Second)
+			// Derive from the box context: urltest reads the configured root CA pool from it.
+			tctx, tcancel := context.WithTimeout(boxCtx, 8*time.Second)
+			stop := context.AfterFunc(ctx, tcancel)
+			defer stop()
 			defer tcancel()
 			ms, err := urltest.URLTest(tctx, testURL, dialer)
 			if err != nil {
@@ -325,6 +342,11 @@ func (e *Engine) TestLatency(ctx context.Context, profiles []*profile.Profile, t
 		}(&results[i])
 	}
 	wg.Wait()
+	for _, r := range results {
+		if r.Error != "" {
+			e.logf("warn", "latency test %s: %s", r.ID, r.Error)
+		}
+	}
 	for _, s := range skipped {
 		e.logf("warn", "latency test skipped: %v", s)
 	}

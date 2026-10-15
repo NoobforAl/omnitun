@@ -177,6 +177,7 @@ class DaemonEngine implements VpnEngine {
         'mode': options.tunMode ? 'tun' : 'proxy',
         'listen_port': options.listenPort,
         'system_proxy': options.systemProxy,
+        if (options.dns.isNotEmpty) 'dns': options.dns,
       });
     } on EngineException catch (e) {
       _emit(EngineState(

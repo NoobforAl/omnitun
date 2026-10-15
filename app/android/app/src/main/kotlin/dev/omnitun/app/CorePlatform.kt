@@ -94,6 +94,19 @@ class CorePlatform(context: Context) : Platform {
         }
         cm.requestNetwork(request, cb, handler)
         callback = cb
+        // Report the current network before returning: sing-box resets connections on the first
+        // default-interface update, so it must arrive while the engine is starting, not after.
+        currentUnderlyingNetwork()?.let { report(listener, it) }
+    }
+
+    /** The active non-VPN network with internet access, if any. */
+    private fun currentUnderlyingNetwork(): Network? {
+        fun usable(n: Network) = cm.getNetworkCapabilities(n)?.let {
+            it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                !it.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+        } == true
+        cm.activeNetwork?.takeIf(::usable)?.let { return it }
+        return cm.allNetworks.firstOrNull(::usable)
     }
 
     override fun closeMonitor() {

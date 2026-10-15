@@ -39,6 +39,12 @@ class SettingsScreen extends ConsumerWidget {
             value: s.killSwitch,
             onChanged: (v) => ctrl.update((s) => s.copyWith(killSwitch: v)),
           ),
+          ListTile(
+            title: const Text('Remote DNS'),
+            subtitle: Text(s.remoteDns),
+            trailing: const Icon(Icons.edit_outlined),
+            onTap: () => _editDns(context, ref, s.remoteDns),
+          ),
           const _Header('App'),
           SwitchListTile(
             title: const Text('Stop VPN when app is closed'),
@@ -52,6 +58,58 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+Future<void> _editDns(BuildContext context, WidgetRef ref, String current) async {
+  final value = await showDialog<String>(context: context, builder: (_) => _DnsDialog(current));
+  if (value != null && value.isNotEmpty) {
+    ref.read(settingsProvider.notifier).update((s) => s.copyWith(remoteDns: value));
+  }
+}
+
+/// Owns its controller so it is disposed only after the dialog leaves the tree.
+class _DnsDialog extends StatefulWidget {
+  const _DnsDialog(this.initial);
+
+  final String initial;
+
+  @override
+  State<_DnsDialog> createState() => _DnsDialogState();
+}
+
+class _DnsDialogState extends State<_DnsDialog> {
+  late final _controller = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Remote DNS'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Resolver used through the tunnel. Examples: https://1.1.1.1/dns-query, '
+              'tls://1.1.1.1, tcp://8.8.8.8, 9.9.9.9'),
+          const SizedBox(height: 12),
+          TextField(controller: _controller, autofocus: true, keyboardType: TextInputType.url),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, SettingsState.defaultRemoteDns),
+          child: const Text('Reset'),
+        ),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.pop(context, _controller.text.trim()), child: const Text('Save')),
+      ],
     );
   }
 }
