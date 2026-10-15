@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/NoobforAl/omnitun/core/importer"
+	"github.com/NoobforAl/omnitun/core/nordlynx"
 )
 
 // DefaultUserAgent asks panels for the plain share-link list most of them
@@ -78,6 +79,9 @@ var ErrAuth = errors.New("subscription authentication failed")
 // system pool (Android needs an explicit pool, see engine.Config.CertificateStore).
 func Fetch(ctx context.Context, req Request, rootCAs *x509.CertPool) (*Result, error) {
 	u, err := url.Parse(strings.TrimSpace(req.URL))
+	if err == nil && u.Scheme == "nordvpn" {
+		return fetchNordVPN(ctx, u, req, rootCAs)
+	}
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return nil, fmt.Errorf("invalid subscription URL %q", req.URL)
 	}
@@ -183,4 +187,39 @@ func parseInfo(h http.Header) Info {
 	}
 	info.Title = title
 	return info
+}
+
+// fetchNordVPN handles nordvpn://<access token>?country=DE&limit=10: NordLynx
+// (WireGuard) profiles from NordVPN's API. The token may also be given as
+// bearer/basic auth instead of in the URL.
+func fetchNordVPN(ctx context.Context, u *url.URL, req Request, rootCAs *x509.CertPool) (*Result, error) {
+	token := firstNonEmptyStr(u.Host, u.User.Username(), req.Auth.Token, req.Auth.Password)
+	limit, _ := strconv.Atoi(u.Query().Get("limit"))
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if rootCAs != nil {
+		transport.TLSClientConfig = &tls.Config{RootCAs: rootCAs}
+	}
+	client := &http.Client{Transport: transport, Timeout: 30 * time.Second}
+	defer client.CloseIdleConnections()
+	profiles, err := nordlynx.Profiles(ctx, client, token, u.Query().Get("country"), limit)
+	if errors.Is(err, nordlynx.ErrAuth) {
+		return nil, fmt.Errorf("%w: %v", ErrAuth, err)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &Result{
+		Result:    importer.Result{Profiles: profiles},
+		Info:      Info{Title: "NordVPN", UpdateIntervalHours: 24},
+		FetchedAt: time.Now(),
+	}, nil
+}
+
+func firstNonEmptyStr(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }

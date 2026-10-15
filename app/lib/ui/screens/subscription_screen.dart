@@ -54,8 +54,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
 
   String? _validate() {
     final uri = Uri.tryParse(_url.text.trim());
-    if (uri == null || !(uri.isScheme('http') || uri.isScheme('https')) || uri.host.isEmpty) {
-      return 'Enter an http(s) subscription URL';
+    // nordvpn://<access token>?country=DE gives NordLynx (WireGuard) servers.
+    if (uri == null || !(uri.isScheme('http') || uri.isScheme('https') || uri.isScheme('nordvpn')) || uri.host.isEmpty) {
+      return 'Enter an http(s) subscription URL (or nordvpn://<access token>)';
     }
     if (_authType == 'header' && _header.text.trim().isEmpty) return 'Enter the header name';
     if (const ['bearer', 'header', 'query'].contains(_authType) && _token.text.trim().isEmpty) {
@@ -111,7 +112,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
             autofocus: widget.existing == null && widget.initialUrl.isEmpty,
             decoration: const InputDecoration(
               labelText: 'Subscription URL',
-              hintText: 'https://provider.example/sub/…',
+              hintText: 'https://provider.example/sub/… or nordvpn://<token>',
               border: OutlineInputBorder(),
             ),
           ),

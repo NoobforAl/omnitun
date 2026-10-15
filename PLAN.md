@@ -321,15 +321,19 @@ omnitun/
 - [x] OpenVPN via sing-box's `openvpn-client` endpoint: `.ovpn` import (inline certs, tls-auth/tls-crypt/tls-crypt-v2, multiple remotes, comp-lzo/compress, verify-x509-name), username/password prompt in the app, sing-box JSON import; end-to-end tests (TCP cert + tls-crypt, UDP user/pass + tls-auth); verified on device through omnitun-server
 - [x] Hysteria v1, AnyTLS, SSH (password/key, host-key pinning), ShadowTLS v1-3 over Shadowsocks: links (`hysteria://`, `anytls://`, `ssh://`, `ss://…?plugin=shadow-tls`), Clash and sing-box JSON import; end-to-end tests; AnyTLS and ShadowTLS verified on device through omnitun-server
 - [ ] OpenVPN XOR/Stunnel obfuscation
-- [ ] Stealth (WireGuard over TLS), NordLynx (token → WireGuard)
-- [ ] Windows built-in VPN: IKEv2, L2TP/IPsec, SSTP
-- [ ] Android: IKEv2 (`Ikev2VpnProfile`), SSTP; L2TP shown as unsupported
+- [x] NordLynx: `nordvpn://<access token>?country=DE&limit=10` subscription → WireGuard profiles (key from `/v1/users/services/credentials`, servers from `/v1/servers/recommendations`); tested against a mock API (no NordVPN account to test live)
+- [ ] Stealth (WireGuard over TLS/WS): sing-box WireGuard `detour` through a TLS/WS outbound with UDP-over-TCP (needs a sing-box server), later a wstunnel-compatible Go client
+- [ ] SSTP: fork the pure-Go `veepin` sstp + PPP packages to run on our TUN fd (or port Open SSTP Client's Kotlin); MS-CHAPv2/PAP
+- [ ] Android IKEv2: platform `Ikev2VpnProfile` + `VpnManager` (API 30+, PSK / EAP-MSCHAPv2 / certificates; the OS owns that tunnel); `veepin` ikev2 later if it must go through the core
+- [ ] L2TP/IPsec: deferred (possible in userspace — TunnelForge does it — but low value)
+- [ ] Windows built-in VPN: IKEv2, L2TP/IPsec, SSTP (Windows phase)
 - [x] NaiveProxy via sing-box `with_naive_outbound` (Chromium cronet, statically linked on Android: +5 MB per APK): `naive+https://` / `naive+quic://` links, sing-box JSON with a pinned certificate; e2e test with real cronet on Windows (libcronet.dll); verified on device through omnitun-server
 - [ ] Lightway (Rust `lightway-core`, AGPL; only useful with self-hosted servers — low priority)
 
 ### Phase 6 — Tor
 - [x] Rust crate with C ABI (stub)
-- [ ] Arti client, obfs4 / Snowflake / WebTunnel bridges, bridge import, bootstrap % in the progress ring
+- [ ] Arti client (`arti-client` 0.47, Rust, in the `tor/` crate): `TorClient` → local SOCKS5 that a sing-box `socks` outbound uses; bootstrap % in the progress ring
+- [ ] Bridges as Go pluggable transports in the core (lyrebird obfs4, snowflake/v2 client lib, webtunnel), each on a localhost SOCKS listener that Arti uses as unmanaged PTs; bridge-line import
 
 ### Phase 8 — Server (`omnitun-server`)
 - [x] `init` with Reality keys, Shadowsocks-2022 key, self-signed certificate

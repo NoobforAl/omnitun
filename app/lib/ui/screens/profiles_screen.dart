@@ -314,8 +314,8 @@ class _ImportSheetState extends ConsumerState<_ImportSheet> {
   Future<void> _import() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    // A single http(s) URL is a subscription link, not a config.
-    if (!text.contains('\n') && RegExp(r'^https?://\S+$').hasMatch(text)) {
+    // A single http(s) or nordvpn:// URL is a subscription link, not a config.
+    if (!text.contains('\n') && RegExp(r'^(https?|nordvpn)://\S+$').hasMatch(text)) {
       _openSubscription(text);
       return;
     }

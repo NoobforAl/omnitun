@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -30,9 +32,24 @@ func keys(m *model, ks ...string) {
 	}
 }
 
+// tempDir is t.TempDir with a cleanup that retries: on Windows a virus
+// scanner can briefly hold a just-written file, failing t.TempDir's cleanup.
+func tempDir(t *testing.T) string {
+	dir, err := os.MkdirTemp("", "omnitun-tui-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for i := 0; i < 40 && os.RemoveAll(dir) != nil; i++ {
+			time.Sleep(50 * time.Millisecond)
+		}
+	})
+	return dir
+}
+
 func newTestModel(t *testing.T) (*model, *store.Store) {
 	t.Helper()
-	s := store.Open(t.TempDir())
+	s := store.Open(tempDir(t))
 	st, err := store.Init(s, store.InitOptions{PublicHost: "203.0.113.7", Name: "Lab"})
 	if err != nil {
 		t.Fatal(err)
