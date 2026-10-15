@@ -141,12 +141,15 @@ class CoreEngine implements VpnEngine {
     final engine = await _ready;
     if (Platform.isAndroid && options.tunMode && engine is DaemonEngine) {
       // The system consent dialog must be accepted before the core can open a TUN.
+      const permission = ConnectProgress('permission', 5);
+      _states.add(EngineState(status: ConnStatus.connecting, activeProfileId: profile.id, progress: permission));
       final granted = await _channel.invokeMethod<bool>('prepareVpn') ?? false;
       if (!granted) {
         _states.add(EngineState(
           status: ConnStatus.error,
           activeProfileId: profile.id,
           error: 'VPN permission was not granted',
+          progress: permission,
         ));
         return;
       }

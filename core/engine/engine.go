@@ -52,6 +52,8 @@ type State struct {
 	NoNetwork bool `json:"no_network,omitempty"`
 	// Failover describes the most recent automatic switch, if any.
 	Failover *FailoverEvent `json:"failover,omitempty"`
+	// Progress is the current (or, on error, the failed) connection stage.
+	Progress *Progress `json:"progress,omitempty"`
 }
 
 // Config sets up an engine.
@@ -71,6 +73,9 @@ type Config struct {
 	// NetCheck reports whether the device is online, dialing through dial
 	// (the tunnel's direct outbound). Nil uses netcheck.OnlineDial.
 	NetCheck func(ctx context.Context, dial netcheck.DialFunc) error
+	// SkipHandshake reports "connected" as soon as the tunnel is up, without
+	// first reaching a server through it (tests with unreachable servers).
+	SkipHandshake bool
 }
 
 // Engine owns at most one running sing-box instance.
@@ -182,45 +187,58 @@ func (e *Engine) Start(profiles []*profile.Profile, opts singbox.Options) error 
 	defer e.mu.Unlock()
 	e.stopLocked()
 
+	selected := opts.Selected
+	if selected == "" {
+		selected = singbox.TagAuto
+	}
+	e.names = map[string]string{singbox.TagAuto: "auto"}
+	for _, p := range profiles {
+		p.EnsureID()
+		e.names[p.ID] = p.DisplayName()
+	}
+	fail := func(stage string, err error) error {
+		err = fmt.Errorf("%s failed: %w", stageLabel[stage], err)
+		e.logf("error", "%v", err)
+		e.setState(State{Status: StatusError, Error: err.Error(), Progress: progress(stage, "")})
+		return err
+	}
+
+	e.setState(State{Status: StatusStarting, Selected: selected, Progress: progress(StagePrepare, "")})
 	cfg, skipped, err := singbox.Build(profiles, opts)
 	if err != nil {
-		e.setState(State{Status: StatusError, Error: err.Error()})
-		return err
+		return fail(StagePrepare, err)
 	}
 	var skippedMsgs []string
 	for _, s := range skipped {
 		skippedMsgs = append(skippedMsgs, s.Error())
 		e.logf("warn", "skipped profile: %v", s)
 	}
-	selected := opts.Selected
-	if selected == "" {
-		selected = singbox.TagAuto
-	}
-	e.setState(State{Status: StatusStarting, Skipped: skippedMsgs, Selected: selected})
 	e.logf("info", "starting %d profile(s) in %s mode", len(profiles)-len(skipped), orMode(opts.Mode))
 
+	e.setState(State{Status: StatusStarting, Skipped: skippedMsgs, Selected: selected, Progress: progress(StageEngineStart, "")})
 	instance, ctx, cancel, err := e.newBox(cfg)
-	if err == nil {
-		if err = instance.Start(); err == nil {
-			e.instance, e.cancel = instance, cancel
-			e.names = map[string]string{singbox.TagAuto: "auto"}
-			for _, p := range profiles {
-				e.names[p.ID] = p.DisplayName()
-			}
-			e.setState(State{Status: StatusRunning, Since: time.Now(), Skipped: skippedMsgs, Selected: selected})
-			go e.trafficLoop(ctx, instance)
-			if opts.Failover {
-				go e.failoverLoop(ctx, instance, profileOrder(profiles), opts)
-			}
-			return nil
-		}
+	if err != nil {
+		return fail(StageEngineStart, err)
+	}
+	// instance.Start opens the TUN / listening port, so failures here belong to the tunnel stage.
+	if err = instance.Start(); err != nil {
 		instance.Close()
 		cancel()
+		return fail(StageTunnelUp, err)
 	}
-	err = fmt.Errorf("start engine: %w", err)
-	e.logf("error", "%v", err)
-	e.setState(State{Status: StatusError, Error: err.Error(), Skipped: skippedMsgs})
-	return err
+	e.instance, e.cancel = instance, cancel
+	go e.trafficLoop(ctx, instance)
+
+	if e.cfg.SkipHandshake {
+		e.setState(State{Status: StatusRunning, Since: time.Now(), Skipped: skippedMsgs, Selected: selected, Progress: progress(StageConnected, "")})
+		if opts.Failover {
+			go e.failoverLoop(ctx, instance, profileOrder(profiles), opts)
+		}
+		return nil
+	}
+	e.setState(State{Status: StatusStarting, Skipped: skippedMsgs, Selected: selected, Progress: progress(StageTunnelUp, "")})
+	go e.handshake(ctx, instance, profileOrder(profiles), selected, opts)
+	return nil
 }
 
 func orMode(m singbox.Mode) singbox.Mode {

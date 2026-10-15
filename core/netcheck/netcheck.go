@@ -5,6 +5,7 @@ package netcheck
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"time"
 )
@@ -77,10 +78,15 @@ func run(ctx context.Context, probes []func(context.Context) error) error {
 	for _, p := range probes {
 		go func() { results <- p(ctx) }()
 	}
+	var first error
 	for range probes {
-		if <-results == nil {
+		err := <-results
+		if err == nil {
 			return nil
 		}
+		if first == nil {
+			first = err
+		}
 	}
-	return ErrOffline
+	return fmt.Errorf("%w (%v)", ErrOffline, first)
 }

@@ -49,7 +49,9 @@ func startServer(t *testing.T, inbound map[string]any) {
 func TestEndToEndShadowsocks(t *testing.T) {
 	var hits atomic.Int32
 	web := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hits.Add(1)
+		if r.URL.Path == "/data" {
+			hits.Add(1)
+		}
 		io.WriteString(w, "hello through the tunnel")
 	})}
 	webLn, err := net.Listen("tcp", "127.0.0.1:0")
@@ -76,6 +78,7 @@ func TestEndToEndShadowsocks(t *testing.T) {
 		ListenPort:   proxyPort,
 		LogLevel:     "error",
 		Selected:     res.Profiles[0].ID,
+		TestURL:      "http://" + webLn.Addr().String() + "/probe",
 		ProxyPrivate: true, // the web server is on loopback; force it through the tunnel
 	})
 	if err != nil {
@@ -88,7 +91,7 @@ func TestEndToEndShadowsocks(t *testing.T) {
 		Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)},
 		Timeout:   10 * time.Second,
 	}
-	resp, err := client.Get("http://" + webLn.Addr().String() + "/")
+	resp, err := client.Get("http://" + webLn.Addr().String() + "/data")
 	if err != nil {
 		t.Fatal(err)
 	}

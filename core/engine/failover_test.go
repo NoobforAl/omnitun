@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -74,27 +75,91 @@ func (l *stateLog) waitFor(t *testing.T, what string, ok func(State) bool) State
 	return State{}
 }
 
+// The dead selected profile is replaced by the live one, either during the
+// connect handshake or, when connected without one, by the health-check loop.
 func TestFailoverSwitchesToWorkingProfile(t *testing.T) {
-	dead, live, testURL := failoverSetup(t)
+	for _, skipHandshake := range []bool{false, true} {
+		t.Run(fmt.Sprintf("skipHandshake=%v", skipHandshake), func(t *testing.T) {
+			dead, live, testURL := failoverSetup(t)
+			var log stateLog
+			e := New(Config{
+				DataDir:       t.TempDir(),
+				OnState:       log.add,
+				NetCheck:      func(context.Context, netcheck.DialFunc) error { return nil },
+				SkipHandshake: skipHandshake,
+			})
+			err := e.Start([]*profile.Profile{dead, live}, singbox.Options{
+				ListenPort: freePort(t), LogLevel: "error", ProxyPrivate: true,
+				Selected: dead.ID, TestURL: testURL,
+				Failover: true, FailoverInterval: 200 * time.Millisecond,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { e.Stop() })
+
+			s := log.waitFor(t, "failover", func(s State) bool { return s.Failover != nil })
+			if s.Selected != live.ID || s.Failover.From != dead.ID || s.Failover.To != live.ID {
+				t.Fatalf("unexpected failover state: selected=%s event=%+v", s.Selected, s.Failover)
+			}
+			log.waitFor(t, "connected", func(s State) bool { return s.Status == StatusRunning && s.Selected == live.ID })
+		})
+	}
+}
+
+// Connecting reports every stage in order and only says "connected" after the handshake.
+func TestHandshakeProgress(t *testing.T) {
+	_, live, testURL := failoverSetup(t)
+	var log stateLog
+	e := New(Config{DataDir: t.TempDir(), OnState: log.add})
+	if err := e.Start(live.AsSlice(), singbox.Options{
+		ListenPort: freePort(t), LogLevel: "error", ProxyPrivate: true, Selected: live.ID, TestURL: testURL,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { e.Stop() })
+	log.waitFor(t, "connected", func(s State) bool { return s.Status == StatusRunning })
+
+	var stages []string
+	log.mu.Lock()
+	for _, s := range log.states {
+		if s.Progress != nil && (len(stages) == 0 || stages[len(stages)-1] != s.Progress.Stage) {
+			stages = append(stages, s.Progress.Stage)
+		}
+		if s.Status == StatusRunning && s.Progress.Stage != StageConnected {
+			t.Errorf("running before handshake finished: stage %s", s.Progress.Stage)
+		}
+	}
+	log.mu.Unlock()
+	want := []string{StagePrepare, StageEngineStart, StageTunnelUp, StageHandshake, StageConnected}
+	if !slices.Equal(stages, want) {
+		t.Fatalf("stages = %v, want %v", stages, want)
+	}
+}
+
+// When no profile answers, the connection fails at the handshake stage and the tunnel is torn down.
+func TestHandshakeFailureStopsTunnel(t *testing.T) {
+	dead, _, testURL := failoverSetup(t)
 	var log stateLog
 	e := New(Config{
 		DataDir:  t.TempDir(),
 		OnState:  log.add,
 		NetCheck: func(context.Context, netcheck.DialFunc) error { return nil },
 	})
-	err := e.Start([]*profile.Profile{dead, live}, singbox.Options{
-		ListenPort: freePort(t), LogLevel: "error", ProxyPrivate: true,
-		Selected: dead.ID, TestURL: testURL,
-		Failover: true, FailoverInterval: 200 * time.Millisecond,
-	})
-	if err != nil {
+	if err := e.Start(dead.AsSlice(), singbox.Options{
+		ListenPort: freePort(t), LogLevel: "error", ProxyPrivate: true, Selected: dead.ID, TestURL: testURL, Failover: true,
+	}); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { e.Stop() })
-
-	s := log.waitFor(t, "failover", func(s State) bool { return s.Failover != nil })
-	if s.Selected != live.ID || s.Failover.From != dead.ID || s.Failover.To != live.ID {
-		t.Fatalf("unexpected failover state: selected=%s event=%+v", s.Selected, s.Failover)
+	s := log.waitFor(t, "error", func(s State) bool { return s.Status == StatusError })
+	if s.Progress == nil || s.Progress.Stage != StageHandshake || s.NoNetwork {
+		t.Fatalf("unexpected failure state: %+v", s)
+	}
+	if !strings.HasPrefix(s.Error, "Contacting server failed") {
+		t.Fatalf("error = %q", s.Error)
+	}
+	if e.State().Status != StatusError {
+		t.Fatalf("final status = %s", e.State().Status)
 	}
 }
 
@@ -102,9 +167,10 @@ func TestFailoverWaitsWhenOffline(t *testing.T) {
 	dead, live, testURL := failoverSetup(t)
 	var log stateLog
 	e := New(Config{
-		DataDir:  t.TempDir(),
-		OnState:  log.add,
-		NetCheck: func(context.Context, netcheck.DialFunc) error { return errors.New("offline") },
+		DataDir:       t.TempDir(),
+		OnState:       log.add,
+		NetCheck:      func(context.Context, netcheck.DialFunc) error { return errors.New("offline") },
+		SkipHandshake: true, // test the running-tunnel health check, not the connect handshake
 	})
 	err := e.Start([]*profile.Profile{dead, live}, singbox.Options{
 		ListenPort: freePort(t), LogLevel: "error", ProxyPrivate: true,

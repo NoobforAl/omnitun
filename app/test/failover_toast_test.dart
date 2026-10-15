@@ -65,4 +65,39 @@ void main() {
     expect(find.text('PC-dev'), findsOneWidget); // home card follows the active profile
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('connecting shows the progress ring, percent and current step', (tester) async {
+    final engine = ScriptedEngine();
+    final store = AppStore.memory({'profiles': [_p('live', 'PC-dev')]});
+    await tester.pumpWidget(ProviderScope(
+      overrides: [storeProvider.overrideWithValue(store), engineProvider.overrideWithValue(engine)],
+      child: const OmnitunApp(),
+    ));
+    await tester.pump();
+
+    engine.controller.add(const EngineState(
+      status: ConnStatus.connecting,
+      activeProfileId: 'live',
+      progress: ConnectProgress('handshake', 85, profile: 'PC-dev'),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('85%'), findsOneWidget);
+    expect(find.text('Contacting server · PC-dev'), findsOneWidget);
+    final ring = tester.widget<CircularProgressIndicator>(find.byType(CircularProgressIndicator));
+    expect(ring.value, closeTo(0.85, 0.01));
+
+    // A failure freezes the ring at the failed stage and shows the reason.
+    engine.controller.add(const EngineState(
+      status: ConnStatus.error,
+      error: 'Contacting server failed: connection refused',
+      progress: ConnectProgress('handshake', 85, profile: 'PC-dev'),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Contacting server failed: connection refused'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('85%'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
 }

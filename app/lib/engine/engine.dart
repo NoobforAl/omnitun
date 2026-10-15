@@ -76,6 +76,23 @@ class ConnectOptions {
   final bool autoFailover;
 }
 
+/// One connection stage (see PLAN.md 3.3 #6). [percent] runs 0-100.
+class ConnectProgress {
+  const ConnectProgress(this.stage, this.percent, {this.profile});
+
+  final String stage;
+  final int percent;
+
+  /// Display name of the profile being tried, when relevant.
+  final String? profile;
+
+  factory ConnectProgress.fromJson(Map<String, dynamic> j) => ConnectProgress(
+        j['stage'] as String,
+        (j['percent'] as num).toInt(),
+        profile: j['profile'] as String?,
+      );
+}
+
 /// An automatic switch made by the core.
 class FailoverInfo {
   const FailoverInfo({required this.from, required this.to, required this.reason, required this.at});
@@ -95,6 +112,7 @@ class EngineState {
     this.upBps = 0,
     this.downBps = 0,
     this.failover,
+    this.progress,
   });
 
   final ConnStatus status;
@@ -106,6 +124,9 @@ class EngineState {
 
   /// The most recent automatic switch during this connection, if any.
   final FailoverInfo? failover;
+
+  /// Current connection stage; on error, the stage that failed.
+  final ConnectProgress? progress;
 
   EngineState copyWith({
     ConnStatus? status,
@@ -123,6 +144,7 @@ class EngineState {
         upBps: upBps ?? this.upBps,
         downBps: downBps ?? this.downBps,
         failover: failover,
+        progress: progress,
       );
 }
 

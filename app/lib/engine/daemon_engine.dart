@@ -157,6 +157,7 @@ class DaemonEngine implements VpnEngine {
     final since = s['since'] as String?;
     final selected = s['selected'] as String?;
     final f = s['failover'] as Map<String, dynamic>?;
+    final p = s['progress'] as Map<String, dynamic>?;
     _emit(EngineState(
       status: status,
       activeProfileId: selected ?? _state.activeProfileId,
@@ -172,6 +173,7 @@ class DaemonEngine implements VpnEngine {
               reason: f['reason'] as String,
               at: DateTime.parse(f['at'] as String).toLocal(),
             ),
+      progress: p == null ? null : ConnectProgress.fromJson(p),
     ));
   }
 

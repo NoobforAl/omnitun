@@ -190,9 +190,14 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 		"route": obj{
 			"rules":                   rules,
 			"final":                   TagSelect,
-			"auto_detect_interface":   true,
 			"default_domain_resolver": "local",
 		},
+	}
+	// Binding outbound sockets to the physical interface is only needed to keep
+	// them out of our own TUN; in proxy mode it just adds failure modes (some
+	// Windows security software rejects interface-bound sockets).
+	if opts.Mode == ModeTUN {
+		cfg["route"].(obj)["auto_detect_interface"] = true
 	}
 	if len(endpoints) > 0 {
 		cfg["endpoints"] = endpoints

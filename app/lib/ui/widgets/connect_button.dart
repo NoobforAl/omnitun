@@ -3,12 +3,21 @@ import 'package:flutter/material.dart';
 import '../../engine/engine.dart';
 import '../theme.dart';
 
-/// The large central connect toggle. Pulses only while connecting.
+/// The large central connect toggle. While connecting, a ring around it fills
+/// 0-100 % with the core's real progress; on failure the ring stops, red, at
+/// the stage that failed. Pulses only while busy.
 class ConnectButton extends StatefulWidget {
-  const ConnectButton({super.key, required this.status, required this.onPressed, this.size = 180});
+  const ConnectButton({
+    super.key,
+    required this.status,
+    required this.onPressed,
+    this.progress,
+    this.size = 180,
+  });
 
   final ConnStatus status;
   final VoidCallback? onPressed;
+  final ConnectProgress? progress;
   final double size;
 
   @override
@@ -21,6 +30,11 @@ class _ConnectButtonState extends State<ConnectButton> with SingleTickerProvider
 
   bool get _busy =>
       widget.status == ConnStatus.connecting || widget.status == ConnStatus.disconnecting;
+
+  /// The ring is shown while connecting and, frozen, after a failed attempt.
+  bool get _showRing =>
+      widget.progress != null &&
+      (widget.status == ConnStatus.connecting || widget.status == ConnStatus.error);
 
   @override
   void initState() {
@@ -55,51 +69,91 @@ class _ConnectButtonState extends State<ConnectButton> with SingleTickerProvider
     final color = statusColor(widget.status, scheme);
     final connected = widget.status == ConnStatus.connected;
     final label = connected || _busy ? 'Disconnect' : 'Connect';
+    final percent = widget.progress?.percent ?? 0;
+    final ringSize = widget.size + 28;
+
+    final button = AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, child) => Container(
+        width: widget.size,
+        height: widget.size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.25 + 0.25 * _pulse.value),
+              blurRadius: 24 + 24 * _pulse.value,
+              spreadRadius: 4 + 10 * _pulse.value,
+            ),
+          ],
+        ),
+        child: child,
+      ),
+      child: Material(
+        shape: const CircleBorder(),
+        color: connected ? color : scheme.surfaceContainerHighest,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: widget.onPressed,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.power_settings_new, size: widget.size * 0.32, color: connected ? Colors.white : color),
+                const SizedBox(height: 4),
+                Text(
+                  label.toUpperCase(),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        letterSpacing: 1.2,
+                        color: connected ? Colors.white : scheme.onSurface,
+                      ),
+                ),
+                if (_showRing && widget.status == ConnStatus.connecting)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      '$percent%',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: color,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
 
     return Semantics(
       button: true,
-      label: '$label. ${statusLabel(widget.status)}',
-      child: AnimatedBuilder(
-        animation: _pulse,
-        builder: (context, child) => Container(
-          width: widget.size,
-          height: widget.size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.25 + 0.25 * _pulse.value),
-                blurRadius: 24 + 24 * _pulse.value,
-                spreadRadius: 4 + 10 * _pulse.value,
-              ),
-            ],
-          ),
-          child: child,
-        ),
-        child: Material(
-          shape: const CircleBorder(),
-          color: connected ? color : scheme.surfaceContainerHighest,
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: widget.onPressed,
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.power_settings_new,
-                      size: widget.size * 0.36, color: connected ? Colors.white : color),
-                  const SizedBox(height: 4),
-                  Text(
-                    label.toUpperCase(),
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          letterSpacing: 1.2,
-                          color: connected ? Colors.white : scheme.onSurface,
-                        ),
+      label: '$label. ${statusLabel(widget.status)}${_showRing ? ', $percent percent' : ''}',
+      child: SizedBox(
+        width: ringSize,
+        height: ringSize,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (_showRing)
+              TweenAnimationBuilder<double>(
+                tween: Tween(end: percent / 100),
+                duration: const Duration(milliseconds: 450),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, _) => SizedBox(
+                  width: ringSize,
+                  height: ringSize,
+                  child: CircularProgressIndicator(
+                    value: value,
+                    strokeWidth: 6,
+                    strokeCap: StrokeCap.round,
+                    color: color,
+                    backgroundColor: color.withValues(alpha: 0.15),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            button,
+          ],
         ),
       ),
     );

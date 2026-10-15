@@ -27,29 +27,31 @@ void main() {
     final port = socket.port;
     await socket.close();
 
-    final states = <ConnStatus>[];
-    final sub = engine.states.listen((s) => states.add(s.status));
+    // A profile nothing listens on: the tunnel comes up, then the handshake
+    // fails and the core reports that stage instead of claiming "connected".
+    final dead = await engine.importText('ss://aes-128-gcm:x@127.0.0.1:$port#dead');
+    final states = <EngineState>[];
+    final sub = engine.states.listen(states.add);
     await engine.connect(
-      imported.profiles.single,
-      options: ConnectOptions(systemProxy: false, listenPort: port),
+      dead.profiles.single,
+      options: ConnectOptions(systemProxy: false, listenPort: port + 1, autoFailover: false),
     );
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    if (states.contains(ConnStatus.noInternet)) {
+    final deadline = DateTime.now().add(const Duration(seconds: 20));
+    while (states.isEmpty || states.last.status != ConnStatus.error) {
+      if (DateTime.now().isAfter(deadline)) fail('no error reported: ${states.map((s) => s.status).toList()}');
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    await sub.cancel();
+    if (states.last.error == 'No internet connection' || states.any((s) => s.status == ConnStatus.noInternet)) {
       markTestSkipped('no network available for the pre-connect check');
       return;
     }
-    expect(states.last, ConnStatus.connected);
+    expect(states.any((s) => s.status == ConnStatus.connected), isFalse);
+    final stages = states.map((s) => s.progress?.stage).nonNulls.toSet();
+    expect(stages, containsAll(['network_check', 'prepare', 'engine_start', 'tunnel_up', 'handshake']));
+    expect(states.last.progress?.stage, 'handshake');
+    expect(states.last.error, startsWith('Contacting server failed'));
 
-    // The local proxy port is open while connected.
-    final probe = await Socket.connect(InternetAddress.loopbackIPv4, port);
-    probe.destroy();
-
-    await engine.disconnect();
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    expect(states.last, ConnStatus.disconnected);
-    await sub.cancel();
-
-    final dead = await engine.importText('ss://aes-128-gcm:x@127.0.0.1:$port#dead');
     expect(await engine.testLatency(dead.profiles.single), -1);
   }, skip: exe == null ? 'omnitun-svc not built' : false, timeout: const Timeout(Duration(seconds: 60)));
 }

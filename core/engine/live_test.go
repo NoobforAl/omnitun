@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/NoobforAl/omnitun/core/importer"
+	"github.com/NoobforAl/omnitun/core/singbox"
 )
 
 // TestLiveLatency measures a real profile over the internet. Opt-in:
@@ -31,5 +32,28 @@ func TestLiveLatency(t *testing.T) {
 		if r.Ms < 0 {
 			t.Errorf("unreachable: %s", r.Error)
 		}
+	}
+}
+
+// TestLiveNetCheck checks the "is the device online" probe through a running
+// tunnel's direct outbound. Opt-in: OMNITUN_LIVE_NET=1.
+func TestLiveNetCheck(t *testing.T) {
+	if os.Getenv("OMNITUN_LIVE_NET") == "" {
+		t.Skip("OMNITUN_LIVE_NET not set")
+	}
+	res, err := importer.Import("ss://aes-128-gcm:x@127.0.0.1:1#dead")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := New(Config{DataDir: t.TempDir(), SkipHandshake: true, OnLog: func(l, m string) { t.Log(l, m) }})
+	if err := e.Start(res.Profiles, singbox.Options{LogLevel: "error"}); err != nil {
+		t.Fatal(err)
+	}
+	defer e.Stop()
+	e.mu.Lock()
+	instance := e.instance
+	e.mu.Unlock()
+	if err := e.netCheck(t.Context(), instance); err != nil {
+		t.Fatalf("netCheck via direct outbound: %v", err)
 	}
 }

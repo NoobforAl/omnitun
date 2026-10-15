@@ -36,14 +36,23 @@ class MockEngine implements VpnEngine {
     List<ProfileInfo> fallbacks = const [],
     ConnectOptions options = const ConnectOptions(),
   }) async {
-    _emit(EngineState(status: ConnStatus.connecting, activeProfileId: profile.id));
     _log('connecting to ${profile.name} (${profile.protocol})');
-    await Future<void>.delayed(connectDelay);
-    if (_state.status != ConnStatus.connecting) return;
+    const stages = [
+      ConnectProgress('network_check', 15),
+      ConnectProgress('prepare', 25),
+      ConnectProgress('engine_start', 45),
+      ConnectProgress('tunnel_up', 65),
+    ];
+    for (final p in [...stages, ConnectProgress('handshake', 85, profile: profile.name)]) {
+      _emit(EngineState(status: ConnStatus.connecting, activeProfileId: profile.id, progress: p));
+      await Future<void>.delayed(connectDelay ~/ 5);
+      if (_state.status != ConnStatus.connecting) return;
+    }
     _emit(EngineState(
       status: ConnStatus.connected,
       activeProfileId: profile.id,
       connectedSince: DateTime.now(),
+      progress: ConnectProgress('connected', 100, profile: profile.name),
     ));
     _log('connected, health probe ok');
     _traffic?.cancel();

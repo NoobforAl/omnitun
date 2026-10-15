@@ -13,6 +13,7 @@ import (
 func newTestServer(t *testing.T, cfg ServerConfig) (*Server, string) {
 	t.Helper()
 	cfg.DataDir = t.TempDir()
+	cfg.SkipHandshake = true // example.com servers are unreachable
 	if cfg.NetCheck == nil {
 		cfg.NetCheck = func(context.Context) error { return nil }
 	}

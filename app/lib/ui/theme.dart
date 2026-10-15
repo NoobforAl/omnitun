@@ -47,6 +47,20 @@ String statusLabel(ConnStatus status) {
   };
 }
 
+/// Human label for a connection stage reported by the core (PLAN.md 3.3 #6).
+String stageLabel(String stage) {
+  return switch (stage) {
+    'permission' => 'Waiting for VPN permission',
+    'network_check' => 'Checking internet connection',
+    'prepare' => 'Preparing configuration',
+    'engine_start' => 'Starting engine',
+    'tunnel_up' => 'Opening tunnel',
+    'handshake' => 'Contacting server',
+    'connected' => 'Connected',
+    _ => stage,
+  };
+}
+
 /// Short protocol badge labels, kept fixed so users learn them.
 String protocolBadge(String protocol) {
   return switch (protocol) {

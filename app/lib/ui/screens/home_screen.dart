@@ -45,6 +45,7 @@ class HomeScreen extends ConsumerWidget {
                 const SizedBox(height: 40),
                 ConnectButton(
                   status: conn.status,
+                  progress: conn.progress,
                   onPressed: profile == null ? null : () => ref.read(connectionProvider.notifier).toggle(),
                 ),
                 const SizedBox(height: 40),
@@ -135,6 +136,20 @@ class _StatusLineState extends State<_StatusLine> {
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontFeatures: const [FontFeature.tabularFigures()],
                     )),
+          ),
+        // While connecting, say which step is running (and for which profile).
+        if (s.status == ConnStatus.connecting && s.progress != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Text(
+                [stageLabel(s.progress!.stage), ?s.progress!.profile].join(' · '),
+                key: ValueKey('${s.progress!.stage}${s.progress!.profile}'),
+                style: Theme.of(context).textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ),
           ),
       ],
     );

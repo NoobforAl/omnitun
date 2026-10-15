@@ -45,6 +45,8 @@ type ServerConfig struct {
 	NetCheck func(ctx context.Context) error
 	// CertificateStore is passed to the engine (see engine.Config).
 	CertificateStore string
+	// SkipHandshake is passed to the engine (tests with unreachable servers).
+	SkipHandshake bool
 	// Platform is passed to the engine (mobile only).
 	Platform adapter.PlatformInterface
 	// OnState is called on every engine state change, after clients are notified.
@@ -100,6 +102,7 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 		DataDir:          cfg.DataDir,
 		Platform:         cfg.Platform,
 		CertificateStore: cfg.CertificateStore,
+		SkipHandshake:    cfg.SkipHandshake,
 		OnState: func(st engine.State) {
 			s.broadcast(Event{Event: "state", Data: st})
 			if cfg.OnState != nil {
@@ -365,7 +368,9 @@ func (s *Server) dispatch(req Request) (any, error) {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+		s.engine.ReportProgress(engine.StageNetworkCheck)
 		if err := s.cfg.NetCheck(ctx); err != nil {
+			s.engine.FailAt(engine.StageNetworkCheck, err)
 			return nil, &Error{Code: CodeNoNetwork, Message: err.Error()}
 		}
 		opts := singbox.Options{
