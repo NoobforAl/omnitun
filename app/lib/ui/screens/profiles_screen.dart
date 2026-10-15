@@ -9,6 +9,7 @@ import '../../state/subscriptions.dart';
 import '../widgets/protocol_badge.dart';
 import 'qr_scan_screen.dart';
 import 'subscription_screen.dart';
+import '../widgets/credentials_dialog.dart';
 
 class ProfilesScreen extends ConsumerWidget {
   const ProfilesScreen({super.key});
@@ -119,7 +120,10 @@ class _GroupList extends ConsumerWidget {
               selected: p.id == selectedId,
               leading: Icon(p.id == selectedId ? Icons.radio_button_checked : Icons.radio_button_off),
               title: Text(p.name, overflow: TextOverflow.ellipsis),
-              subtitle: Text('${p.server}:${p.port}', overflow: TextOverflow.ellipsis),
+              subtitle: Text(
+                p.needsCredentials && !p.hasCredentials ? '${p.server}:${p.port} · needs sign-in' : '${p.server}:${p.port}',
+                overflow: TextOverflow.ellipsis,
+              ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -129,8 +133,13 @@ class _GroupList extends ConsumerWidget {
                   PopupMenuButton<String>(
                     onSelected: (v) {
                       if (v == 'delete') ref.read(profilesProvider.notifier).remove(p.id);
+                      if (v == 'credentials') askCredentials(context, ref, p);
                     },
-                    itemBuilder: (_) => const [PopupMenuItem(value: 'delete', child: Text('Delete'))],
+                    itemBuilder: (_) => [
+                      if (p.needsCredentials)
+                        const PopupMenuItem(value: 'credentials', child: Text('Username and password')),
+                      const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                    ],
                   ),
                 ],
               ),

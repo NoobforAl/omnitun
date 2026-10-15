@@ -43,7 +43,9 @@ users
   user expire <name> <days|never>
   user quota <name> <GB|0>
   user reset <name>                   new credentials (old links stop working)
-  link <name> [--qr] [--sub]          share links; --sub: subscription URL only
+  link <name> [--qr] [--sub] [--ovpn udp|tcp]
+                                      share links; --sub: subscription URL only;
+                                      --ovpn: print the OpenVPN config file
 
 run
   run                                 start the server (reloads when users change)
@@ -330,12 +332,13 @@ func cmdLink(s *store.Store, args []string) error {
 	fs := flag.NewFlagSet("link", flag.ExitOnError)
 	qr := fs.Bool("qr", false, "show QR codes")
 	subOnly := fs.Bool("sub", false, "only the subscription URL")
+	ovpn := fs.String("ovpn", "", "print the user's OpenVPN config file: udp or tcp")
 	pos, err := parse(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(pos) == 0 {
-		return fmt.Errorf("usage: link <name> [--qr] [--sub]")
+		return fmt.Errorf("usage: link <name> [--qr] [--sub] [--ovpn udp|tcp]")
 	}
 	st, err := s.Load()
 	if err != nil {
@@ -344,6 +347,14 @@ func cmdLink(s *store.Store, args []string) error {
 	u := st.User(pos[0])
 	if u == nil {
 		return fmt.Errorf("no user %q", pos[0])
+	}
+	if *ovpn != "" {
+		text, err := serverconf.OVPN(st, u, "openvpn-"+strings.TrimPrefix(*ovpn, "openvpn-"))
+		if err != nil {
+			return err
+		}
+		fmt.Print(text)
+		return nil
 	}
 	printLinks(st, u, *qr, *subOnly)
 	return nil
@@ -367,6 +378,16 @@ func printLinks(st *store.State, u *store.User, qr, subOnly bool) {
 	}
 	for _, l := range serverconf.Links(st, u) {
 		show(l.Protocol+":", l.URL)
+	}
+	for _, proto := range []string{store.OpenVPNUDP, store.OpenVPNTCP} {
+		if p := st.Server.Protocols[proto]; p == nil || !p.Enabled {
+			continue
+		}
+		if url := serverconf.OVPNURL(st, u, proto); url != "" {
+			show(proto+" (.ovpn file for any OpenVPN app):", url)
+		} else {
+			fmt.Printf("%s: link %s --ovpn %s > %s.ovpn\n\n", proto, u.Name, strings.TrimPrefix(proto, "openvpn-"), proto)
+		}
 	}
 }
 

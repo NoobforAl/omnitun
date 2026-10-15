@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/NoobforAl/omnitun/core/profile"
@@ -131,5 +132,48 @@ func TestImportSingBoxJSON(t *testing.T) {
 	}
 	if wg := res.Profiles[3]; wg.Protocol != profile.WireGuard || wg.Server != "w.example.com" || wg.Port != 51820 {
 		t.Fatalf("wg: %+v", wg)
+	}
+}
+
+func TestParseOVPN(t *testing.T) {
+	base := "client\ndev tun\nproto tcp-client\nremote vpn1.example.com 443\nremote vpn2.example.com 1194 udp\nremote-random\n" +
+		"cipher AES-256-CBC\ndata-ciphers AES-256-GCM:CHACHA20-POLY1305\nauth SHA256\ncomp-lzo\nverify-x509-name server name\n" +
+		"remote-cert-tls server\nresolv-retry infinite\nauth-user-pass\n<ca>\n-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n</ca>\n" +
+		"key-direction 1\n<tls-auth>\n-----BEGIN OpenVPN Static key V1-----\nab\n-----END OpenVPN Static key V1-----\n</tls-auth>\n"
+	res, err := Import(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := res.Profiles[0]
+	o := p.OpenVPN
+	if p.Protocol != profile.OpenVPN || p.Server != "vpn1.example.com" || p.Port != 443 || o.Network != "tcp" {
+		t.Fatalf("first remote: %+v %+v", p, o)
+	}
+	if len(o.Remotes) != 1 || o.Remotes[0].Network != "udp" || o.Remotes[0].Port != 1194 || !o.RemoteRandom {
+		t.Fatalf("remotes: %+v", o.Remotes)
+	}
+	if !o.NeedsAuth || o.ControlWrap != "tls-auth" || o.KeyDirection != "1" || o.CompressionLZO != "adaptive" ||
+		o.VerifyX509Type != "name" || len(o.DataCiphers) != 2 || o.Cipher != "AES-256-CBC" {
+		t.Fatalf("options: %+v", o)
+	}
+
+	for name, bad := range map[string]string{
+		"file reference": strings.Replace(base, "<ca>", "ca ca.crt\n<x>", 1),
+		"tap":            strings.Replace(base, "dev tun", "dev tap", 1),
+		"no ca":          strings.Replace(strings.Replace(base, "<ca>", "<cax>", 1), "</ca>", "</cax>", 1),
+		"auth file":      strings.Replace(base, "auth-user-pass\n", "auth-user-pass creds.txt\n", 1),
+	} {
+		if _, err := Import(bad); err == nil {
+			t.Errorf("%s: expected an error", name)
+		}
+	}
+	// Inline credentials.
+	withCreds := base + "<auth-user-pass>\nalice\nsecret\n</auth-user-pass>\n"
+	res, err = Import(withCreds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := res.Profiles[0]; p.Username != "alice" || p.Password != "secret" {
+		t.Fatalf("inline creds: %q %q", p.Username, p.Password)
 	}
 }

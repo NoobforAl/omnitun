@@ -35,6 +35,13 @@ func Import(text string) (*Result, error) {
 	if looksLikeClash(text) {
 		return ImportClash(text)
 	}
+	if looksLikeOVPN(text) {
+		p, err := ParseOVPN(text)
+		if err != nil {
+			return nil, fmt.Errorf("openvpn: %w", err)
+		}
+		return &Result{Profiles: []*profile.Profile{p}}, nil
+	}
 	if looksLikeWireGuardConf(text) {
 		p, err := ParseWireGuardConf(text)
 		if err != nil {

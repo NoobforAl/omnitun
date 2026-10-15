@@ -70,7 +70,9 @@ func (s *Server) Start() error {
 func (s *Server) startBoxLocked(st *store.State) error {
 	s.loaded = s.store.ModTime()
 	cfg := serverconf.Build(st, s.store, time.Now())
-	if len(cfg["inbounds"].([]any)) == 0 {
+	inbounds, _ := cfg["inbounds"].([]any)
+	endpoints, _ := cfg["endpoints"].([]any)
+	if len(inbounds)+len(endpoints) == 0 {
 		s.logf("no active users or protocols; waiting for changes")
 		return nil
 	}
@@ -86,7 +88,7 @@ func (s *Server) startBoxLocked(st *store.State) error {
 		if err == nil {
 			if err = instance.Start(); err == nil {
 				s.instance, s.cancel = instance, cancel
-				s.logf("serving %d inbound(s) for %d user(s)", len(cfg["inbounds"].([]any)), len(st.ActiveUsers(time.Now())))
+				s.logf("serving %d protocol(s) for %d user(s)", len(inbounds)+len(endpoints), len(st.ActiveUsers(time.Now())))
 				return nil
 			}
 			instance.Close()

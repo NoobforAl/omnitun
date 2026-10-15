@@ -55,9 +55,14 @@ class ProfilesController extends Notifier<List<ProfileInfo>> {
     final at = state.indexWhere((p) => p.group == group);
     final rest = state.where((p) => p.group != group).toList();
     final fresh = <String>{};
+    // Credentials entered in the app aren't part of the subscription; keep them.
+    final old = {for (final p in state) p.id: p};
     final incoming = [
       for (final p in profiles)
-        if (fresh.add(p.id)) p.inGroup(group),
+        if (fresh.add(p.id))
+          (p.needsCredentials && !p.hasCredentials && (old[p.id]?.hasCredentials ?? false))
+              ? p.inGroup(group).withCredentials(old[p.id]!.raw['username'] as String, old[p.id]!.raw['password'] as String)
+              : p.inGroup(group),
     ];
     // A profile also imported manually stays in its manual group.
     final manual = {for (final p in rest) p.id};
@@ -65,6 +70,10 @@ class ProfilesController extends Notifier<List<ProfileInfo>> {
     final insertAt = at < 0 ? rest.length : rest.where((p) => state.indexOf(p) < at).length;
     _save([...rest.take(insertAt), ...incoming, ...rest.skip(insertAt)]);
   }
+
+  /// Saves the username and password of a profile that needs them (OpenVPN).
+  void setCredentials(String id, String username, String password) =>
+      _save([for (final p in state) p.id == id ? p.withCredentials(username, password) : p]);
 
   void removeGroup(String group) => _save(state.where((p) => p.group != group).toList());
 

@@ -41,7 +41,7 @@ Decision (2026-10-15): dependencies are chosen on technical merit; license compa
 | amneziawg-go | AmneziaWG (not supported by sing-box) |
 | Arti (Rust) + lyrebird/snowflake/webtunnel | Tor with bridges |
 | NaiveProxy | Separate binary (Chromium network stack) |
-| OpenVPN | sing-box 1.14 has an `openvpn` outbound (`with_openvpn` tag) — try it first; fall back to OpenVPN 2.6 binary (needed for the XOR patch) |
+| OpenVPN | sing-box 1.14's `openvpn-client` / `openvpn-server` endpoints (`with_openvpn` tag) — in use for client and server; the OpenVPN 2.6 binary is only needed for the XOR patch |
 | OpenConnect / NaiveProxy | Also built into sing-box 1.14 (`with_openconnect`, `with_naive_outbound` — naive needs cronet, so it's off for now) |
 | Lightway (Rust, Linux/macOS only today) | Separate binary, low priority |
 | Windows RAS / Android `Ikev2VpnProfile` | IKEv2, L2TP, SSTP (OS-native) |
@@ -182,7 +182,7 @@ omnitun-server tui                             interactive manager
 omnitun-server service                         systemd unit
 ```
 
-- **Protocols (in-process, sing-box):** VLESS+Reality (no certificate needed; impersonates a real site), Shadowsocks-2022 (multi-user), Trojan, Hysteria2, TUIC. Trojan/Hysteria2/TUIC use a generated self-signed certificate (links carry `insecure=1`).
+- **Protocols (in-process, sing-box):** VLESS+Reality (no certificate needed; impersonates a real site), Shadowsocks-2022 (multi-user), Trojan, Hysteria2, TUIC, OpenVPN over UDP and TCP (own CA, tls-crypt, users sign in with name + password; `.ovpn` download per user; Omnitun clients get a sing-box JSON subscription that includes OpenVPN). Trojan/Hysteria2/TUIC use a generated self-signed certificate (links carry `insecure=1`).
 - **Users:** every user gets credentials for every protocol and **one subscription URL** (`http://host:port/<random path>/<token>`) that returns all links in failover order with `subscription-userinfo` (quota, expiry), `profile-update-interval` and `profile-title` headers. The Omnitun client imports it as a group.
 - **Live changes:** CLI and TUI edit the same state file; `run` reloads within 2 s and removes expired users each minute.
 - **TUI** (Bubble Tea): user table (status, expiry, quota, note), add / enable-disable / expiry / quota / note / new credentials / delete, per-user view with QR codes for the subscription and each link, protocol on/off and ports.
@@ -318,7 +318,8 @@ omnitun/
 - [ ] Onboarding screens; profile sharing (QR/link) from the app
 
 ### Phase 5 — More client protocols
-- [ ] OpenVPN via sing-box's `openvpn` outbound (try first) or the OpenVPN 2.6 binary; XOR/Stunnel obfuscation
+- [x] OpenVPN via sing-box's `openvpn-client` endpoint: `.ovpn` import (inline certs, tls-auth/tls-crypt/tls-crypt-v2, multiple remotes, comp-lzo/compress, verify-x509-name), username/password prompt in the app, sing-box JSON import; end-to-end tests (TCP cert + tls-crypt, UDP user/pass + tls-auth); verified on device through omnitun-server
+- [ ] OpenVPN XOR/Stunnel obfuscation
 - [ ] Stealth (WireGuard over TLS), NordLynx (token → WireGuard)
 - [ ] Windows built-in VPN: IKEv2, L2TP/IPsec, SSTP
 - [ ] Android: IKEv2 (`Ikev2VpnProfile`), SSTP; L2TP shown as unsupported
@@ -331,13 +332,13 @@ omnitun/
 ### Phase 8 — Server (`omnitun-server`)
 - [x] `init` with Reality keys, Shadowsocks-2022 key, self-signed certificate
 - [x] Users: add / list / delete / enable / disable / expiry / quota / note / new credentials
-- [x] Protocols: VLESS+Reality, Shadowsocks-2022, Trojan, Hysteria2, TUIC (all verified end-to-end with the Omnitun client)
+- [x] Protocols: VLESS+Reality, Shadowsocks-2022, Trojan, Hysteria2, TUIC, OpenVPN UDP/TCP (all verified end-to-end with the Omnitun client)
 - [x] Per-user links + terminal QR codes; one subscription URL per user with quota/expiry headers
 - [x] `run` with live reload on changes and expiry; `service` prints a systemd unit
 - [x] TUI: users, links + QR, protocol on/off and ports
 - [ ] Per-user traffic accounting and quota **enforcement** (today the quota is only reported)
 - [ ] ACME/Let's Encrypt certificates for a domain (no more `insecure=1`); HTTPS for the subscription endpoint
-- [ ] WireGuard / AmneziaWG server, Tor bridge (obfs4/WebTunnel), OpenVPN / IKEv2 / SSTP via system packages
+- [ ] WireGuard / AmneziaWG server, Tor bridge (obfs4/WebTunnel), IKEv2 / SSTP via system packages
 - [ ] Firewall/NAT setup (nftables), `install` command that writes and enables the systemd unit
 - [ ] File locking for concurrent CLI/TUI writes; backup/export of the state
 - [ ] TUI: live server status, traffic per user, logs

@@ -8,6 +8,7 @@ import '../../state/providers.dart';
 import '../theme.dart';
 import '../widgets/connect_button.dart';
 import '../widgets/protocol_badge.dart';
+import '../widgets/credentials_dialog.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key, required this.onOpenProfiles});
@@ -46,7 +47,15 @@ class HomeScreen extends ConsumerWidget {
                 ConnectButton(
                   status: conn.status,
                   progress: conn.progress,
-                  onPressed: profile == null ? null : () => ref.read(connectionProvider.notifier).toggle(),
+                  onPressed: profile == null
+                      ? null
+                      : () async {
+                          final conn = ref.read(connectionProvider.notifier);
+                          if (!conn.isActive && profile.needsCredentials && !profile.hasCredentials) {
+                            if (!await askCredentials(context, ref, profile)) return;
+                          }
+                          conn.toggle();
+                        },
                 ),
                 const SizedBox(height: 40),
                 if (conn.status == ConnStatus.connected) ...[

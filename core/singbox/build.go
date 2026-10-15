@@ -279,6 +279,9 @@ func convert(p *profile.Profile) (out obj, isEndpoint bool, err error) {
 		addTLS(base, tlsOrDefault(p.TLS))
 	case profile.WireGuard:
 		return wireguardEndpoint(p), true, nil
+	case profile.OpenVPN:
+		ep, err := openvpnEndpoint(p)
+		return ep, true, err
 	case profile.AmneziaWG:
 		return nil, false, fmt.Errorf("amneziawg runs on the dedicated AWG engine (not sing-box)")
 	default:
@@ -318,6 +321,91 @@ func wireguardEndpoint(p *profile.Profile) obj {
 		ep["mtu"] = wg.MTU
 	}
 	return ep
+}
+
+// openvpnEndpoint maps an OpenVPN profile to sing-box's openvpn-client endpoint.
+func openvpnEndpoint(p *profile.Profile) (obj, error) {
+	o := p.OpenVPN
+	if o == nil {
+		return nil, fmt.Errorf("missing OpenVPN settings")
+	}
+	if o.NeedsAuth && (p.Username == "" || p.Password == "") {
+		return nil, profile.ErrNeedsCredentials
+	}
+	ep := obj{"type": "openvpn-client"}
+	if len(o.Remotes) == 0 {
+		ep["server"], ep["server_port"], ep["network"] = p.Server, p.Port, orDefault(o.Network, "udp")
+	} else {
+		servers := []any{obj{"server": p.Server, "server_port": p.Port, "network": orDefault(o.Network, "udp")}}
+		for _, r := range o.Remotes {
+			servers = append(servers, obj{"server": r.Server, "server_port": r.Port, "network": orDefault(r.Network, "udp")})
+		}
+		ep["servers"] = servers
+	}
+	if o.RemoteRandom {
+		ep["remote_random"] = true
+	}
+	if p.Username != "" {
+		ep["username"], ep["password"] = p.Username, p.Password
+	}
+	tls := obj{"certificate": []string{o.CA}}
+	if o.Cert != "" {
+		tls["client_certificate"] = []string{o.Cert}
+		tls["client_key"] = []string{o.Key}
+	}
+	if o.VerifyX509Name != "" {
+		tls["server_name"] = o.VerifyX509Name
+		if o.VerifyX509Type != "" {
+			tls["server_name_type"] = o.VerifyX509Type
+		} else {
+			tls["server_name_type"] = "subject"
+		}
+	}
+	if o.RemoteCertTLS != "" {
+		tls["remote_certificate_tls"] = o.RemoteCertTLS
+	}
+	if o.TLSVersionMin != "" {
+		tls["version_min"] = o.TLSVersionMin
+	}
+	if o.TLSCipher != "" {
+		tls["cipher"] = o.TLSCipher
+	}
+	if o.ControlWrap != "" {
+		cw := obj{"type": strings.ReplaceAll(o.ControlWrap, "-", "_"), "key": []string{o.ControlWrapKey}}
+		if o.ControlWrap == "tls-auth" {
+			switch o.KeyDirection {
+			case "1":
+				cw["direction"] = "client"
+			case "0":
+				cw["direction"] = "server"
+			}
+		}
+		tls["control_wrap"] = cw
+	}
+	ep["tls"] = tls
+	if len(o.DataCiphers) > 0 {
+		ep["data_ciphers"] = o.DataCiphers
+	}
+	// In TLS mode a client's `cipher` is the fallback for servers without cipher negotiation.
+	if fb := orDefault(o.DataCiphersFallback, o.Cipher); fb != "" {
+		ep["data_ciphers_fallback"] = fb
+	}
+	if o.Auth != "" {
+		ep["auth"] = o.Auth
+	}
+	if o.Compression != "" {
+		ep["compression"] = o.Compression
+	}
+	if o.CompressionLZO != "" {
+		ep["compression_lzo"] = o.CompressionLZO
+	}
+	if o.MTU > 0 {
+		ep["mtu"] = o.MTU
+	}
+	if o.MSSFix > 0 {
+		ep["mss_fix"] = o.MSSFix
+	}
+	return ep, nil
 }
 
 // normalizePrefixes adds a host prefix length to bare addresses.
@@ -452,4 +540,10 @@ func orDefault(s, def string) string {
 		return def
 	}
 	return s
+}
+
+// Outbound converts one profile to a sing-box outbound, or to an endpoint
+// (isEndpoint) for WireGuard and OpenVPN. The caller sets "tag".
+func Outbound(p *profile.Profile) (out map[string]any, isEndpoint bool, err error) {
+	return convert(p)
 }

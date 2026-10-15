@@ -130,4 +130,30 @@ void main() {
     );
     expect(old.isDue, isTrue);
   });
+
+  test('OpenVPN credentials are saved, persisted and survive a refresh', () async {
+    ProfileInfo ovpn() => ProfileInfo.fromJson({
+          'id': 'o', 'name': 'VPN', 'protocol': 'openvpn', 'server': 'vpn.x', 'port': 1194,
+          'openvpn': {'needs_auth': true, 'ca': 'x'},
+        });
+    engine.next = [ovpn()];
+    await c.read(subscriptionsProvider.notifier).add(url: 'https://prov.example/sub');
+    var p = c.read(profilesProvider).single;
+    expect(p.needsCredentials, isTrue);
+    expect(p.hasCredentials, isFalse);
+
+    c.read(profilesProvider.notifier).setCredentials('o', 'alice', 'secret');
+    p = c.read(profilesProvider).single;
+    expect(p.hasCredentials, isTrue);
+    expect(p.raw['username'], 'alice');
+
+    final id = c.read(subscriptionsProvider).single.id;
+    engine.next = [ovpn()];
+    await c.read(subscriptionsProvider.notifier).refresh(id);
+    expect(c.read(profilesProvider).single.raw['password'], 'secret');
+
+    c.dispose();
+    c = make();
+    expect(c.read(profilesProvider).single.hasCredentials, isTrue);
+  });
 }

@@ -58,6 +58,8 @@ func setup(t *testing.T) (*store.Store, *Server) {
 			store.Trojan:       freeTCP(t),
 			store.Hysteria2:    freeUDP(t),
 			store.TUIC:         freeUDP(t),
+			store.OpenVPNUDP:   freeUDP(t),
+			store.OpenVPNTCP:   freeTCP(t),
 		},
 		RealityHandshake: "localhost:" + decoyPort,
 		SubPort:          freeTCP(t),
@@ -81,28 +83,53 @@ func setup(t *testing.T) (*store.Store, *Server) {
 	return s, srv
 }
 
-// Every generated link must work with the Omnitun client engine against the generated server.
-func TestGeneratedLinksConnect(t *testing.T) {
+// lanIPv4 returns a non-loopback IPv4 address: packets inside an OpenVPN
+// tunnel can't go to loopback (the server's netstack drops them).
+func lanIPv4(t *testing.T) string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range addrs {
+		if ipn, ok := a.(*net.IPNet); ok && ipn.IP.To4() != nil && !ipn.IP.IsLoopback() && !ipn.IP.IsLinkLocalUnicast() {
+			return ipn.IP.String()
+		}
+	}
+	t.Skip("no LAN IPv4 address")
+	return ""
+}
+
+// Every profile the server hands out (the sing-box subscription, which also
+// carries OpenVPN) must work with the Omnitun client engine against the server.
+func TestGeneratedProfilesConnect(t *testing.T) {
 	s, _ := setup(t)
 	st, err := s.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	web := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	web := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "ok:"+r.URL.Path)
 	}))
+	web.Listener.Close()
+	if web.Listener, err = net.Listen("tcp", net.JoinHostPort(lanIPv4(t), "0")); err != nil {
+		t.Fatal(err)
+	}
+	web.Start()
 	defer web.Close()
 
-	links := serverconf.Links(st, st.User("alice"))
-	if len(links) != len(store.AllProtocols) {
-		t.Fatalf("got %d links", len(links))
+	body, err := serverconf.SingBoxSubscription(st, st.User("alice"))
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, l := range links {
-		t.Run(l.Protocol, func(t *testing.T) {
-			p, err := importer.ParseLink(l.URL)
-			if err != nil {
-				t.Fatalf("client cannot parse %s: %v", l.URL, err)
-			}
+	res, err := importer.Import(string(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Profiles) != len(store.AllProtocols) {
+		t.Fatalf("got %d profiles, errors %v", len(res.Profiles), res.Errors)
+	}
+	for _, p := range res.Profiles {
+		t.Run(p.Name, func(t *testing.T) {
 			proxyPort := freeTCP(t)
 			e := engine.New(engine.Config{DataDir: t.TempDir()})
 			if err := e.Start(p.AsSlice(), singbox.Options{
@@ -153,9 +180,44 @@ func TestSubscriptionEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Share links exist for everything except OpenVPN.
 	res, err := importer.Import(string(decoded))
-	if err != nil || len(res.Profiles) != len(store.AllProtocols) {
+	if err != nil || len(res.Profiles) != len(store.AllProtocols)-2 {
 		t.Fatalf("import: %v, %d profiles", err, len(res.Profiles))
+	}
+
+	// The Omnitun client gets a sing-box config including both OpenVPN variants.
+	req, _ := http.NewRequest(http.MethodGet, subURL, nil)
+	req.Header.Set("User-Agent", "Omnitun/0.1 v2rayN/7.0")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	res, err = importer.Import(string(body))
+	if err != nil || len(res.Profiles) != len(store.AllProtocols) {
+		t.Fatalf("sing-box import: %v, %d profiles %v", err, len(res.Profiles), res.Errors)
+	}
+	ovpns := 0
+	for _, p := range res.Profiles {
+		if p.Protocol == "openvpn" && p.Username == "alice" && p.Password == u.Password {
+			ovpns++
+		}
+	}
+	if ovpns != 2 {
+		t.Fatalf("openvpn profiles with credentials: %d", ovpns)
+	}
+
+	// The .ovpn download works in any OpenVPN client (and in Omnitun).
+	resp, err = http.Get(serverconf.OVPNURL(st, u, store.OpenVPNTCP))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if res, err := importer.Import(string(body)); err != nil || res.Profiles[0].OpenVPN.Network != "tcp" {
+		t.Fatalf(".ovpn import: %v", err)
 	}
 
 	// Wrong token: not found. Disabled user: forbidden and removed from sing-box on reload.
@@ -176,5 +238,27 @@ func TestSubscriptionEndpoint(t *testing.T) {
 	srv.mu.Unlock()
 	if running {
 		t.Fatal("sing-box still running with no active users")
+	}
+}
+
+// A server with only OpenVPN enabled still starts.
+func TestOnlyOpenVPN(t *testing.T) {
+	s, srv := setup(t)
+	if err := s.Update(func(st *store.State) error {
+		for _, p := range store.AllProtocols {
+			st.Server.Protocols[p].Enabled = store.IsOpenVPN(p)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Reload(); err != nil {
+		t.Fatal(err)
+	}
+	srv.mu.Lock()
+	running := srv.instance != nil
+	srv.mu.Unlock()
+	if !running {
+		t.Fatal("sing-box not running with only OpenVPN enabled")
 	}
 }

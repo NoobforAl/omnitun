@@ -47,6 +47,16 @@ class ProfileInfo {
         raw: raw,
       );
 
+  /// OpenVPN profiles with `auth-user-pass` need a username and password.
+  bool get needsCredentials => (raw['openvpn'] as Map?)?['needs_auth'] == true;
+
+  bool get hasCredentials =>
+      (raw['username'] as String? ?? '').isNotEmpty && (raw['password'] as String? ?? '').isNotEmpty;
+
+  /// The same profile with sign-in credentials (kept in [raw] so they are persisted).
+  ProfileInfo withCredentials(String username, String password) =>
+      ProfileInfo.fromJson({...raw, 'username': username, 'password': password}).copyWith(latencyMs: latencyMs);
+
   /// The same profile assigned to [group] (kept in [raw] so it is persisted).
   ProfileInfo inGroup(String group) => ProfileInfo.fromJson({...raw, 'group': group});
 

@@ -5,8 +5,12 @@ package profile
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 )
+
+// ErrNeedsCredentials means the profile needs a username and password before connecting.
+var ErrNeedsCredentials = errors.New("needs a username and password")
 
 // Protocol identifiers.
 const (
@@ -20,6 +24,7 @@ const (
 	AmneziaWG   = "amneziawg"
 	Naive       = "naive"
 	Tor         = "tor"
+	OpenVPN     = "openvpn"
 )
 
 // Profile is one connectable server configuration.
@@ -43,6 +48,7 @@ type Profile struct {
 	WireGuard  *WG        `json:"wireguard,omitempty"`
 	Hysteria2  *Hy2       `json:"hysteria2,omitempty"`
 	TUIC       *TUICOpts  `json:"tuic,omitempty"`
+	OpenVPN    *OVPN      `json:"openvpn,omitempty"`
 	Plugin     string     `json:"plugin,omitempty"` // shadowsocks SIP003 plugin
 	PluginOpts string     `json:"plugin_opts,omitempty"`
 
@@ -103,6 +109,48 @@ type TUICOpts struct {
 	UDPRelayMode      string `json:"udp_relay_mode,omitempty"`
 }
 
+// OVPN holds OpenVPN client settings, mostly as written in a .ovpn file.
+// Username/Password (auth-user-pass) live in Profile.Username/Password.
+type OVPN struct {
+	// Network is the transport of the first remote: "udp" or "tcp".
+	Network string `json:"network"`
+	// Remotes are the additional `remote` lines after the first one
+	// (which is Profile.Server/Port), tried in order.
+	Remotes      []OVPNRemote `json:"remotes,omitempty"`
+	RemoteRandom bool         `json:"remote_random,omitempty"`
+
+	CA   string `json:"ca"`             // PEM
+	Cert string `json:"cert,omitempty"` // PEM, client certificate
+	Key  string `json:"key,omitempty"`  // PEM, client private key
+	// ControlWrap is "tls-auth", "tls-crypt" or "tls-crypt-v2" with its key.
+	ControlWrap    string `json:"control_wrap,omitempty"`
+	ControlWrapKey string `json:"control_wrap_key,omitempty"`
+	KeyDirection   string `json:"key_direction,omitempty"` // "0"/"1" for tls-auth
+
+	Cipher              string   `json:"cipher,omitempty"`
+	DataCiphers         []string `json:"data_ciphers,omitempty"`
+	DataCiphersFallback string   `json:"data_ciphers_fallback,omitempty"`
+	Auth                string   `json:"auth,omitempty"`
+	Compression         string   `json:"compression,omitempty"`     // compress <alg>
+	CompressionLZO      string   `json:"compression_lzo,omitempty"` // comp-lzo
+	RemoteCertTLS       string   `json:"remote_cert_tls,omitempty"`
+	VerifyX509Name      string   `json:"verify_x509_name,omitempty"`
+	VerifyX509Type      string   `json:"verify_x509_type,omitempty"`
+	TLSVersionMin       string   `json:"tls_version_min,omitempty"`
+	TLSCipher           string   `json:"tls_cipher,omitempty"`
+	MTU                 int      `json:"mtu,omitempty"`
+	MSSFix              int      `json:"mss_fix,omitempty"`
+	// NeedsAuth is set when the config has auth-user-pass without inline credentials.
+	NeedsAuth bool `json:"needs_auth,omitempty"`
+}
+
+// OVPNRemote is one `remote host port proto` line.
+type OVPNRemote struct {
+	Server  string `json:"server"`
+	Port    int    `json:"port"`
+	Network string `json:"network,omitempty"`
+}
+
 // Validate checks the fields every protocol needs.
 func (p *Profile) Validate() error {
 	if p.Protocol == "" {
@@ -130,6 +178,10 @@ func (p *Profile) Validate() error {
 	case TUIC:
 		if p.UUID == "" {
 			return fmt.Errorf("profile %q: missing uuid", p.Name)
+		}
+	case OpenVPN:
+		if p.OpenVPN == nil || p.OpenVPN.CA == "" {
+			return fmt.Errorf("profile %q: missing OpenVPN CA certificate", p.Name)
 		}
 	case WireGuard, AmneziaWG:
 		if p.WireGuard == nil || p.WireGuard.PrivateKey == "" || p.WireGuard.PeerPublicKey == "" {

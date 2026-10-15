@@ -77,19 +77,30 @@ type sbOutbound struct {
 // sing-box config. Groups, direct/block/dns outbounds are skipped.
 func ImportSingBoxJSON(text string) (*Result, error) {
 	var doc struct {
-		Outbounds []sbOutbound `json:"outbounds"`
-		Endpoints []sbOutbound `json:"endpoints"`
+		Outbounds []json.RawMessage `json:"outbounds"`
+		Endpoints []json.RawMessage `json:"endpoints"`
 	}
 	if err := json.Unmarshal([]byte(text), &doc); err != nil {
 		return nil, fmt.Errorf("sing-box JSON: %w", err)
 	}
 	res := &Result{}
-	for _, o := range append(doc.Outbounds, doc.Endpoints...) {
+	for _, raw := range append(doc.Outbounds, doc.Endpoints...) {
+		var o sbOutbound
+		if err := json.Unmarshal(raw, &o); err != nil {
+			res.Errors = append(res.Errors, err.Error())
+			continue
+		}
 		switch o.Type {
 		case "direct", "block", "dns", "selector", "urltest", "":
 			continue
 		}
-		p, err := sbToProfile(o)
+		var p *profile.Profile
+		var err error
+		if o.Type == "openvpn-client" {
+			p, err = sbOpenVPNToProfile(raw)
+		} else {
+			p, err = sbToProfile(o)
+		}
 		if err == nil {
 			err = p.Validate()
 		}
@@ -176,5 +187,103 @@ func sbToProfile(o sbOutbound) (*profile.Profile, error) {
 	default:
 		return nil, fmt.Errorf("unsupported outbound type %q", o.Type)
 	}
+	return p, nil
+}
+
+// sbOpenVPN is sing-box's openvpn-client endpoint (the fields Omnitun maps).
+type sbOpenVPN struct {
+	Tag        string `json:"tag"`
+	Server     string `json:"server"`
+	ServerPort int    `json:"server_port"`
+	Network    string `json:"network"`
+	Servers    []struct {
+		Server     string `json:"server"`
+		ServerPort int    `json:"server_port"`
+		Network    string `json:"network"`
+	} `json:"servers"`
+	RemoteRandom bool   `json:"remote_random"`
+	Username     string `json:"username"`
+	Password     string `json:"password"`
+	TLS          struct {
+		Certificate          stringList `json:"certificate"`
+		ClientCertificate    stringList `json:"client_certificate"`
+		ClientKey            stringList `json:"client_key"`
+		ServerName           string     `json:"server_name"`
+		ServerNameType       string     `json:"server_name_type"`
+		RemoteCertificateTLS string     `json:"remote_certificate_tls"`
+		VersionMin           string     `json:"version_min"`
+		Cipher               string     `json:"cipher"`
+		ControlWrap          *struct {
+			Type      string     `json:"type"`
+			Key       stringList `json:"key"`
+			Direction string     `json:"direction"`
+		} `json:"control_wrap"`
+	} `json:"tls"`
+	DataCiphers         stringList `json:"data_ciphers"`
+	DataCiphersFallback string     `json:"data_ciphers_fallback"`
+	Auth                string     `json:"auth"`
+	Compression         string     `json:"compression"`
+	CompressionLZO      string     `json:"compression_lzo"`
+	MTU                 int        `json:"mtu"`
+	MSSFix              int        `json:"mss_fix"`
+}
+
+// stringList accepts a JSON string or an array of strings (sing-box "Listable").
+type stringList []string
+
+func (l *stringList) UnmarshalJSON(b []byte) error {
+	var one string
+	if json.Unmarshal(b, &one) == nil {
+		*l = []string{one}
+		return nil
+	}
+	var many []string
+	if err := json.Unmarshal(b, &many); err != nil {
+		return err
+	}
+	*l = many
+	return nil
+}
+
+func (l stringList) joined() string { return strings.Join(l, "\n") }
+
+func sbOpenVPNToProfile(raw json.RawMessage) (*profile.Profile, error) {
+	var v sbOpenVPN
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return nil, err
+	}
+	if v.TLS.Certificate == nil {
+		return nil, fmt.Errorf("only certificate-based (TLS mode) OpenVPN is supported")
+	}
+	o := &profile.OVPN{
+		Network: orDefault(v.Network, "udp"), RemoteRandom: v.RemoteRandom,
+		CA: v.TLS.Certificate.joined(), Cert: v.TLS.ClientCertificate.joined(), Key: v.TLS.ClientKey.joined(),
+		VerifyX509Name: v.TLS.ServerName, VerifyX509Type: v.TLS.ServerNameType,
+		RemoteCertTLS: v.TLS.RemoteCertificateTLS, TLSVersionMin: v.TLS.VersionMin, TLSCipher: v.TLS.Cipher,
+		DataCiphers: v.DataCiphers, DataCiphersFallback: v.DataCiphersFallback, Auth: v.Auth,
+		Compression: v.Compression, CompressionLZO: v.CompressionLZO, MTU: v.MTU, MSSFix: v.MSSFix,
+		NeedsAuth: v.Username != "",
+	}
+	if cw := v.TLS.ControlWrap; cw != nil && cw.Type != "" {
+		o.ControlWrap, o.ControlWrapKey = strings.ReplaceAll(cw.Type, "_", "-"), cw.Key.joined()
+		switch cw.Direction {
+		case "client":
+			o.KeyDirection = "1"
+		case "server":
+			o.KeyDirection = "0"
+		}
+	}
+	p := &profile.Profile{
+		Name: v.Tag, Protocol: profile.OpenVPN, Server: v.Server, Port: v.ServerPort,
+		Username: v.Username, Password: v.Password, OpenVPN: o,
+	}
+	for i, r := range v.Servers {
+		if i == 0 && p.Server == "" {
+			p.Server, p.Port, o.Network = r.Server, r.ServerPort, orDefault(r.Network, "udp")
+			continue
+		}
+		o.Remotes = append(o.Remotes, profile.OVPNRemote{Server: r.Server, Port: r.ServerPort, Network: orDefault(r.Network, "udp")})
+	}
+	p.Source = fmt.Sprintf("sing-box:openvpn:%s:%d:%s", p.Server, p.Port, p.Name)
 	return p, nil
 }

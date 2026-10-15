@@ -22,7 +22,7 @@ type obj = map[string]any
 func Build(st *store.State, s *store.Store, now time.Time) obj {
 	users := st.ActiveUsers(now)
 	srv := st.Server
-	var inbounds []any
+	var inbounds, endpoints []any
 	tls := func(extra obj) obj {
 		t := obj{
 			"enabled":          true,
@@ -35,6 +35,10 @@ func Build(st *store.State, s *store.Store, now time.Time) obj {
 	for _, name := range store.AllProtocols {
 		p := srv.Protocols[name]
 		if p == nil || !p.Enabled || len(users) == 0 {
+			continue
+		}
+		if store.IsOpenVPN(name) {
+			endpoints = append(endpoints, openvpnEndpoint(name, p.Port, srv.OpenVPN, users))
 			continue
 		}
 		in := obj{"tag": name, "listen": "::", "listen_port": p.Port}
@@ -84,11 +88,77 @@ func Build(st *store.State, s *store.Store, now time.Time) obj {
 		}
 		inbounds = append(inbounds, in)
 	}
-	return obj{
+	cfg := obj{
 		"log":       obj{"level": "warn", "timestamp": true},
 		"inbounds":  inbounds,
 		"outbounds": []any{obj{"type": "direct", "tag": "direct"}},
 	}
+	if len(endpoints) > 0 {
+		cfg["endpoints"] = endpoints
+	}
+	return cfg
+}
+
+// openvpnEndpoint is an OpenVPN server; users sign in with name + password.
+// UDP and TCP get separate client address pools.
+func openvpnEndpoint(name string, port int, o store.OpenVPN, users []*store.User) obj {
+	network, pool := "udp", "10.18.0.1/16"
+	if name == store.OpenVPNTCP {
+		network, pool = "tcp", "10.19.0.1/16"
+	}
+	return obj{
+		"type": "openvpn-server", "tag": name, "listen": "::", "listen_port": port,
+		"network": network, "address": []string{pool},
+		"users": mapUsers(users, func(u *store.User) obj {
+			return obj{"username": u.Name, "password": u.Password}
+		}),
+		"tls": obj{
+			"certificate":               o.ServerCert,
+			"key":                       o.ServerKey,
+			"verify_client_certificate": "none",
+			"control_wrap":              obj{"type": "tls_crypt", "key": o.TLSCrypt},
+		},
+		"push": obj{"redirect_gateway": true, "dns": []string{"1.1.1.1", "8.8.8.8"}},
+	}
+}
+
+// OVPN returns a single-file OpenVPN client config for the user, with the
+// credentials inline (OpenVPN 2.6+, Omnitun). proto is store.OpenVPNUDP or store.OpenVPNTCP.
+func OVPN(st *store.State, u *store.User, proto string) (string, error) {
+	p := st.Server.Protocols[proto]
+	if !store.IsOpenVPN(proto) || p == nil {
+		return "", fmt.Errorf("unknown OpenVPN protocol %q", proto)
+	}
+	if !p.Enabled {
+		return "", fmt.Errorf("%s is disabled (enable it with: proto enable %s)", proto, proto)
+	}
+	network := "udp"
+	if proto == store.OpenVPNTCP {
+		network = "tcp"
+	}
+	o := st.Server.OpenVPN
+	return fmt.Sprintf(`# %s (%s) for %s
+client
+dev tun
+proto %s
+remote %s %d
+nobind
+persist-key
+persist-tun
+resolv-retry infinite
+remote-cert-tls server
+data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305
+verb 3
+auth-user-pass
+<auth-user-pass>
+%s
+%s
+</auth-user-pass>
+<ca>
+%s</ca>
+<tls-crypt>
+%s</tls-crypt>
+`, st.Server.Name, proto, u.Name, network, st.Server.PublicHost, p.Port, u.Name, u.Password, o.CA, o.TLSCrypt), nil
 }
 
 func mapUsers(users []*store.User, f func(*store.User) obj) []any {
@@ -131,8 +201,8 @@ func Links(st *store.State, u *store.User) []Link {
 	var out []Link
 	for _, name := range store.AllProtocols {
 		p := srv.Protocols[name]
-		if p == nil || !p.Enabled {
-			continue
+		if p == nil || !p.Enabled || store.IsOpenVPN(name) {
+			continue // OpenVPN has no share link; see OVPN and OVPNURL
 		}
 		var link string
 		switch name {
@@ -156,6 +226,16 @@ func Links(st *store.State, u *store.User) []Link {
 		out = append(out, Link{Protocol: name, URL: link})
 	}
 	return out
+}
+
+// OVPNURL is where the user downloads the .ovpn file for proto, or "" if
+// subscriptions are disabled.
+func OVPNURL(st *store.State, u *store.User, proto string) string {
+	sub := SubscriptionURL(st, u)
+	if sub == "" {
+		return ""
+	}
+	return sub + "/" + proto + ".ovpn"
 }
 
 // SubscriptionURL is the user's subscription link, or "" if disabled.

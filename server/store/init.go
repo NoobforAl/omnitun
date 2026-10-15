@@ -34,6 +34,8 @@ var DefaultPorts = map[string]int{
 	Trojan:       8443,
 	Hysteria2:    8443, // UDP
 	TUIC:         8444, // UDP
+	OpenVPNUDP:   1194,
+	OpenVPNTCP:   1194,
 }
 
 // Init creates a state with fresh keys and a self-signed certificate.
@@ -72,6 +74,9 @@ func Init(s *Store, opts InitOptions) (*State, error) {
 				Enabled: true, Listen: "0.0.0.0", Port: opts.SubPort, Path: RandomHex(8),
 			},
 		},
+	}
+	if st.Server.OpenVPN, err = NewOpenVPN(opts.Name); err != nil {
+		return nil, err
 	}
 	for _, p := range AllProtocols {
 		port := DefaultPorts[p]

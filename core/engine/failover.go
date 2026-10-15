@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	box "github.com/sagernet/sing-box"
@@ -154,11 +155,26 @@ func (e *Engine) probe(ctx context.Context, instance *box.Box, tag, testURL stri
 	if !ok {
 		return fmt.Errorf("profile %s is not running", tag)
 	}
-	pctx, cancel := context.WithTimeout(ctx, 8*time.Second)
-	defer cancel()
-	_, err := urltest.URLTest(pctx, testURL, dialer)
-	return err
+	// Endpoints that connect in the background (OpenVPN) refuse traffic until
+	// their handshake finishes; wait for that instead of failing at once.
+	readyBy := time.Now().Add(endpointReadyTimeout)
+	for {
+		pctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+		_, err := urltest.URLTest(pctx, testURL, dialer)
+		cancel()
+		if err == nil || !strings.Contains(err.Error(), "not ready") || time.Now().After(readyBy) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(250 * time.Millisecond):
+		}
+	}
 }
+
+// endpointReadyTimeout is how long a probe waits for an endpoint that is still connecting.
+const endpointReadyTimeout = 15 * time.Second
 
 // netCheck tests internet access through the tunnel's direct outbound, which
 // bypasses the VPN (protected socket on Android).

@@ -26,10 +26,15 @@ const (
 	Trojan       = "trojan"
 	Hysteria2    = "hysteria2"
 	TUIC         = "tuic"
+	OpenVPNUDP   = "openvpn-udp"
+	OpenVPNTCP   = "openvpn-tcp"
 )
 
 // AllProtocols in display order.
-var AllProtocols = []string{VLESSReality, Shadowsocks, Trojan, Hysteria2, TUIC}
+var AllProtocols = []string{VLESSReality, Shadowsocks, Trojan, Hysteria2, TUIC, OpenVPNUDP, OpenVPNTCP}
+
+// IsOpenVPN reports whether a protocol key is one of the OpenVPN variants.
+func IsOpenVPN(proto string) bool { return proto == OpenVPNUDP || proto == OpenVPNTCP }
 
 // Proto is one inbound.
 type Proto struct {
@@ -71,6 +76,7 @@ type Server struct {
 	KeyFile      string       `json:"key_file"`
 	SelfSigned   bool         `json:"self_signed"`
 	Subscription Subscription `json:"subscription"`
+	OpenVPN      OpenVPN      `json:"openvpn"`
 }
 
 // User is one account. Every protocol uses the same user with its own credentials.
@@ -178,6 +184,15 @@ func (s *Store) Load() (*State, error) {
 	var st State
 	if err := json.Unmarshal(data, &st); err != nil {
 		return nil, fmt.Errorf("read %s: %w", s.path(), err)
+	}
+	changed, err := st.migrate()
+	if err != nil {
+		return nil, err
+	}
+	if changed {
+		if err := s.Save(&st); err != nil {
+			return nil, err
+		}
 	}
 	return &st, nil
 }
