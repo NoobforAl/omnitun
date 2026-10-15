@@ -51,6 +51,11 @@ func (s *Server) Start() error {
 	if err != nil {
 		return err
 	}
+	if renewed, err := store.RenewSelfSignedCert(s.store, st); err != nil {
+		return fmt.Errorf("renew certificate: %w", err)
+	} else if renewed {
+		s.logf("issued a new self-signed certificate (valid %d days)", int(store.SelfSignedValidity.Hours()/24))
+	}
 	if err := s.startBoxLocked(st); err != nil {
 		return err
 	}

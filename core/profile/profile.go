@@ -53,6 +53,7 @@ type Profile struct {
 	TUIC       *TUICOpts  `json:"tuic,omitempty"`
 	OpenVPN    *OVPN      `json:"openvpn,omitempty"`
 	SSH        *SSHOpts   `json:"ssh,omitempty"`
+	Naive      *NaiveOpts `json:"naive,omitempty"`
 	Plugin     string     `json:"plugin,omitempty"` // shadowsocks SIP003 plugin
 	PluginOpts string     `json:"plugin_opts,omitempty"`
 
@@ -68,6 +69,9 @@ type TLS struct {
 	Insecure    bool     `json:"insecure,omitempty"`
 	Fingerprint string   `json:"fingerprint,omitempty"` // uTLS fingerprint
 	Reality     *Reality `json:"reality,omitempty"`
+	// Certificate is a PEM certificate to trust (pin) instead of the system
+	// CAs, e.g. a server's self-signed certificate.
+	Certificate string `json:"certificate,omitempty"`
 }
 
 // Reality settings for VLESS+Reality.
@@ -97,6 +101,12 @@ type WG struct {
 	Keepalive     int      `json:"keepalive,omitempty"`
 	// Amnezia holds AmneziaWG obfuscation parameters (Jc, Jmin, Jmax, S1, S2, H1-H4).
 	Amnezia map[string]string `json:"amnezia,omitempty"`
+}
+
+// NaiveOpts holds NaiveProxy options. User and password are in Username/Password.
+type NaiveOpts struct {
+	QUIC         bool              `json:"quic,omitempty"` // HTTP/3 instead of HTTP/2
+	ExtraHeaders map[string]string `json:"extra_headers,omitempty"`
 }
 
 // SSHOpts holds SSH tunnel options. User and password are in Username/Password.
@@ -191,6 +201,10 @@ func (p *Profile) Validate() error {
 	case TUIC:
 		if p.UUID == "" {
 			return fmt.Errorf("profile %q: missing uuid", p.Name)
+		}
+	case Naive:
+		if p.Username == "" || p.Password == "" {
+			return fmt.Errorf("profile %q: missing naive user or password", p.Name)
 		}
 	case SSH:
 		if p.Username == "" {

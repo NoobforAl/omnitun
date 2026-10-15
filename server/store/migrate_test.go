@@ -44,3 +44,18 @@ func TestMigrateAddsOpenVPN(t *testing.T) {
 		t.Fatal("keys regenerated on the second load")
 	}
 }
+
+// Old 10-year self-signed certificates are replaced; fresh ones are kept.
+func TestRenewSelfSignedCert(t *testing.T) {
+	s := Open(t.TempDir())
+	st := &State{Server: Server{SelfSigned: true, CertFile: "tls.crt", KeyFile: "tls.key", PublicHost: "1.2.3.4"}}
+	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if renewed, err := RenewSelfSignedCert(s, st); err != nil || !renewed {
+		t.Fatalf("missing cert: renewed=%v err=%v", renewed, err)
+	}
+	if renewed, _ := RenewSelfSignedCert(s, st); renewed {
+		t.Fatal("fresh certificate renewed again")
+	}
+}

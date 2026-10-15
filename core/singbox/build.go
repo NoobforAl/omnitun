@@ -348,6 +348,32 @@ func convertProfile(p *profile.Profile, tag string) (out obj, isEndpoint bool, e
 				base["client_version"] = o.ClientVersion
 			}
 		}
+	case profile.Naive:
+		// Naive runs on Chromium's network stack (cronet): it takes only the
+		// server name and an optional pinned certificate, no other TLS options.
+		base["type"] = "naive"
+		base["username"], base["password"] = p.Username, p.Password
+		tls := obj{"enabled": true}
+		if p.TLS != nil {
+			if p.TLS.ServerName != "" {
+				tls["server_name"] = p.TLS.ServerName
+			}
+			if p.TLS.Certificate != "" {
+				tls["certificate"] = p.TLS.Certificate
+			}
+			if p.TLS.Insecure && p.TLS.Certificate == "" {
+				return nil, false, nil, fmt.Errorf("naive can't skip certificate checks; pin the server certificate instead")
+			}
+		}
+		base["tls"] = tls
+		if o := p.Naive; o != nil {
+			if o.QUIC {
+				base["quic"] = true
+			}
+			if len(o.ExtraHeaders) > 0 {
+				base["extra_headers"] = o.ExtraHeaders
+			}
+		}
 	case profile.WireGuard:
 		return wireguardEndpoint(p), true, nil, nil
 	case profile.OpenVPN:
@@ -549,6 +575,9 @@ func addTLS(out obj, t *profile.TLS) {
 	}
 	if r := t.Reality; r != nil {
 		tls["reality"] = obj{"enabled": true, "public_key": r.PublicKey, "short_id": r.ShortID}
+	}
+	if t.Certificate != "" {
+		tls["certificate"] = t.Certificate
 	}
 	out["tls"] = tls
 }

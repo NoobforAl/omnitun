@@ -60,6 +60,7 @@ func setup(t *testing.T) (*store.Store, *Server) {
 			store.TUIC:         freeUDP(t),
 			store.AnyTLS:       freeTCP(t),
 			store.ShadowTLS:    freeTCP(t),
+			store.Naive:        freeTCP(t),
 			store.OpenVPNUDP:   freeUDP(t),
 			store.OpenVPNTCP:   freeTCP(t),
 		},
@@ -119,7 +120,7 @@ func TestGeneratedProfilesConnect(t *testing.T) {
 	web.Start()
 	defer web.Close()
 
-	body, err := serverconf.SingBoxSubscription(st, st.User("alice"))
+	body, err := serverconf.SingBoxSubscription(st, s, st.User("alice"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,6 +133,9 @@ func TestGeneratedProfilesConnect(t *testing.T) {
 	}
 	for _, p := range res.Profiles {
 		t.Run(p.Name, func(t *testing.T) {
+			if p.Protocol == "naive" && !naiveIncluded {
+				t.Skip("naive client needs -tags with_naive_outbound (see naive_test.go)")
+			}
 			proxyPort := freeTCP(t)
 			e := engine.New(engine.Config{DataDir: t.TempDir()})
 			if err := e.Start(p.AsSlice(), singbox.Options{

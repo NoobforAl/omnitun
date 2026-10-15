@@ -17,7 +17,7 @@ See [PLAN.md](PLAN.md) for the architecture and roadmap.
 | `core/mobile` | gomobile entry point for Android: runs the control server in-process and plugs `VpnService` into sing-box |
 | `cmd/omnitun-svc` | Core daemon the desktop app launches (exits when the app dies) |
 | `cmd/omnitun` | Developer CLI for the core |
-| `cmd/omnitun-server` + `server/` | VPN server: users, 9 protocols (incl. AnyTLS, ShadowTLS, OpenVPN UDP/TCP), subscriptions, `.ovpn` downloads, TUI (`omnitun-server help`) |
+| `cmd/omnitun-server` + `server/` | VPN server: users, 10 protocols (incl. AnyTLS, ShadowTLS, NaiveProxy, OpenVPN UDP/TCP), subscriptions, `.ovpn` downloads, TUI (`omnitun-server help`) |
 | `tools/devserver` | Local Shadowsocks server for manual tests (e.g. phone over `adb reverse tcp:8388 tcp:8388`) |
 | `tor/` | Rust Tor module (Arti) with a C ABI |
 
@@ -36,6 +36,10 @@ scripts/build-android-core.sh            # all ABIs; or: scripts/build-android-c
 # Signed release APKs, one per ABI (~30 MB each); creates a keystore on first run —
 # back up app/android/omnitun-release.jks and key.properties
 scripts/build-android-release.sh         # add --skip-core to reuse the existing .aar
+
+# NaiveProxy tests need Chromium's cronet (Android builds include it; on Windows
+# cronet loads libcronet.dll from the Go module cache, found by the tests)
+go test -tags=with_gvisor,with_quic,with_wireguard,with_utls,with_naive_outbound,with_purego,badlinkname,tfogo_checklinkname0   -ldflags=-checklinkname=0 -run 'Naive|Generated' ./core/engine/ ./server/runtime/
 
 # Rust
 cd tor && cargo test

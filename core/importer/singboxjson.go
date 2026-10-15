@@ -14,11 +14,12 @@ func looksLikeJSON(text string) bool {
 }
 
 type sbTLS struct {
-	Enabled    bool     `json:"enabled"`
-	ServerName string   `json:"server_name"`
-	Insecure   bool     `json:"insecure"`
-	ALPN       []string `json:"alpn"`
-	UTLS       *struct {
+	Certificate stringList `json:"certificate"`
+	Enabled     bool       `json:"enabled"`
+	ServerName  string     `json:"server_name"`
+	Insecure    bool       `json:"insecure"`
+	ALPN        []string   `json:"alpn"`
+	UTLS        *struct {
 		Fingerprint string `json:"fingerprint"`
 	} `json:"utls"`
 	Reality *struct {
@@ -46,21 +47,24 @@ type sbPeer struct {
 }
 
 type sbOutbound struct {
-	Type       string       `json:"type"`
-	Tag        string       `json:"tag"`
-	Server     string       `json:"server"`
-	ServerPort int          `json:"server_port"`
-	UUID       string       `json:"uuid"`
-	Password   string       `json:"password"`
-	Method     string       `json:"method"`
-	Security   string       `json:"security"`
-	AlterID    int          `json:"alter_id"`
-	Flow       string       `json:"flow"`
-	Plugin     string       `json:"plugin"`
-	PluginOpts string       `json:"plugin_opts"`
-	TLS        *sbTLS       `json:"tls"`
-	Transport  *sbTransport `json:"transport"`
-	Obfs       *struct {
+	Type         string            `json:"type"`
+	Tag          string            `json:"tag"`
+	Server       string            `json:"server"`
+	ServerPort   int               `json:"server_port"`
+	UUID         string            `json:"uuid"`
+	Username     string            `json:"username"`
+	QUIC         bool              `json:"quic"`
+	ExtraHeaders map[string]string `json:"extra_headers"`
+	Password     string            `json:"password"`
+	Method       string            `json:"method"`
+	Security     string            `json:"security"`
+	AlterID      int               `json:"alter_id"`
+	Flow         string            `json:"flow"`
+	Plugin       string            `json:"plugin"`
+	PluginOpts   string            `json:"plugin_opts"`
+	TLS          *sbTLS            `json:"tls"`
+	Transport    *sbTransport      `json:"transport"`
+	Obfs         *struct {
 		Type     string `json:"type"`
 		Password string `json:"password"`
 	} `json:"obfs"`
@@ -163,7 +167,7 @@ func sbToProfile(o sbOutbound) (*profile.Profile, error) {
 	}
 	p.Source = fmt.Sprintf("sing-box:%s:%s:%d:%s", o.Type, o.Server, o.ServerPort, o.Tag)
 	if t := o.TLS; t != nil && t.Enabled {
-		p.TLS = &profile.TLS{Enabled: true, ServerName: t.ServerName, Insecure: t.Insecure, ALPN: t.ALPN}
+		p.TLS = &profile.TLS{Enabled: true, ServerName: t.ServerName, Insecure: t.Insecure, ALPN: t.ALPN, Certificate: t.Certificate.joined()}
 		if t.UTLS != nil {
 			p.TLS.Fingerprint = t.UTLS.Fingerprint
 		}
@@ -198,6 +202,12 @@ func sbToProfile(o sbOutbound) (*profile.Profile, error) {
 		p.Protocol = profile.Trojan
 	case "anytls":
 		p.Protocol = profile.AnyTLS
+	case "naive":
+		p.Protocol = profile.Naive
+		p.Username = o.Username
+		if o.QUIC || len(o.ExtraHeaders) > 0 {
+			p.Naive = &profile.NaiveOpts{QUIC: o.QUIC, ExtraHeaders: o.ExtraHeaders}
+		}
 	case "shadowsocks":
 		p.Protocol = profile.Shadowsocks
 		p.Method, p.Plugin, p.PluginOpts = o.Method, o.Plugin, o.PluginOpts

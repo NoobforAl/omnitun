@@ -102,6 +102,13 @@ func Build(st *store.State, s *store.Store, now time.Time) obj {
 					return obj{"name": u.Name, "password": u.SSKey}
 				}),
 			})
+		case store.Naive:
+			in["type"] = "naive"
+			in["network"] = "tcp"
+			in["users"] = mapUsers(users, func(u *store.User) obj {
+				return obj{"username": u.Name, "password": u.Password}
+			})
+			in["tls"] = tls(nil)
 		case store.TUIC:
 			in["type"] = "tuic"
 			in["congestion_control"] = "bbr"
@@ -254,6 +261,11 @@ func Links(st *store.State, u *store.User) []Link {
 			}
 			userinfo := base64.RawURLEncoding.EncodeToString([]byte("2022-blake3-aes-128-gcm:" + srv.SSServerKey + ":" + u.SSKey))
 			link = fmt.Sprintf("ss://%s@%s?plugin=%s#%s", userinfo, hostPort(p.Port), url.QueryEscape(plugin), label("ShadowTLS"))
+		case store.Naive:
+			// Naive verifies certificates like Chrome; with a self-signed
+			// certificate only the sing-box subscription (which pins it) works.
+			link = fmt.Sprintf("naive+https://%s:%s@%s/#%s",
+				url.PathEscape(u.Name), url.PathEscape(u.Password), hostPort(p.Port), label("Naive"))
 		case store.TUIC:
 			link = fmt.Sprintf("tuic://%s:%s@%s?congestion_control=bbr&alpn=h3&sni=%s%s#%s",
 				u.UUID, u.Password, hostPort(p.Port), host, insecure, label("TUIC"))

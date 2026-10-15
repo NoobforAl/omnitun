@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -28,12 +29,19 @@ func wantsSingBox(r *http.Request) bool {
 
 // SingBoxSubscription is the user's profiles as a sing-box config (outbounds
 // and endpoints), including OpenVPN, which has no share-link format.
-func SingBoxSubscription(st *store.State, u *store.User) ([]byte, error) {
+func SingBoxSubscription(st *store.State, s *store.Store, u *store.User) ([]byte, error) {
+	certPEM := ""
+	if data, err := os.ReadFile(s.Path(st.Server.CertFile)); err == nil {
+		certPEM = string(data)
+	}
 	var profiles []*profile.Profile
 	for _, l := range Links(st, u) {
 		p, err := importer.ParseLink(l.URL)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", l.Protocol, err)
+		}
+		if l.Protocol == store.Naive && st.Server.SelfSigned && certPEM != "" {
+			p.TLS.Certificate = certPEM // pin the self-signed certificate
 		}
 		profiles = append(profiles, p)
 	}
@@ -138,7 +146,7 @@ func SubscriptionHandler(s *store.Store) http.Handler {
 		// Omnitun (and other sing-box clients) get a sing-box config, which can
 		// also carry OpenVPN; everyone else gets the usual base64 link list.
 		if wantsSingBox(r) {
-			body, err := SingBoxSubscription(st, user)
+			body, err := SingBoxSubscription(st, s, user)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return

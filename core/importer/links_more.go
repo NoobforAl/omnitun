@@ -3,6 +3,7 @@ package importer
 import (
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/NoobforAl/omnitun/core/profile"
 )
@@ -86,6 +87,47 @@ func parseSSH(link string) (*profile.Profile, error) {
 	}
 	if o.PrivateKey != "" || len(o.HostKey) > 0 || o.ClientVersion != "" {
 		p.SSH = o
+	}
+	return p, nil
+}
+
+// naive+https://user:pass@host:port/?extra-headers=K%3AV%0D%0AK2%3AV2#name  (naive+quic:// for HTTP/3)
+func parseNaive(link string) (*profile.Profile, error) {
+	quic := strings.HasPrefix(strings.ToLower(link), "naive+quic://")
+	_, rest, _ := strings.Cut(link, "://")
+	u, host, port, err := parseURL("https://" + rest)
+	if err != nil {
+		if !strings.Contains(err.Error(), "invalid port") {
+			return nil, err
+		}
+		// The port is optional (default 443).
+		u, err = url.Parse("https://" + rest)
+		if err != nil {
+			return nil, err
+		}
+		host, port = u.Hostname(), 443
+	}
+	password, _ := u.User.Password()
+	p := &profile.Profile{
+		Name:     fragmentName(u),
+		Protocol: profile.Naive,
+		Server:   host,
+		Port:     port,
+		Username: u.User.Username(),
+		Password: password,
+		TLS:      &profile.TLS{Enabled: true, ServerName: u.Query().Get("sni")},
+	}
+	o := &profile.NaiveOpts{QUIC: quic}
+	if h := u.Query().Get("extra-headers"); h != "" {
+		o.ExtraHeaders = map[string]string{}
+		for line := range strings.SplitSeq(strings.ReplaceAll(h, "\r\n", "\n"), "\n") {
+			if k, v, ok := strings.Cut(line, ":"); ok {
+				o.ExtraHeaders[strings.TrimSpace(k)] = strings.TrimSpace(v)
+			}
+		}
+	}
+	if o.QUIC || len(o.ExtraHeaders) > 0 {
+		p.Naive = o
 	}
 	return p, nil
 }

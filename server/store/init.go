@@ -36,6 +36,7 @@ var DefaultPorts = map[string]int{
 	TUIC:         8444, // UDP
 	AnyTLS:       8445,
 	ShadowTLS:    8446,
+	Naive:        8447,
 	OpenVPNUDP:   1194,
 	OpenVPNTCP:   1194,
 }
@@ -116,7 +117,33 @@ func RandomBase64(n int) string {
 	return base64.StdEncoding.EncodeToString(b)
 }
 
-// WriteSelfSignedCert writes a 10-year ECDSA certificate for host.
+// SelfSignedValidity is short because Chromium (and so NaiveProxy, which pins
+// this certificate) rejects long-lived certificates even when trusted
+// explicitly, following the CA/Browser Forum limits (200 days in 2026,
+// 100 in 2027). The server renews it on start well before it expires.
+const SelfSignedValidity = 90 * 24 * time.Hour
+
+// RenewSelfSignedCert replaces the server's self-signed certificate when it
+// expires within 30 days or was issued for longer than SelfSignedValidity. It
+// reports whether it renewed the certificate.
+func RenewSelfSignedCert(s *Store, st *State) (bool, error) {
+	if !st.Server.SelfSigned {
+		return false, nil
+	}
+	certPath := s.Path(st.Server.CertFile)
+	if data, err := os.ReadFile(certPath); err == nil {
+		if block, _ := pem.Decode(data); block != nil {
+			if cert, err := x509.ParseCertificate(block.Bytes); err == nil &&
+				time.Until(cert.NotAfter) > 30*24*time.Hour && cert.NotAfter.Sub(cert.NotBefore) <= SelfSignedValidity+24*time.Hour {
+				return false, nil
+			}
+		}
+	}
+	return true, WriteSelfSignedCert(certPath, s.Path(st.Server.KeyFile), st.Server.PublicHost)
+}
+
+// WriteSelfSignedCert writes a self-signed ECDSA certificate for host, valid
+// for SelfSignedValidity.
 func WriteSelfSignedCert(certPath, keyPath, host string) error {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -127,7 +154,7 @@ func WriteSelfSignedCert(certPath, keyPath, host string) error {
 		SerialNumber: serial,
 		Subject:      pkix.Name{CommonName: host},
 		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().AddDate(10, 0, 0),
+		NotAfter:     time.Now().Add(SelfSignedValidity),
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}

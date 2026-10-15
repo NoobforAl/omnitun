@@ -182,7 +182,7 @@ omnitun-server tui                             interactive manager
 omnitun-server service                         systemd unit
 ```
 
-- **Protocols (in-process, sing-box):** VLESS+Reality (no certificate needed; impersonates a real site), Shadowsocks-2022 (multi-user), Trojan, Hysteria2, TUIC, AnyTLS, ShadowTLS v3 (+ Shadowsocks-2022, borrowing the Reality site's handshake), OpenVPN over UDP and TCP (own CA, tls-crypt, users sign in with name + password; `.ovpn` download per user; Omnitun clients get a sing-box JSON subscription that includes OpenVPN). Trojan/Hysteria2/TUIC use a generated self-signed certificate (links carry `insecure=1`).
+- **Protocols (in-process, sing-box):** VLESS+Reality (no certificate needed; impersonates a real site), Shadowsocks-2022 (multi-user), Trojan, Hysteria2, TUIC, AnyTLS, ShadowTLS v3 (+ Shadowsocks-2022, borrowing the Reality site's handshake), NaiveProxy (the subscription pins the self-signed certificate; certificates are 90-day and renewed on start because Chromium rejects long-lived ones), OpenVPN over UDP and TCP (own CA, tls-crypt, users sign in with name + password; `.ovpn` download per user; Omnitun clients get a sing-box JSON subscription that includes OpenVPN). Trojan/Hysteria2/TUIC use a generated self-signed certificate (links carry `insecure=1`).
 - **Users:** every user gets credentials for every protocol and **one subscription URL** (`http://host:port/<random path>/<token>`) that returns all links in failover order with `subscription-userinfo` (quota, expiry), `profile-update-interval` and `profile-title` headers. The Omnitun client imports it as a group.
 - **Live changes:** CLI and TUI edit the same state file; `run` reloads within 2 s and removes expired users each minute.
 - **TUI** (Bubble Tea): user table (status, expiry, quota, note), add / enable-disable / expiry / quota / note / new credentials / delete, per-user view with QR codes for the subscription and each link, protocol on/off and ports.
@@ -324,7 +324,8 @@ omnitun/
 - [ ] Stealth (WireGuard over TLS), NordLynx (token → WireGuard)
 - [ ] Windows built-in VPN: IKEv2, L2TP/IPsec, SSTP
 - [ ] Android: IKEv2 (`Ikev2VpnProfile`), SSTP; L2TP shown as unsupported
-- [ ] NaiveProxy (cronet), Lightway (separate binary)
+- [x] NaiveProxy via sing-box `with_naive_outbound` (Chromium cronet, statically linked on Android: +5 MB per APK): `naive+https://` / `naive+quic://` links, sing-box JSON with a pinned certificate; e2e test with real cronet on Windows (libcronet.dll); verified on device through omnitun-server
+- [ ] Lightway (Rust `lightway-core`, AGPL; only useful with self-hosted servers — low priority)
 
 ### Phase 6 — Tor
 - [x] Rust crate with C ABI (stub)
@@ -333,7 +334,7 @@ omnitun/
 ### Phase 8 — Server (`omnitun-server`)
 - [x] `init` with Reality keys, Shadowsocks-2022 key, self-signed certificate
 - [x] Users: add / list / delete / enable / disable / expiry / quota / note / new credentials
-- [x] Protocols: VLESS+Reality, Shadowsocks-2022, Trojan, Hysteria2, TUIC, AnyTLS, ShadowTLS v3, OpenVPN UDP/TCP (all verified end-to-end with the Omnitun client)
+- [x] Protocols: VLESS+Reality, Shadowsocks-2022, Trojan, Hysteria2, TUIC, AnyTLS, ShadowTLS v3, NaiveProxy, OpenVPN UDP/TCP (all verified end-to-end with the Omnitun client)
 - [x] Per-user links + terminal QR codes; one subscription URL per user with quota/expiry headers
 - [x] `run` with live reload on changes and expiry; `service` prints a systemd unit
 - [x] TUI: users, links + QR, protocol on/off and ports
