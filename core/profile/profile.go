@@ -25,6 +25,9 @@ const (
 	Naive       = "naive"
 	Tor         = "tor"
 	OpenVPN     = "openvpn"
+	Hysteria    = "hysteria" // v1
+	AnyTLS      = "anytls"
+	SSH         = "ssh"
 )
 
 // Profile is one connectable server configuration.
@@ -49,6 +52,7 @@ type Profile struct {
 	Hysteria2  *Hy2       `json:"hysteria2,omitempty"`
 	TUIC       *TUICOpts  `json:"tuic,omitempty"`
 	OpenVPN    *OVPN      `json:"openvpn,omitempty"`
+	SSH        *SSHOpts   `json:"ssh,omitempty"`
 	Plugin     string     `json:"plugin,omitempty"` // shadowsocks SIP003 plugin
 	PluginOpts string     `json:"plugin_opts,omitempty"`
 
@@ -95,7 +99,16 @@ type WG struct {
 	Amnezia map[string]string `json:"amnezia,omitempty"`
 }
 
-// Hy2 holds Hysteria2 options.
+// SSHOpts holds SSH tunnel options. User and password are in Username/Password.
+type SSHOpts struct {
+	PrivateKey           string   `json:"private_key,omitempty"` // PEM
+	PrivateKeyPassphrase string   `json:"private_key_passphrase,omitempty"`
+	HostKey              []string `json:"host_key,omitempty"` // authorized_keys format; empty = accept any
+	ClientVersion        string   `json:"client_version,omitempty"`
+}
+
+// Hy2 holds Hysteria2 options; Hysteria v1 uses Obfs (a plain obfuscation
+// password) and the bandwidth fields.
 type Hy2 struct {
 	Obfs         string `json:"obfs,omitempty"`
 	ObfsPassword string `json:"obfs_password,omitempty"`
@@ -167,7 +180,7 @@ func (p *Profile) Validate() error {
 		if p.UUID == "" {
 			return fmt.Errorf("profile %q: missing uuid", p.Name)
 		}
-	case Trojan, Hysteria2:
+	case Trojan, Hysteria2, AnyTLS:
 		if p.Password == "" {
 			return fmt.Errorf("profile %q: missing password", p.Name)
 		}
@@ -178,6 +191,13 @@ func (p *Profile) Validate() error {
 	case TUIC:
 		if p.UUID == "" {
 			return fmt.Errorf("profile %q: missing uuid", p.Name)
+		}
+	case SSH:
+		if p.Username == "" {
+			return fmt.Errorf("profile %q: missing ssh user", p.Name)
+		}
+		if p.Password == "" && (p.SSH == nil || p.SSH.PrivateKey == "") {
+			return fmt.Errorf("profile %q: missing ssh password or private key", p.Name)
 		}
 	case OpenVPN:
 		if p.OpenVPN == nil || p.OpenVPN.CA == "" {

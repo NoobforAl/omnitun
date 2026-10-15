@@ -349,8 +349,8 @@ class _ImportSheetState extends ConsumerState<_ImportSheet> {
         children: [
           Text('Import config', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 4),
-          const Text('Paste share links (vless://, trojan://, ss://, hy2://, …), a Clash or sing-box config, a subscription, '
-              'or a WireGuard .conf — or open a file or scan a QR code.'),
+          const Text('Paste share links (vless://, trojan://, ss://, hy2://, anytls://, ssh://, …), a Clash or sing-box config, a subscription, '
+              'a WireGuard .conf or an OpenVPN .ovpn — or open a file or scan a QR code.'),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,

@@ -200,6 +200,9 @@ func clashToProfile(cp clashProxy) (*profile.Profile, error) {
 				}
 			}
 			p.PluginOpts = strings.Join(opts, ";")
+		case "shadow-tls":
+			p.Plugin = "shadow-tls"
+			p.PluginOpts = fmt.Sprintf("host=%s;password=%s;version=%s", po.str("host"), po.str("password"), firstNonEmpty(po.str("version"), "2"))
 		default:
 			return nil, fmt.Errorf("unsupported shadowsocks plugin %q", cp.str("plugin"))
 		}
@@ -233,6 +236,25 @@ func clashToProfile(cp clashProxy) (*profile.Profile, error) {
 		p.TUIC = &profile.TUICOpts{
 			CongestionControl: cp.str("congestion-controller"),
 			UDPRelayMode:      cp.str("udp-relay-mode"),
+		}
+	case "hysteria":
+		p.Protocol = profile.Hysteria
+		p.Password = cp.str("auth-str", "auth_str", "auth")
+		p.TLS = tls(true)
+		h := &profile.Hy2{Obfs: cp.str("obfs")}
+		h.UpMbps, h.DownMbps = cp.num("up"), cp.num("down")
+		p.Hysteria2 = h
+	case "anytls":
+		p.Protocol = profile.AnyTLS
+		p.Password = cp.str("password")
+		p.TLS = tls(true)
+	case "ssh":
+		p.Protocol = profile.SSH
+		p.Username = cp.str("username", "user")
+		p.Password = cp.str("password")
+		o := &profile.SSHOpts{PrivateKey: cp.str("private-key"), PrivateKeyPassphrase: cp.str("private-key-passphrase"), HostKey: cp.list("host-key")}
+		if o.PrivateKey != "" || len(o.HostKey) > 0 {
+			p.SSH = o
 		}
 	case "wireguard":
 		p.Protocol = profile.WireGuard

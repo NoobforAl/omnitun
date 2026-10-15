@@ -26,12 +26,14 @@ const (
 	Trojan       = "trojan"
 	Hysteria2    = "hysteria2"
 	TUIC         = "tuic"
+	AnyTLS       = "anytls"
+	ShadowTLS    = "shadowtls" // ShadowTLS v3 in front of Shadowsocks-2022
 	OpenVPNUDP   = "openvpn-udp"
 	OpenVPNTCP   = "openvpn-tcp"
 )
 
 // AllProtocols in display order.
-var AllProtocols = []string{VLESSReality, Shadowsocks, Trojan, Hysteria2, TUIC, OpenVPNUDP, OpenVPNTCP}
+var AllProtocols = []string{VLESSReality, Shadowsocks, Trojan, Hysteria2, TUIC, AnyTLS, ShadowTLS, OpenVPNUDP, OpenVPNTCP}
 
 // IsOpenVPN reports whether a protocol key is one of the OpenVPN variants.
 func IsOpenVPN(proto string) bool { return proto == OpenVPNUDP || proto == OpenVPNTCP }

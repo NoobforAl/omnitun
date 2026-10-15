@@ -100,16 +100,18 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 	)
 	for _, p := range profiles {
 		p.EnsureID()
-		out, isEndpoint, err := convert(p)
+		out, isEndpoint, extras, err := convert(p, p.ID)
 		if err != nil {
 			skipped = append(skipped, fmt.Errorf("%s: %w", p.DisplayName(), err))
 			continue
 		}
-		out["tag"] = p.ID
 		if isEndpoint {
 			endpoints = append(endpoints, out)
 		} else {
 			outbounds = append(outbounds, out)
+		}
+		for _, x := range extras {
+			outbounds = append(outbounds, x)
 		}
 		tags = append(tags, p.ID)
 	}
@@ -217,8 +219,18 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 	return cfg, skipped, nil
 }
 
-// convert maps one profile to a sing-box outbound (or endpoint for WireGuard).
-func convert(p *profile.Profile) (out obj, isEndpoint bool, err error) {
+// convert maps one profile to a sing-box outbound tagged tag (or an endpoint
+// for WireGuard and OpenVPN). extras are helper outbounds it depends on
+// (ShadowTLS), tagged after tag.
+func convert(p *profile.Profile, tag string) (out obj, isEndpoint bool, extras []obj, err error) {
+	out, isEndpoint, extras, err = convertProfile(p, tag)
+	if out != nil {
+		out["tag"] = tag
+	}
+	return
+}
+
+func convertProfile(p *profile.Profile, tag string) (out obj, isEndpoint bool, extras []obj, err error) {
 	base := obj{"server": p.Server, "server_port": p.Port}
 	switch p.Protocol {
 	case profile.VLESS:
@@ -245,7 +257,16 @@ func convert(p *profile.Profile) (out obj, isEndpoint bool, err error) {
 		base["type"] = "shadowsocks"
 		base["method"] = p.Method
 		base["password"] = p.Password
-		if p.Plugin != "" {
+		switch p.Plugin {
+		case "":
+		case "shadow-tls":
+			stls, err := shadowTLSOutbound(p, tag+"-shadowtls")
+			if err != nil {
+				return nil, false, nil, err
+			}
+			base["detour"] = stls["tag"]
+			extras = append(extras, stls)
+		default:
 			base["plugin"] = p.Plugin
 			base["plugin_opts"] = p.PluginOpts
 		}
@@ -277,17 +298,102 @@ func convert(p *profile.Profile) (out obj, isEndpoint bool, err error) {
 			}
 		}
 		addTLS(base, tlsOrDefault(p.TLS))
+	case profile.Hysteria:
+		base["type"] = "hysteria"
+		if p.Password != "" {
+			base["auth_str"] = p.Password
+		}
+		// Hysteria v1 needs bandwidth hints; these defaults suit mobile links.
+		up, down := 10, 50
+		if h := p.Hysteria2; h != nil {
+			if h.Obfs != "" {
+				base["obfs"] = h.Obfs
+			}
+			if h.UpMbps > 0 {
+				up = h.UpMbps
+			}
+			if h.DownMbps > 0 {
+				down = h.DownMbps
+			}
+		}
+		base["up_mbps"], base["down_mbps"] = up, down
+		t := tlsOrDefault(p.TLS)
+		if len(t.ALPN) == 0 {
+			c := *t
+			c.ALPN = []string{"hysteria"}
+			t = &c
+		}
+		addTLS(base, t)
+	case profile.AnyTLS:
+		base["type"] = "anytls"
+		base["password"] = p.Password
+		addTLS(base, tlsOrDefault(p.TLS))
+	case profile.SSH:
+		base["type"] = "ssh"
+		base["user"] = p.Username
+		if p.Password != "" {
+			base["password"] = p.Password
+		}
+		if o := p.SSH; o != nil {
+			if o.PrivateKey != "" {
+				base["private_key"] = o.PrivateKey
+			}
+			if o.PrivateKeyPassphrase != "" {
+				base["private_key_passphrase"] = o.PrivateKeyPassphrase
+			}
+			if len(o.HostKey) > 0 {
+				base["host_key"] = o.HostKey
+			}
+			if o.ClientVersion != "" {
+				base["client_version"] = o.ClientVersion
+			}
+		}
 	case profile.WireGuard:
-		return wireguardEndpoint(p), true, nil
+		return wireguardEndpoint(p), true, nil, nil
 	case profile.OpenVPN:
 		ep, err := openvpnEndpoint(p)
-		return ep, true, err
+		return ep, true, nil, err
 	case profile.AmneziaWG:
-		return nil, false, fmt.Errorf("amneziawg runs on the dedicated AWG engine (not sing-box)")
+		return nil, false, nil, fmt.Errorf("amneziawg runs on the dedicated AWG engine (not sing-box)")
 	default:
-		return nil, false, fmt.Errorf("protocol %q is not supported by the sing-box engine", p.Protocol)
+		return nil, false, nil, fmt.Errorf("protocol %q is not supported by the sing-box engine", p.Protocol)
 	}
-	return base, false, nil
+	return base, false, extras, nil
+}
+
+// shadowTLSOutbound is the ShadowTLS layer under a Shadowsocks profile whose
+// plugin is "shadow-tls" (options "host=<sni>;password=<pw>;version=<1-3>").
+func shadowTLSOutbound(p *profile.Profile, tag string) (obj, error) {
+	opts := map[string]string{}
+	for kv := range strings.SplitSeq(p.PluginOpts, ";") {
+		k, v, _ := strings.Cut(strings.TrimSpace(kv), "=")
+		if k != "" {
+			opts[k] = v
+		}
+	}
+	version := 3
+	if v := opts["version"]; v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 3 {
+			return nil, fmt.Errorf("shadow-tls: invalid version %q", v)
+		}
+		version = n
+	}
+	if opts["host"] == "" {
+		return nil, fmt.Errorf("shadow-tls: missing host")
+	}
+	tls := obj{"enabled": true, "server_name": opts["host"], "utls": obj{"enabled": true, "fingerprint": "chrome"}}
+	if opts["insecure"] == "1" || opts["insecure"] == "true" {
+		tls["insecure"] = true
+	}
+	out := obj{"type": "shadowtls", "tag": tag, "server": p.Server, "server_port": p.Port, "version": version, "tls": tls}
+	if version > 1 {
+		if opts["password"] == "" {
+			return nil, fmt.Errorf("shadow-tls: missing password")
+		}
+		out["password"] = opts["password"]
+	}
+	return out, nil
 }
 
 func wireguardEndpoint(p *profile.Profile) obj {
@@ -542,8 +648,9 @@ func orDefault(s, def string) string {
 	return s
 }
 
-// Outbound converts one profile to a sing-box outbound, or to an endpoint
-// (isEndpoint) for WireGuard and OpenVPN. The caller sets "tag".
-func Outbound(p *profile.Profile) (out map[string]any, isEndpoint bool, err error) {
-	return convert(p)
+// Outbound converts one profile to a sing-box outbound tagged tag, or to an
+// endpoint (isEndpoint) for WireGuard and OpenVPN. extras are helper
+// outbounds it depends on (ShadowTLS) and must be included too.
+func Outbound(p *profile.Profile, tag string) (out map[string]any, isEndpoint bool, extras []map[string]any, err error) {
+	return convert(p, tag)
 }

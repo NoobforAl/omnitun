@@ -182,7 +182,7 @@ omnitun-server tui                             interactive manager
 omnitun-server service                         systemd unit
 ```
 
-- **Protocols (in-process, sing-box):** VLESS+Reality (no certificate needed; impersonates a real site), Shadowsocks-2022 (multi-user), Trojan, Hysteria2, TUIC, OpenVPN over UDP and TCP (own CA, tls-crypt, users sign in with name + password; `.ovpn` download per user; Omnitun clients get a sing-box JSON subscription that includes OpenVPN). Trojan/Hysteria2/TUIC use a generated self-signed certificate (links carry `insecure=1`).
+- **Protocols (in-process, sing-box):** VLESS+Reality (no certificate needed; impersonates a real site), Shadowsocks-2022 (multi-user), Trojan, Hysteria2, TUIC, AnyTLS, ShadowTLS v3 (+ Shadowsocks-2022, borrowing the Reality site's handshake), OpenVPN over UDP and TCP (own CA, tls-crypt, users sign in with name + password; `.ovpn` download per user; Omnitun clients get a sing-box JSON subscription that includes OpenVPN). Trojan/Hysteria2/TUIC use a generated self-signed certificate (links carry `insecure=1`).
 - **Users:** every user gets credentials for every protocol and **one subscription URL** (`http://host:port/<random path>/<token>`) that returns all links in failover order with `subscription-userinfo` (quota, expiry), `profile-update-interval` and `profile-title` headers. The Omnitun client imports it as a group.
 - **Live changes:** CLI and TUI edit the same state file; `run` reloads within 2 s and removes expired users each minute.
 - **TUI** (Bubble Tea): user table (status, expiry, quota, note), add / enable-disable / expiry / quota / note / new credentials / delete, per-user view with QR codes for the subscription and each link, protocol on/off and ports.
@@ -319,6 +319,7 @@ omnitun/
 
 ### Phase 5 — More client protocols
 - [x] OpenVPN via sing-box's `openvpn-client` endpoint: `.ovpn` import (inline certs, tls-auth/tls-crypt/tls-crypt-v2, multiple remotes, comp-lzo/compress, verify-x509-name), username/password prompt in the app, sing-box JSON import; end-to-end tests (TCP cert + tls-crypt, UDP user/pass + tls-auth); verified on device through omnitun-server
+- [x] Hysteria v1, AnyTLS, SSH (password/key, host-key pinning), ShadowTLS v1-3 over Shadowsocks: links (`hysteria://`, `anytls://`, `ssh://`, `ss://…?plugin=shadow-tls`), Clash and sing-box JSON import; end-to-end tests; AnyTLS and ShadowTLS verified on device through omnitun-server
 - [ ] OpenVPN XOR/Stunnel obfuscation
 - [ ] Stealth (WireGuard over TLS), NordLynx (token → WireGuard)
 - [ ] Windows built-in VPN: IKEv2, L2TP/IPsec, SSTP
@@ -332,7 +333,7 @@ omnitun/
 ### Phase 8 — Server (`omnitun-server`)
 - [x] `init` with Reality keys, Shadowsocks-2022 key, self-signed certificate
 - [x] Users: add / list / delete / enable / disable / expiry / quota / note / new credentials
-- [x] Protocols: VLESS+Reality, Shadowsocks-2022, Trojan, Hysteria2, TUIC, OpenVPN UDP/TCP (all verified end-to-end with the Omnitun client)
+- [x] Protocols: VLESS+Reality, Shadowsocks-2022, Trojan, Hysteria2, TUIC, AnyTLS, ShadowTLS v3, OpenVPN UDP/TCP (all verified end-to-end with the Omnitun client)
 - [x] Per-user links + terminal QR codes; one subscription URL per user with quota/expiry headers
 - [x] `run` with live reload on changes and expiry; `service` prints a systemd unit
 - [x] TUI: users, links + QR, protocol on/off and ports

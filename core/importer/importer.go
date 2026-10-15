@@ -101,6 +101,12 @@ func ParseLink(link string) (*profile.Profile, error) {
 		p, err = parseTUIC(link)
 	case "wireguard", "wg":
 		p, err = parseWireGuardLink(link)
+	case "hysteria", "hy":
+		p, err = parseHysteria(link)
+	case "anytls":
+		p, err = parseAnyTLS(link)
+	case "ssh":
+		p, err = parseSSH(link)
 	default:
 		return nil, fmt.Errorf("%w: %s://", ErrUnsupported, scheme)
 	}

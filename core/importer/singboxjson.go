@@ -84,28 +84,62 @@ func ImportSingBoxJSON(text string) (*Result, error) {
 		return nil, fmt.Errorf("sing-box JSON: %w", err)
 	}
 	res := &Result{}
-	for _, raw := range append(doc.Outbounds, doc.Endpoints...) {
-		var o sbOutbound
-		if err := json.Unmarshal(raw, &o); err != nil {
+	all := append(doc.Outbounds, doc.Endpoints...)
+	// ShadowTLS outbounds are layers under Shadowsocks ones (via "detour").
+	shadowTLS := map[string]sbShadowTLS{}
+	for _, raw := range all {
+		var st sbShadowTLS
+		if json.Unmarshal(raw, &st) == nil && st.Type == "shadowtls" {
+			shadowTLS[st.Tag] = st
+		}
+	}
+	for _, raw := range all {
+		var head struct {
+			Type   string `json:"type"`
+			Tag    string `json:"tag"`
+			Detour string `json:"detour"`
+		}
+		if err := json.Unmarshal(raw, &head); err != nil {
 			res.Errors = append(res.Errors, err.Error())
 			continue
 		}
-		switch o.Type {
-		case "direct", "block", "dns", "selector", "urltest", "":
+		switch head.Type {
+		case "direct", "block", "dns", "selector", "urltest", "shadowtls", "":
 			continue
 		}
 		var p *profile.Profile
 		var err error
-		if o.Type == "openvpn-client" {
+		switch head.Type {
+		case "openvpn-client":
 			p, err = sbOpenVPNToProfile(raw)
-		} else {
-			p, err = sbToProfile(o)
+		case "hysteria":
+			p, err = sbHysteriaToProfile(raw)
+		case "ssh":
+			p, err = sbSSHToProfile(raw)
+		default:
+			var o sbOutbound
+			if err = json.Unmarshal(raw, &o); err == nil {
+				p, err = sbToProfile(o)
+			}
+		}
+		if err == nil && head.Detour != "" {
+			if st, ok := shadowTLS[head.Detour]; ok && p.Protocol == profile.Shadowsocks {
+				// The ShadowTLS server is the address clients actually dial.
+				p.Server, p.Port = st.Server, st.ServerPort
+				p.Plugin = "shadow-tls"
+				p.PluginOpts = fmt.Sprintf("host=%s;password=%s;version=%d", st.TLS.ServerName, st.Password, max(st.Version, 1))
+				if st.TLS.Insecure {
+					p.PluginOpts += ";insecure=1"
+				}
+			} else {
+				err = fmt.Errorf("detour %q is not supported", head.Detour)
+			}
 		}
 		if err == nil {
 			err = p.Validate()
 		}
 		if err != nil {
-			res.Errors = append(res.Errors, fmt.Sprintf("%s: %v", o.Tag, err))
+			res.Errors = append(res.Errors, fmt.Sprintf("%s: %v", head.Tag, err))
 			continue
 		}
 		p.EnsureID()
@@ -162,6 +196,8 @@ func sbToProfile(o sbOutbound) (*profile.Profile, error) {
 		p.Method = o.Security
 	case "trojan":
 		p.Protocol = profile.Trojan
+	case "anytls":
+		p.Protocol = profile.AnyTLS
 	case "shadowsocks":
 		p.Protocol = profile.Shadowsocks
 		p.Method, p.Plugin, p.PluginOpts = o.Method, o.Plugin, o.PluginOpts
@@ -285,5 +321,74 @@ func sbOpenVPNToProfile(raw json.RawMessage) (*profile.Profile, error) {
 		o.Remotes = append(o.Remotes, profile.OVPNRemote{Server: r.Server, Port: r.ServerPort, Network: orDefault(r.Network, "udp")})
 	}
 	p.Source = fmt.Sprintf("sing-box:openvpn:%s:%d:%s", p.Server, p.Port, p.Name)
+	return p, nil
+}
+
+type sbShadowTLS struct {
+	Type       string `json:"type"`
+	Tag        string `json:"tag"`
+	Server     string `json:"server"`
+	ServerPort int    `json:"server_port"`
+	Version    int    `json:"version"`
+	Password   string `json:"password"`
+	TLS        struct {
+		ServerName string `json:"server_name"`
+		Insecure   bool   `json:"insecure"`
+	} `json:"tls"`
+}
+
+func sbHysteriaToProfile(raw json.RawMessage) (*profile.Profile, error) {
+	var v struct {
+		Tag        string `json:"tag"`
+		Server     string `json:"server"`
+		ServerPort int    `json:"server_port"`
+		AuthStr    string `json:"auth_str"`
+		Obfs       string `json:"obfs"`
+		UpMbps     int    `json:"up_mbps"`
+		DownMbps   int    `json:"down_mbps"`
+		TLS        *sbTLS `json:"tls"`
+	}
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return nil, err
+	}
+	p := &profile.Profile{
+		Name: v.Tag, Protocol: profile.Hysteria, Server: v.Server, Port: v.ServerPort, Password: v.AuthStr,
+		Hysteria2: &profile.Hy2{Obfs: v.Obfs, UpMbps: v.UpMbps, DownMbps: v.DownMbps},
+		TLS:       &profile.TLS{Enabled: true},
+	}
+	if t := v.TLS; t != nil {
+		p.TLS.ServerName, p.TLS.Insecure, p.TLS.ALPN = t.ServerName, t.Insecure, t.ALPN
+	}
+	p.Source = fmt.Sprintf("sing-box:hysteria:%s:%d:%s", p.Server, p.Port, p.Name)
+	return p, nil
+}
+
+func sbSSHToProfile(raw json.RawMessage) (*profile.Profile, error) {
+	var v struct {
+		Tag                  string     `json:"tag"`
+		Server               string     `json:"server"`
+		ServerPort           int        `json:"server_port"`
+		User                 string     `json:"user"`
+		Password             string     `json:"password"`
+		PrivateKey           stringList `json:"private_key"`
+		PrivateKeyPassphrase string     `json:"private_key_passphrase"`
+		HostKey              stringList `json:"host_key"`
+		ClientVersion        string     `json:"client_version"`
+	}
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return nil, err
+	}
+	port := v.ServerPort
+	if port == 0 {
+		port = 22
+	}
+	p := &profile.Profile{Name: v.Tag, Protocol: profile.SSH, Server: v.Server, Port: port, Username: v.User, Password: v.Password}
+	if len(v.PrivateKey) > 0 || len(v.HostKey) > 0 || v.ClientVersion != "" {
+		p.SSH = &profile.SSHOpts{
+			PrivateKey: v.PrivateKey.joined(), PrivateKeyPassphrase: v.PrivateKeyPassphrase,
+			HostKey: v.HostKey, ClientVersion: v.ClientVersion,
+		}
+	}
+	p.Source = fmt.Sprintf("sing-box:ssh:%s:%d:%s", p.Server, p.Port, p.Name)
 	return p, nil
 }

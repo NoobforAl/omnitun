@@ -34,6 +34,8 @@ var DefaultPorts = map[string]int{
 	Trojan:       8443,
 	Hysteria2:    8443, // UDP
 	TUIC:         8444, // UDP
+	AnyTLS:       8445,
+	ShadowTLS:    8446,
 	OpenVPNUDP:   1194,
 	OpenVPNTCP:   1194,
 }

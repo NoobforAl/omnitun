@@ -78,6 +78,30 @@ func Build(st *store.State, s *store.Store, now time.Time) obj {
 				return obj{"name": u.Name, "password": u.Password}
 			})
 			in["tls"] = tls(obj{"alpn": []string{"h3"}})
+		case store.AnyTLS:
+			in["type"] = "anytls"
+			in["users"] = mapUsers(users, func(u *store.User) obj {
+				return obj{"name": u.Name, "password": u.Password}
+			})
+			in["tls"] = tls(nil)
+		case store.ShadowTLS:
+			// ShadowTLS v3 borrows the handshake of the Reality site, then
+			// hands the stream to an internal (not listening) Shadowsocks inbound.
+			host, port := splitHostPort(srv.Reality.Handshake, 443)
+			in["type"] = "shadowtls"
+			in["version"] = 3
+			in["users"] = mapUsers(users, func(u *store.User) obj {
+				return obj{"name": u.Name, "password": u.Password}
+			})
+			in["handshake"] = obj{"server": host, "server_port": port}
+			in["detour"] = name + "-ss"
+			inbounds = append(inbounds, obj{
+				"type": "shadowsocks", "tag": name + "-ss", "method": "2022-blake3-aes-128-gcm",
+				"password": srv.SSServerKey,
+				"users": mapUsers(users, func(u *store.User) obj {
+					return obj{"name": u.Name, "password": u.SSKey}
+				}),
+			})
 		case store.TUIC:
 			in["type"] = "tuic"
 			in["congestion_control"] = "bbr"
@@ -219,6 +243,17 @@ func Links(st *store.State, u *store.User) []Link {
 		case store.Hysteria2:
 			link = fmt.Sprintf("hysteria2://%s@%s?sni=%s%s#%s",
 				u.Password, hostPort(p.Port), host, insecure, label("Hysteria2"))
+		case store.AnyTLS:
+			link = fmt.Sprintf("anytls://%s@%s/?sni=%s%s#%s",
+				url.PathEscape(u.Password), hostPort(p.Port), host, insecure, label("AnyTLS"))
+		case store.ShadowTLS:
+			sni, _ := splitHostPort(srv.Reality.Handshake, 443)
+			plugin := fmt.Sprintf("shadow-tls;host=%s;password=%s;version=3", sni, u.Password)
+			if srv.SelfSigned {
+				plugin += ";insecure=1"
+			}
+			userinfo := base64.RawURLEncoding.EncodeToString([]byte("2022-blake3-aes-128-gcm:" + srv.SSServerKey + ":" + u.SSKey))
+			link = fmt.Sprintf("ss://%s@%s?plugin=%s#%s", userinfo, hostPort(p.Port), url.QueryEscape(plugin), label("ShadowTLS"))
 		case store.TUIC:
 			link = fmt.Sprintf("tuic://%s:%s@%s?congestion_control=bbr&alpn=h3&sni=%s%s#%s",
 				u.UUID, u.Password, hostPort(p.Port), host, insecure, label("TUIC"))

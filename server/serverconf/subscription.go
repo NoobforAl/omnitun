@@ -54,15 +54,17 @@ func SingBoxSubscription(st *store.State, u *store.User) ([]byte, error) {
 	}
 	outbounds, endpoints := []any{}, []any{}
 	for _, p := range profiles {
-		out, isEndpoint, err := singbox.Outbound(p)
+		out, isEndpoint, extras, err := singbox.Outbound(p, p.Name)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", p.Name, err)
 		}
-		out["tag"] = p.Name
 		if isEndpoint {
 			endpoints = append(endpoints, out)
 		} else {
 			outbounds = append(outbounds, out)
+		}
+		for _, x := range extras {
+			outbounds = append(outbounds, x)
 		}
 	}
 	return json.MarshalIndent(map[string]any{"outbounds": outbounds, "endpoints": endpoints}, "", "  ")

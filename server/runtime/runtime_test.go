@@ -58,6 +58,8 @@ func setup(t *testing.T) (*store.Store, *Server) {
 			store.Trojan:       freeTCP(t),
 			store.Hysteria2:    freeUDP(t),
 			store.TUIC:         freeUDP(t),
+			store.AnyTLS:       freeTCP(t),
+			store.ShadowTLS:    freeTCP(t),
 			store.OpenVPNUDP:   freeUDP(t),
 			store.OpenVPNTCP:   freeTCP(t),
 		},

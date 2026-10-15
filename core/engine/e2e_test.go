@@ -127,3 +127,27 @@ func TestEndToEndShadowsocks(t *testing.T) {
 		t.Fatalf("dead profile reported reachable: %+v", results[1])
 	}
 }
+
+// startServerInbounds runs a sing-box server with several inbounds (for
+// layered protocols such as ShadowTLS + Shadowsocks).
+func startServerInbounds(t *testing.T, inbounds []any) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(include.Context(context.Background()))
+	t.Cleanup(cancel)
+	opts, err := parseOptions(ctx, map[string]any{
+		"log":       map[string]any{"level": "error"},
+		"inbounds":  inbounds,
+		"outbounds": []any{map[string]any{"type": "direct", "tag": "direct"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server, err := box.New(box.Options{Context: ctx, Options: opts})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := server.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { server.Close() })
+}

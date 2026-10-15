@@ -177,3 +177,28 @@ func TestParseOVPN(t *testing.T) {
 		t.Fatalf("inline creds: %q %q", p.Username, p.Password)
 	}
 }
+
+func TestImportClashNewTypes(t *testing.T) {
+	res, err := Import(`proxies:
+  - {name: hy1, type: hysteria, server: h.example.com, port: 443, auth-str: pw, obfs: ob, up: "20 Mbps", down: 80, sni: h.example.com, skip-cert-verify: true}
+  - {name: any, type: anytls, server: a.example.com, port: 443, password: pw, sni: a.example.com}
+  - {name: ssh, type: ssh, server: s.example.com, port: 22, username: u, password: pw, host-key: ["ssh-ed25519 AAAA"]}
+  - {name: stls, type: ss, server: t.example.com, port: 443, cipher: 2022-blake3-aes-128-gcm, password: "AAAAAAAAAAAAAAAAAAAAAA==", plugin: shadow-tls, plugin-opts: {host: www.microsoft.com, password: sp, version: 3}}
+`)
+	if err != nil || len(res.Profiles) != 4 {
+		t.Fatalf("err=%v profiles=%d errors=%v", err, len(res.Profiles), res.Errors)
+	}
+	hy, any, ssh, stls := res.Profiles[0], res.Profiles[1], res.Profiles[2], res.Profiles[3]
+	if hy.Protocol != profile.Hysteria || hy.Password != "pw" || hy.Hysteria2.UpMbps != 20 || hy.Hysteria2.DownMbps != 80 || hy.Hysteria2.Obfs != "ob" || !hy.TLS.Insecure {
+		t.Fatalf("hysteria: %+v %+v", hy, hy.Hysteria2)
+	}
+	if any.Protocol != profile.AnyTLS || any.TLS.ServerName != "a.example.com" {
+		t.Fatalf("anytls: %+v", any)
+	}
+	if ssh.Protocol != profile.SSH || ssh.Username != "u" || ssh.SSH == nil || len(ssh.SSH.HostKey) != 1 {
+		t.Fatalf("ssh: %+v", ssh)
+	}
+	if stls.Plugin != "shadow-tls" || stls.PluginOpts != "host=www.microsoft.com;password=sp;version=3" {
+		t.Fatalf("shadow-tls: %q %q", stls.Plugin, stls.PluginOpts)
+	}
+}
