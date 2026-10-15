@@ -227,6 +227,12 @@ func (e *Engine) Start(profiles []*profile.Profile, opts singbox.Options) error 
 		return fail(StageTunnelUp, err)
 	}
 	e.instance, e.cancel = instance, cancel
+	// sing-box's cache file restores the selector's last choice from a previous
+	// run, which would silently override the profile chosen now.
+	if err := e.applySelectionLocked(selected); err != nil {
+		e.stopLocked()
+		return fail(StageTunnelUp, err)
+	}
 	go e.trafficLoop(ctx, instance)
 
 	if e.cfg.SkipHandshake {
@@ -283,6 +289,36 @@ func (e *Engine) Select(tag string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.selectLocked(tag, nil)
+}
+
+// applySelectionLocked points the selector at tag without touching the state.
+func (e *Engine) applySelectionLocked(tag string) error {
+	out, ok := e.instance.Outbound().Outbound(singbox.TagSelect)
+	if !ok {
+		return errors.New("selector not found")
+	}
+	sel, ok := out.(interface{ SelectOutbound(string) bool })
+	if !ok || !sel.SelectOutbound(tag) {
+		return fmt.Errorf("cannot select profile %q", tag)
+	}
+	return nil
+}
+
+// Selected returns the profile tag the selector is actually routing through.
+func (e *Engine) Selected() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.instance == nil {
+		return ""
+	}
+	out, ok := e.instance.Outbound().Outbound(singbox.TagSelect)
+	if !ok {
+		return ""
+	}
+	if now, ok := out.(interface{ Now() string }); ok {
+		return now.Now()
+	}
+	return ""
 }
 
 // selectLocked switches the selector; failover, when set, is recorded in the state.

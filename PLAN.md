@@ -265,6 +265,8 @@ omnitun/
 
 `[x]` done (and tested) · `[ ]` left. Device tests ran on a Samsung A30s (Android 11).
 
+**Priority (2026-10-15): mobile first.** Android, core, server and shared UI items come first; Phase 3 (Windows VPN) is deferred until everything else is done.
+
 ### Phase 0 — Bootstrap ✅
 - [x] Monorepo: Go module, Rust `tor` crate, Flutter app, CI workflow, MIT license
 - [x] Build scripts with sing-box feature tags (`scripts/go.ps1`, `Makefile`, `build-android-core.sh`)
@@ -291,7 +293,7 @@ omnitun/
 - [ ] Always-on VPN / start on boot
 - [ ] Notification shows profile name and live speed
 
-### Phase 3 — Windows
+### Phase 3 — Windows (deferred — after all other phases)
 - [x] Desktop app runs on the real core in proxy mode (system proxy on/off)
 - [ ] `omnitun-svc` as a Windows service (SYSTEM) for full VPN (TUN) mode without running the app as admin
 - [ ] System tray (connect/disconnect, switch profile, quit), close-to-tray

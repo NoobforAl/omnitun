@@ -197,3 +197,30 @@ func TestRotateAfter(t *testing.T) {
 		t.Fatalf("unknown current: got %v", got)
 	}
 }
+
+// A selection made in a previous run (persisted by sing-box's cache file)
+// must not override the profile chosen for this run.
+func TestSelectionNotOverriddenByCache(t *testing.T) {
+	dead, live, testURL := failoverSetup(t)
+	dir := t.TempDir()
+	e := New(Config{DataDir: dir, SkipHandshake: true})
+	opts := singbox.Options{ListenPort: freePort(t), LogLevel: "error", ProxyPrivate: true, TestURL: testURL}
+
+	opts.Selected = live.ID
+	if err := e.Start([]*profile.Profile{dead, live}, opts); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Select(dead.ID); err != nil { // persisted in the cache file
+		t.Fatal(err)
+	}
+	e.Stop()
+
+	opts.Selected = live.ID
+	if err := e.Start([]*profile.Profile{dead, live}, opts); err != nil {
+		t.Fatal(err)
+	}
+	defer e.Stop()
+	if got := e.Selected(); got != live.ID {
+		t.Fatalf("selector routes through %s, want the chosen profile %s", got, live.ID)
+	}
+}
