@@ -67,7 +67,7 @@ IKEv2, L2TP/IPsec and SSTP on **Windows** use the built-in RAS VPN client (no th
 ┌──────────────────────────── Flutter UI (Dart) ─────────────────────────────┐
 │ screens · state (Riverpod) · local DB (drift/SQLite) · i18n · theming       │
 └──────────────┬─────────────────────────────────────────┬────────────────────┘
-        Android│ MethodChannel + FFI              Windows│ Named pipe (gRPC/JSON-RPC)
+        Android│ MethodChannel + FFI              Desktop│ loopback TCP, JSON lines + token
 ┌──────────────▼──────────────┐          ┌───────────────▼─────────────────────┐
 │ Kotlin VpnService (fg svc)  │          │ omnitun-svc.exe (Windows Service,   │
 │  - prepare() permission     │          │  runs as SYSTEM; UI runs unelevated) │
@@ -141,7 +141,7 @@ Everything is normalized into one internal **Profile** model (`protocol`, `serve
 
 **Windows**
 - UI runs unelevated. `omnitun-svc` is installed once by the MSI/MSIX installer (UAC prompt at install time only).
-- Safety: the service holds a **session lease** — the UI keeps the named pipe open and sends a heartbeat. If the pipe closes or heartbeats stop (UI closed or killed), the service tears down the tunnel, routes, DNS and WFP rules within ~3 s.
+- Safety: the service holds a **session lease** — the UI keeps a token-authenticated loopback control connection (`core/control`, newline-delimited JSON) open and pings every 4 s. If the connection closes or pings stop (UI closed or killed), the service tears down the tunnel after a 5 s grace period. In dev/unprivileged mode the UI launches `omnitun-svc --parent-pid`, which exits when the UI process dies (verified).
 - All add-on processes (openvpn, naive, …) are started inside a **Job Object** with `KILL_ON_JOB_CLOSE`, so they can never outlive the service.
 - On service start, stale Wintun adapters, routes and firewall rules from a crash are cleaned up.
 - Optional kill switch through WFP while connected.
@@ -220,7 +220,7 @@ omnitun/
 ├─ tor/                 Rust crate wrapping Arti, C ABI (cbindgen)
 ├─ platform/
 │  ├─ android/          Kotlin VpnService, IKEv2, SSTP modules
-│  └─ windows-svc/      Go Windows service (named pipe, Wintun, WFP, RAS)
+│  └─ windows-svc/      Go Windows service (control protocol, Wintun, WFP, RAS)
 ├─ server/              Go server CLI + TUI
 ├─ addons/              build scripts for GPL/AGPL external binaries (openvpn, lightway, naive)
 ├─ proto/               shared API schema (JSON schema / protobuf)
@@ -236,9 +236,9 @@ omnitun/
 | Phase | Goal | Deliverables |
 |---|---|---|
 | **0. Bootstrap** ✅ | Toolchain and skeleton | Monorepo (single Go module at root), Rust `tor` crate, Flutter app shell with mock engine, CI, LICENSE (MIT) |
-| **1. Core MVP** 🚧 | First tunnels | ✅ importer (share links, subscriptions, WG/AWG `.conf`); ✅ profile → sing-box config; ✅ in-process engine + dev CLI; ⬜ libcore C ABI + Flutter FFI; ⬜ AmneziaWG engine |
+| **1. Core MVP** 🚧 | First tunnels | ✅ importer (share links, subscriptions, WG/AWG `.conf`); ✅ profile → sing-box config; ✅ in-process engine + dev CLI; ✅ desktop bridge (daemon); ✅ latency tests, live switching, traffic stats, system proxy; ⬜ Android bridge (gomobile + VpnService); ⬜ AmneziaWG engine |
 | **2. Android MVP** | Real app on a phone | VpnService + permission flow, foreground notification, lifecycle stop rules, Home/Profiles/Import screens, QR scan |
-| **3. Windows MVP** | Real app on desktop | `omnitun-svc` + named pipe + heartbeat lease, Wintun, Job Objects, tray, MSIX/MSI installer |
+| **3. Windows MVP** | Real app on desktop | ✅ `omnitun-svc` daemon + control protocol + lease + parent-death exit; ✅ Flutter DaemonEngine; ⬜ run as SYSTEM service for TUN, tray, MSIX/MSI installer |
 | **4. Groups and failover** | Reliability | Groups, subscriptions with auth, health checks, no-internet detection, failover strategies, typed errors |
 | **5. More protocols** | Coverage | Stealth-WG, NordLynx, Windows RAS (IKEv2/L2TP/SSTP), Android IKEv2 + SSTP |
 | **6. Tor** | Censorship resistance | Rust Arti lib, obfs4/snowflake/webtunnel PTs, bridge import |

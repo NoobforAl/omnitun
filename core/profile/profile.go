@@ -10,16 +10,16 @@ import (
 
 // Protocol identifiers.
 const (
-	VLESS      = "vless"
-	VMess      = "vmess"
-	Trojan     = "trojan"
+	VLESS       = "vless"
+	VMess       = "vmess"
+	Trojan      = "trojan"
 	Shadowsocks = "shadowsocks"
-	Hysteria2  = "hysteria2"
-	TUIC       = "tuic"
-	WireGuard  = "wireguard"
-	AmneziaWG  = "amneziawg"
-	Naive      = "naive"
-	Tor        = "tor"
+	Hysteria2   = "hysteria2"
+	TUIC        = "tuic"
+	WireGuard   = "wireguard"
+	AmneziaWG   = "amneziawg"
+	Naive       = "naive"
+	Tor         = "tor"
 )
 
 // Profile is one connectable server configuration.
@@ -38,13 +38,13 @@ type Profile struct {
 	Flow     string `json:"flow,omitempty"`   // vless flow, e.g. xtls-rprx-vision
 	AlterID  int    `json:"alter_id,omitempty"`
 
-	TLS       *TLS       `json:"tls,omitempty"`
-	Transport *Transport `json:"transport,omitempty"`
-	WireGuard *WG        `json:"wireguard,omitempty"`
-	Hysteria2 *Hy2       `json:"hysteria2,omitempty"`
-	TUIC      *TUICOpts  `json:"tuic,omitempty"`
-	Plugin    string     `json:"plugin,omitempty"` // shadowsocks SIP003 plugin
-	PluginOpts string    `json:"plugin_opts,omitempty"`
+	TLS        *TLS       `json:"tls,omitempty"`
+	Transport  *Transport `json:"transport,omitempty"`
+	WireGuard  *WG        `json:"wireguard,omitempty"`
+	Hysteria2  *Hy2       `json:"hysteria2,omitempty"`
+	TUIC       *TUICOpts  `json:"tuic,omitempty"`
+	Plugin     string     `json:"plugin,omitempty"` // shadowsocks SIP003 plugin
+	PluginOpts string     `json:"plugin_opts,omitempty"`
 
 	// Source is the original link or file text the profile came from.
 	Source string `json:"source,omitempty"`

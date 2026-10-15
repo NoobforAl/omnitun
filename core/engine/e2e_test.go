@@ -71,7 +71,7 @@ func TestEndToEndShadowsocks(t *testing.T) {
 		t.Fatal(err)
 	}
 	proxyPort := freePort(t)
-	e := New(nil)
+	e := New(Config{DataDir: t.TempDir()})
 	err = e.Start(res.Profiles, singbox.Options{
 		ListenPort:   proxyPort,
 		LogLevel:     "error",
@@ -99,5 +99,28 @@ func TestEndToEndShadowsocks(t *testing.T) {
 	}
 	if hits.Load() != 1 {
 		t.Fatalf("web server hits = %d", hits.Load())
+	}
+
+	if err := e.Select(singbox.TagAuto); err != nil {
+		t.Fatalf("select auto: %v", err)
+	}
+	if err := e.Select("missing"); err == nil {
+		t.Fatal("selecting an unknown profile should fail")
+	}
+
+	// Latency through the Shadowsocks server, plus one dead profile.
+	dead, err := importer.ParseLink(fmt.Sprintf("ss://aes-128-gcm:x@127.0.0.1:%d#dead", freePort(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, err := e.TestLatency(t.Context(), append(res.Profiles, dead), "http://"+webLn.Addr().String()+"/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results[0].Ms < 0 {
+		t.Fatalf("live profile unreachable: %+v", results[0])
+	}
+	if results[1].Ms != -1 {
+		t.Fatalf("dead profile reported reachable: %+v", results[1])
 	}
 }

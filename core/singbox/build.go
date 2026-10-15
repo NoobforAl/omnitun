@@ -42,6 +42,9 @@ type Options struct {
 	// ProxyPrivate also sends LAN/private addresses through the tunnel
 	// (by default they bypass it).
 	ProxyPrivate bool
+	// SystemProxy points the OS proxy settings at the local port while
+	// running (proxy mode only); sing-box restores them on stop.
+	SystemProxy bool
 }
 
 func (o *Options) defaults() {
@@ -124,12 +127,16 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 	var inbounds []any
 	switch opts.Mode {
 	case ModeProxy:
-		inbounds = append(inbounds, obj{
+		mixed := obj{
 			"type":        "mixed",
 			"tag":         "mixed-in",
 			"listen":      opts.ListenAddr,
 			"listen_port": opts.ListenPort,
-		})
+		}
+		if opts.SystemProxy {
+			mixed["set_system_proxy"] = true
+		}
+		inbounds = append(inbounds, mixed)
 	case ModeTUN:
 		inbounds = append(inbounds, obj{
 			"type":         "tun",

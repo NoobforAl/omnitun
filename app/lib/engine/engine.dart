@@ -15,6 +15,7 @@ class ProfileInfo {
     required this.port,
     this.group = 'Default',
     this.latencyMs,
+    this.raw = const {},
   });
 
   final String id;
@@ -27,6 +28,9 @@ class ProfileInfo {
   /// Last measured latency; null = not tested, -1 = unreachable.
   final int? latencyMs;
 
+  /// The full profile as produced by the core; sent back verbatim on connect.
+  final Map<String, dynamic> raw;
+
   ProfileInfo copyWith({int? latencyMs}) => ProfileInfo(
         id: id,
         name: name,
@@ -35,6 +39,7 @@ class ProfileInfo {
         port: port,
         group: group,
         latencyMs: latencyMs ?? this.latencyMs,
+        raw: raw,
       );
 
   factory ProfileInfo.fromJson(Map<String, dynamic> j) => ProfileInfo(
@@ -43,7 +48,20 @@ class ProfileInfo {
         protocol: j['protocol'] as String,
         server: j['server'] as String,
         port: j['port'] as int,
+        raw: j,
       );
+}
+
+/// How a connection should be made.
+class ConnectOptions {
+  const ConnectOptions({this.tunMode = false, this.systemProxy = true, this.listenPort = 2080});
+
+  /// Capture all traffic (needs VPN permission / admin). Otherwise proxy mode.
+  final bool tunMode;
+
+  /// In proxy mode, point the OS proxy settings at the local port.
+  final bool systemProxy;
+  final int listenPort;
 }
 
 class EngineState {
@@ -94,7 +112,14 @@ abstract class VpnEngine {
   /// Log lines from the core.
   Stream<String> get logs;
 
-  Future<void> connect(ProfileInfo profile, {List<ProfileInfo> fallbacks = const []});
+  /// Human-readable engine name for the settings screen.
+  String get name;
+
+  Future<void> connect(
+    ProfileInfo profile, {
+    List<ProfileInfo> fallbacks = const [],
+    ConnectOptions options = const ConnectOptions(),
+  });
   Future<void> disconnect();
   Future<ImportResult> importText(String text);
 

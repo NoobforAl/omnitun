@@ -4,6 +4,7 @@ package engine
 
 import (
 	"net"
+	"sync"
 	"testing"
 
 	"github.com/NoobforAl/omnitun/core/importer"
@@ -35,7 +36,14 @@ func TestStartStopProxyMode(t *testing.T) {
 	for _, p := range profiles {
 		t.Run(p.Name, func(t *testing.T) {
 			var states []Status
-			e := New(func(s State) { states = append(states, s.Status) })
+			var mu sync.Mutex
+			e := New(Config{DataDir: t.TempDir(), OnState: func(s State) {
+				mu.Lock()
+				defer mu.Unlock()
+				if n := len(states); n == 0 || states[n-1] != s.Status {
+					states = append(states, s.Status)
+				}
+			}})
 			port := freePort(t)
 			if err := e.Start(p.AsSlice(), singbox.Options{ListenPort: port, LogLevel: "error"}); err != nil {
 				t.Fatal(err)
@@ -60,7 +68,7 @@ func TestStartStopProxyMode(t *testing.T) {
 		})
 	}
 	// All profiles together form one selector/urltest group.
-	e := New(nil)
+	e := New(Config{DataDir: t.TempDir()})
 	if err := e.Start(profiles, singbox.Options{ListenPort: freePort(t), LogLevel: "error"}); err != nil {
 		t.Fatal(err)
 	}

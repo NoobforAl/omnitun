@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../engine/engine.dart';
-import '../engine/mock_engine.dart';
+import '../engine/core_engine.dart';
 
 final engineProvider = Provider<VpnEngine>((ref) {
-  final engine = MockEngine();
+  final engine = CoreEngine();
   ref.onDispose(engine.dispose);
   return engine;
 });
@@ -74,7 +74,12 @@ class ConnectionController extends Notifier<EngineState> {
     final profile = ref.read(selectedProfileProvider);
     if (profile == null) return;
     final others = ref.read(profilesProvider).where((p) => p.id != profile.id).toList();
-    await engine.connect(profile, fallbacks: others);
+    final settings = ref.read(settingsProvider);
+    await engine.connect(
+      profile,
+      fallbacks: others,
+      options: ConnectOptions(tunMode: settings.tunMode, systemProxy: settings.systemProxy),
+    );
   }
 }
 
@@ -101,20 +106,32 @@ final logsProvider = NotifierProvider<LogsController, List<String>>(LogsControll
 
 class SettingsState {
   const SettingsState({
-    this.tunMode = true,
+    this.tunMode = false,
+    this.systemProxy = true,
     this.stopOnClose = true,
     this.autoFailover = true,
     this.killSwitch = false,
   });
 
+  /// Capture all traffic. Off = proxy mode (works without admin rights on desktop).
   final bool tunMode;
+
+  /// In proxy mode, set the OS proxy to the local port while connected.
+  final bool systemProxy;
   final bool stopOnClose;
   final bool autoFailover;
   final bool killSwitch;
 
-  SettingsState copyWith({bool? tunMode, bool? stopOnClose, bool? autoFailover, bool? killSwitch}) =>
+  SettingsState copyWith({
+    bool? tunMode,
+    bool? systemProxy,
+    bool? stopOnClose,
+    bool? autoFailover,
+    bool? killSwitch,
+  }) =>
       SettingsState(
         tunMode: tunMode ?? this.tunMode,
+        systemProxy: systemProxy ?? this.systemProxy,
         stopOnClose: stopOnClose ?? this.stopOnClose,
         autoFailover: autoFailover ?? this.autoFailover,
         killSwitch: killSwitch ?? this.killSwitch,

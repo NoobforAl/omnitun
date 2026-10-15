@@ -6,13 +6,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"time"
 
 	box "github.com/sagernet/sing-box"
+	"github.com/sagernet/sing-box/adapter"
+	"github.com/sagernet/sing-box/common/trafficcontrol"
+	"github.com/sagernet/sing-box/common/urltest"
 	"github.com/sagernet/sing-box/include"
+	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	sjson "github.com/sagernet/sing/common/json"
+	"github.com/sagernet/sing/service"
 
 	"github.com/NoobforAl/omnitun/core/profile"
 	"github.com/NoobforAl/omnitun/core/singbox"
@@ -34,20 +40,37 @@ type State struct {
 	Since   time.Time `json:"since,omitzero"`
 	Error   string    `json:"error,omitempty"`
 	Skipped []string  `json:"skipped,omitempty"`
+	// Selected is the active profile ID, or "auto".
+	Selected  string `json:"selected,omitempty"`
+	UpBps     int64  `json:"up_bps"`
+	DownBps   int64  `json:"down_bps"`
+	UpTotal   int64  `json:"up_total"`
+	DownTotal int64  `json:"down_total"`
+}
+
+// Config sets up an engine.
+type Config struct {
+	// DataDir holds the sing-box cache file. Defaults to the OS temp dir.
+	DataDir string
+	// OnState is called on every state change and once per second with traffic while running.
+	OnState func(State)
+	// OnLog receives sing-box log lines.
+	OnLog func(level, message string)
 }
 
 // Engine owns at most one running sing-box instance.
 type Engine struct {
+	cfg Config
+
 	mu       sync.Mutex
 	instance *box.Box
 	cancel   context.CancelFunc
 	state    State
-	onState  func(State)
 }
 
-// New returns an engine. onState, if non-nil, is called on every state change.
-func New(onState func(State)) *Engine {
-	return &Engine{state: State{Status: StatusStopped}, onState: onState}
+// New returns an idle engine.
+func New(cfg Config) *Engine {
+	return &Engine{cfg: cfg, state: State{Status: StatusStopped}}
 }
 
 // State returns the current state.
@@ -57,10 +80,17 @@ func (e *Engine) State() State {
 	return e.state
 }
 
+// setState must be called with e.mu held.
 func (e *Engine) setState(s State) {
 	e.state = s
-	if e.onState != nil {
-		e.onState(s)
+	if e.cfg.OnState != nil {
+		e.cfg.OnState(s)
+	}
+}
+
+func (e *Engine) logf(level, format string, args ...any) {
+	if e.cfg.OnLog != nil {
+		e.cfg.OnLog(level, fmt.Sprintf(format, args...))
 	}
 }
 
@@ -78,6 +108,43 @@ func parseOptions(ctx context.Context, cfg map[string]any) (option.Options, erro
 	return sjson.UnmarshalExtendedContext[option.Options](ctx, raw)
 }
 
+type logWriter struct{ e *Engine }
+
+func (w logWriter) WriteMessage(level log.Level, message string) {
+	if w.e.cfg.OnLog != nil {
+		w.e.cfg.OnLog(log.FormatLevel(level), message)
+	}
+}
+
+func (e *Engine) dataDir() string {
+	if e.cfg.DataDir != "" {
+		return e.cfg.DataDir
+	}
+	return filepath.Join(osTempDir(), "omnitun")
+}
+
+// newBox builds and creates (but does not start) a sing-box instance.
+func (e *Engine) newBox(cfg map[string]any) (*box.Box, context.Context, context.CancelFunc, error) {
+	cfg["experimental"] = map[string]any{
+		"cache_file": map[string]any{"enabled": true, "path": filepath.Join(e.dataDir(), "cache.db")},
+	}
+	if err := ensureDir(e.dataDir()); err != nil {
+		return nil, nil, nil, err
+	}
+	ctx, cancel := context.WithCancel(include.Context(context.Background()))
+	options, err := parseOptions(ctx, cfg)
+	if err != nil {
+		cancel()
+		return nil, nil, nil, err
+	}
+	instance, err := box.New(box.Options{Context: ctx, Options: options, PlatformLogWriter: logWriter{e}})
+	if err != nil {
+		cancel()
+		return nil, nil, nil, err
+	}
+	return instance, ctx, cancel, nil
+}
+
 // Start builds a config for profiles and starts the tunnel. A running tunnel is stopped first.
 func (e *Engine) Start(profiles []*profile.Profile, opts singbox.Options) error {
 	e.mu.Lock()
@@ -92,27 +159,89 @@ func (e *Engine) Start(profiles []*profile.Profile, opts singbox.Options) error 
 	var skippedMsgs []string
 	for _, s := range skipped {
 		skippedMsgs = append(skippedMsgs, s.Error())
+		e.logf("warn", "skipped profile: %v", s)
 	}
-	e.setState(State{Status: StatusStarting, Skipped: skippedMsgs})
+	selected := opts.Selected
+	if selected == "" {
+		selected = singbox.TagAuto
+	}
+	e.setState(State{Status: StatusStarting, Skipped: skippedMsgs, Selected: selected})
+	e.logf("info", "starting %d profile(s) in %s mode", len(profiles)-len(skipped), orMode(opts.Mode))
 
-	ctx, cancel := context.WithCancel(include.Context(context.Background()))
-	options, err := parseOptions(ctx, cfg)
+	instance, ctx, cancel, err := e.newBox(cfg)
 	if err == nil {
-		var instance *box.Box
-		instance, err = box.New(box.Options{Context: ctx, Options: options})
-		if err == nil {
-			if err = instance.Start(); err == nil {
-				e.instance, e.cancel = instance, cancel
-				e.setState(State{Status: StatusRunning, Since: time.Now(), Skipped: skippedMsgs})
-				return nil
-			}
-			instance.Close()
+		if err = instance.Start(); err == nil {
+			e.instance, e.cancel = instance, cancel
+			e.setState(State{Status: StatusRunning, Since: time.Now(), Skipped: skippedMsgs, Selected: selected})
+			go e.trafficLoop(ctx, instance)
+			return nil
 		}
+		instance.Close()
+		cancel()
 	}
-	cancel()
 	err = fmt.Errorf("start engine: %w", err)
+	e.logf("error", "%v", err)
 	e.setState(State{Status: StatusError, Error: err.Error(), Skipped: skippedMsgs})
 	return err
+}
+
+func orMode(m singbox.Mode) singbox.Mode {
+	if m == "" {
+		return singbox.ModeProxy
+	}
+	return m
+}
+
+// trafficLoop publishes per-second traffic rates until ctx is cancelled.
+func (e *Engine) trafficLoop(ctx context.Context, instance *box.Box) {
+	manager := service.PtrFromContext[trafficcontrol.Manager](ctx)
+	if manager == nil {
+		return
+	}
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	var lastUp, lastDown int64
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		up, down := manager.Total()
+		e.mu.Lock()
+		if e.instance != instance {
+			e.mu.Unlock()
+			return
+		}
+		s := e.state
+		s.UpBps, s.DownBps = up-lastUp, down-lastDown
+		s.UpTotal, s.DownTotal = up, down
+		e.setState(s)
+		e.mu.Unlock()
+		lastUp, lastDown = up, down
+	}
+}
+
+// Select switches the running tunnel to a profile ID (or "auto") without reconnecting.
+func (e *Engine) Select(tag string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.instance == nil {
+		return errors.New("not running")
+	}
+	out, ok := e.instance.Outbound().Outbound(singbox.TagSelect)
+	if !ok {
+		return errors.New("selector not found")
+	}
+	sel, ok := out.(interface{ SelectOutbound(string) bool })
+	if !ok || !sel.SelectOutbound(tag) {
+		return fmt.Errorf("unknown profile %q", tag)
+	}
+	s := e.state
+	s.Selected = tag
+	e.setState(s)
+	e.logf("info", "switched to %s", tag)
+	return nil
 }
 
 // Stop tears down the tunnel. It is safe to call when nothing is running.
@@ -130,8 +259,78 @@ func (e *Engine) stopLocked() error {
 	e.cancel()
 	e.instance, e.cancel = nil, nil
 	e.setState(State{Status: StatusStopped})
+	e.logf("info", "stopped")
 	if err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
 	return nil
+}
+
+// LatencyResult is the outcome of testing one profile.
+type LatencyResult struct {
+	ID    string `json:"id"`
+	Ms    int    `json:"ms"` // -1 when unreachable
+	Error string `json:"error,omitempty"`
+}
+
+// TestLatency measures an HTTP round trip through each profile with a
+// temporary sing-box instance that has no inbounds, so it works whether or
+// not a tunnel is running.
+func (e *Engine) TestLatency(ctx context.Context, profiles []*profile.Profile, testURL string) ([]LatencyResult, error) {
+	cfg, skipped, err := singbox.Build(profiles, singbox.Options{TestURL: testURL, LogLevel: "error"})
+	if err != nil {
+		return nil, err
+	}
+	delete(cfg, "inbounds")
+	delete(cfg, "dns")
+	delete(cfg, "route")
+	tmp := New(Config{DataDir: filepath.Join(e.dataDir(), "latency")})
+	instance, _, cancel, err := tmp.newBox(cfg)
+	if err != nil {
+		return nil, err
+	}
+	defer cancel()
+	if err := instance.Start(); err != nil {
+		instance.Close()
+		return nil, err
+	}
+	defer instance.Close()
+
+	results := make([]LatencyResult, len(profiles))
+	var wg sync.WaitGroup
+	for i, p := range profiles {
+		results[i] = LatencyResult{ID: p.ID, Ms: -1}
+		dialer, ok := lookupDialer(instance, p.ID)
+		if !ok {
+			results[i].Error = "not supported by engine"
+			continue
+		}
+		wg.Add(1)
+		go func(r *LatencyResult) {
+			defer wg.Done()
+			tctx, tcancel := context.WithTimeout(ctx, 8*time.Second)
+			defer tcancel()
+			ms, err := urltest.URLTest(tctx, testURL, dialer)
+			if err != nil {
+				r.Error = err.Error()
+				return
+			}
+			r.Ms = int(ms)
+		}(&results[i])
+	}
+	wg.Wait()
+	for _, s := range skipped {
+		e.logf("warn", "latency test skipped: %v", s)
+	}
+	return results, nil
+}
+
+func lookupDialer(instance *box.Box, tag string) (adapter.Outbound, bool) {
+	if out, ok := instance.Outbound().Outbound(tag); ok {
+		return out, true
+	}
+	if ep, ok := instance.Endpoint().Get(tag); ok {
+		return ep, true
+	}
+	return nil, false
 }

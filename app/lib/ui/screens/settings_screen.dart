@@ -22,6 +22,12 @@ class SettingsScreen extends ConsumerWidget {
             onChanged: (v) => ctrl.update((s) => s.copyWith(tunMode: v)),
           ),
           SwitchListTile(
+            title: const Text('Set system proxy'),
+            subtitle: const Text('Proxy mode: point the OS proxy settings at Omnitun while connected'),
+            value: s.systemProxy,
+            onChanged: s.tunMode ? null : (v) => ctrl.update((s) => s.copyWith(systemProxy: v)),
+          ),
+          SwitchListTile(
             title: const Text('Auto-switch on failure'),
             subtitle: const Text('Try the next profile in the group when one stops working'),
             value: s.autoFailover,
@@ -39,10 +45,10 @@ class SettingsScreen extends ConsumerWidget {
             value: s.stopOnClose,
             onChanged: (v) => ctrl.update((s) => s.copyWith(stopOnClose: v)),
           ),
-          const ListTile(
-            leading: Icon(Icons.info_outline),
-            title: Text('Omnitun'),
-            subtitle: Text('MIT License · engine: preview (mock)'),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('Omnitun'),
+            subtitle: Text('MIT License · engine: ${ref.watch(engineProvider).name}'),
           ),
         ],
       ),

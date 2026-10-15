@@ -28,7 +28,14 @@ class MockEngine implements VpnEngine {
   void _log(String line) => _logs.add('${DateTime.now().toIso8601String().substring(11, 19)}  $line');
 
   @override
-  Future<void> connect(ProfileInfo profile, {List<ProfileInfo> fallbacks = const []}) async {
+  String get name => 'preview (mock)';
+
+  @override
+  Future<void> connect(
+    ProfileInfo profile, {
+    List<ProfileInfo> fallbacks = const [],
+    ConnectOptions options = const ConnectOptions(),
+  }) async {
     _emit(EngineState(status: ConnStatus.connecting, activeProfileId: profile.id));
     _log('connecting to ${profile.name} (${profile.protocol})');
     await Future<void>.delayed(connectDelay);

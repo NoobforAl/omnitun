@@ -84,11 +84,15 @@ func run(cmd string, args []string) error {
 		}
 		return printJSON(cfg)
 	case "run":
-		eng := engine.New(func(s engine.State) {
-			fmt.Fprintf(os.Stderr, "state: %s %s\n", s.Status, s.Error)
-			for _, sk := range s.Skipped {
-				fmt.Fprintln(os.Stderr, "skipped:", sk)
-			}
+		var last engine.Status
+		eng := engine.New(engine.Config{
+			OnState: func(s engine.State) {
+				if s.Status != last {
+					last = s.Status
+					fmt.Fprintf(os.Stderr, "state: %s %s\n", s.Status, s.Error)
+				}
+			},
+			OnLog: func(level, msg string) { fmt.Fprintf(os.Stderr, "[%s] %s\n", level, msg) },
 		})
 		if err := eng.Start(res.Profiles, opts); err != nil {
 			return err
