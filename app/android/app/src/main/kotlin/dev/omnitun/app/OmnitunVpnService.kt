@@ -93,6 +93,27 @@ class OmnitunVpnService : VpnService() {
         return pfd.fd
     }
 
+    private var lastText = ""
+
+    /** Shows the profile and live speed; called about once a second while connected. */
+    fun updateStatus(status: String, profile: String, upBps: Long, downBps: Long) {
+        val title = when (status) {
+            "connected" -> getString(R.string.vpn_connected)
+            else -> getString(R.string.vpn_connecting)
+        } + if (profile.isNotEmpty()) " · $profile" else ""
+        val text = if (status == "connected") "↓ ${speed(downBps)}   ↑ ${speed(upBps)}" else ""
+        val key = "$title|$text"
+        if (key == lastText) return
+        lastText = key
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(title, text))
+    }
+
+    private fun speed(bps: Long): String = when {
+        bps >= 1 shl 20 -> "%.1f MB/s".format(bps / 1048576.0)
+        bps >= 1 shl 10 -> "${bps shr 10} KB/s"
+        else -> "$bps B/s"
+    }
+
     /** Called when the core reports the tunnel stopped. */
     fun stopVpn() {
         tun?.close()
@@ -136,11 +157,11 @@ class OmnitunVpnService : VpnService() {
         }
     }
 
-    private fun updateNotification(text: String) {
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(text))
+    private fun updateNotification(title: String) {
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(title))
     }
 
-    private fun buildNotification(text: String): Notification {
+    private fun buildNotification(title: String, text: String = ""): Notification {
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CHANNEL) == null) {
             nm.createNotificationChannel(
@@ -154,10 +175,12 @@ class OmnitunVpnService : VpnService() {
         )
         return Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_vpn_key)
-            .setContentTitle(getString(R.string.app_name))
-            .setContentText(text)
+            .setContentTitle(title)
+            .setContentText(text.ifEmpty { getString(R.string.app_name) })
             .setContentIntent(open)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
             .addAction(Notification.Action.Builder(null, getString(R.string.vpn_disconnect), disconnect).build())
             .build()
     }

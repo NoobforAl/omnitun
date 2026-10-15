@@ -54,6 +54,8 @@ type State struct {
 	Failover *FailoverEvent `json:"failover,omitempty"`
 	// Progress is the current (or, on error, the failed) connection stage.
 	Progress *Progress `json:"progress,omitempty"`
+	// ProfileName is the display name of Selected ("auto" for the auto group).
+	ProfileName string `json:"profile_name,omitempty"`
 }
 
 // Config sets up an engine.
@@ -104,6 +106,11 @@ func (e *Engine) State() State {
 
 // setState must be called with e.mu held.
 func (e *Engine) setState(s State) {
+	if s.Selected != "" {
+		s.ProfileName = e.name(s.Selected)
+	} else {
+		s.ProfileName = ""
+	}
 	e.state = s
 	if e.cfg.OnState != nil {
 		e.cfg.OnState(s)

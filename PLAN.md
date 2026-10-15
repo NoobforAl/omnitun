@@ -291,7 +291,7 @@ omnitun/
 - [ ] Release build: R8/minify, signing config, smaller per-ABI APKs/AAB
 - [x] Per-app split tunneling ("only selected" / "bypass selected", app picker with icons) — verified: bypassed Chrome showed the phone's own IP while the VPN was up
 - [ ] Always-on VPN / start on boot
-- [ ] Notification shows profile name and live speed
+- [x] Notification shows profile name and live speed (verified on device)
 
 ### Phase 3 — Windows (deferred — after all other phases)
 - [x] Desktop app runs on the real core in proxy mode (system proxy on/off)

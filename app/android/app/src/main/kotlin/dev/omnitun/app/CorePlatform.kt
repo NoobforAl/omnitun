@@ -33,9 +33,17 @@ class CorePlatform(context: Context) : Platform {
         if (!service.protect(fd)) throw IllegalStateException("protect($fd) failed")
     }
 
-    override fun stateChanged(status: String) {
-        if (status == "disconnected" || status == "error") {
-            OmnitunVpnService.instance?.stopVpn()
+    override fun stateChanged(stateJSON: String) {
+        val state = runCatching { JSONObject(stateJSON) }.getOrNull() ?: return
+        val service = OmnitunVpnService.instance ?: return
+        when (val status = state.optString("status")) {
+            "disconnected", "error" -> service.stopVpn()
+            else -> service.updateStatus(
+                status,
+                state.optString("profile"),
+                state.optLong("up_bps"),
+                state.optLong("down_bps"),
+            )
         }
     }
 

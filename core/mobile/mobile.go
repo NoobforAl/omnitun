@@ -27,9 +27,11 @@ type Platform interface {
 	StartMonitor(listener DefaultNetworkListener) error
 	// CloseMonitor stops reporting.
 	CloseMonitor() error
-	// StateChanged reports the engine status: "connecting", "connected", "disconnected" or "error".
+	// StateChanged reports the engine state as JSON (see notifyState): status is
+	// "connecting", "connected", "disconnected" or "error"; it is called about once
+	// a second while connected, with traffic, so the notification can show speed.
 	// The native side stops its VPN service on "disconnected" and "error".
-	StateChanged(status string)
+	StateChanged(stateJSON string)
 }
 
 // DefaultNetworkListener receives default-network updates from the platform.
@@ -60,7 +62,12 @@ func Start(dataDir string, platform Platform) (string, error) {
 		Platform: newPlatformWrapper(platform),
 		// Go cannot read the Android system CA store; use the embedded Mozilla bundle.
 		CertificateStore: "mozilla",
-		OnState:          func(st engine.State) { platform.StateChanged(string(st.Status)) },
+		OnState: func(st engine.State) {
+			b, _ := json.Marshal(notifyState{
+				Status: string(st.Status), Profile: st.ProfileName, UpBps: st.UpBps, DownBps: st.DownBps,
+			})
+			platform.StateChanged(string(b))
+		},
 	})
 	if err != nil {
 		return "", err
@@ -93,4 +100,12 @@ func Stop() {
 		srv.Close()
 		srv, info = nil, ""
 	}
+}
+
+// notifyState is the JSON passed to Platform.StateChanged.
+type notifyState struct {
+	Status  string `json:"status"`
+	Profile string `json:"profile,omitempty"`
+	UpBps   int64  `json:"up_bps"`
+	DownBps int64  `json:"down_bps"`
 }
