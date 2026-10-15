@@ -333,8 +333,12 @@ omnitun/
 
 ### Phase 6 — Tor
 - [x] Rust crate with C ABI (stub)
-- [ ] Arti client (`arti-client` 0.47, Rust, in the `tor/` crate): `TorClient` → local SOCKS5 that a sing-box `socks` outbound uses; bootstrap % in the progress ring
-- [ ] Bridges as Go pluggable transports in the core (lyrebird obfs4, snowflake/v2 client lib, webtunnel), each on a localhost SOCKS listener that Arti uses as unmanaged PTs; bridge-line import
+- [x] `omnitun-tor` binary (Rust, `tor/`): Arti 0.47 (rustls + ring, static sqlite) behind a minimal local SOCKS5 port; JSON progress lines on stdout (`listening`, `bootstrap` %, `ready`, `error`); exits when stdin closes; bridge lines and unmanaged transports as arguments; unit tests (args, SOCKS)
+- [x] `core/tor`: bridge pluggable transports in Go (lyrebird 0.8.1: obfs4, WebTunnel, Snowflake, meek), each on a local PT-SOCKS port for Arti; process manager (start, progress, ready, stop); Tor Browser's built-in bridges embedded (obfs4, Snowflake, meek); bridge-line parsing; opt-in live test (`OMNITUN_LIVE_TOR=obfs4|snowflake|meek|direct`, `OMNITUN_TOR_BIN`)
+- [ ] **Not yet working end to end:** from the dev PC (Mullvad + Kaspersky) direct Tor stalls at 15% (relay connections never complete) and built-in Snowflake reaches the broker but bootstrap doesn't finish in 8 min. Next: try built-in obfs4 and meek, and real bridges from bridges.torproject.org; run the live test on the phone's network
+- [ ] Engine: Tor profile type (`tor` + bridges), started like the other external engines (async bootstrap → progress ring "Connecting to Tor NN%"), then sing-box routes the profile to Arti's SOCKS port; keep the app's own sockets out of the VPN for Tor profiles (Tor and the PTs run as the app)
+- [ ] Android packaging: `cargo ndk` builds of `omnitun-tor` shipped as `jniLibs/<abi>/libomnitun_tor.so`, path passed to the core (`OMNITUN_TOR_BIN` via `Os.setenv`); measure the APK size cost
+- [ ] App UI: Tor profile ("Connect to Tor"), bridge settings (none / built-in obfs4 / Snowflake / meek / custom bridge lines), import bridge lines (paste / QR / file); quiet Snowflake's verbose logging
 
 ### Phase 8 — Server (`omnitun-server`)
 - [x] `init` with Reality keys, Shadowsocks-2022 key, self-signed certificate

@@ -3,13 +3,36 @@ name = "omnitun-tor"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-description = "Tor client (Arti) for Omnitun, exposed through a C ABI"
+description = "Tor client (Arti) for Omnitun: a local SOCKS5 port the Go core routes Tor profiles into"
 
 [lib]
-crate-type = ["rlib", "staticlib", "cdylib"]
+crate-type = ["rlib"]
+
+[[bin]]
+name = "omnitun-tor"
+path = "src/main.rs"
 
 [dependencies]
+# rustls instead of native-tls: no OpenSSL to cross-compile for Android.
+arti-client = { version = "0.47", default-features = false, features = [
+    "tokio", "rustls", "compression", "static-sqlite", "bridge-client", "pt-client",
+] }
+tor-rtcompat = { version = "0.47", default-features = false, features = ["tokio", "rustls"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "io-std", "time", "sync"] }
+futures = "0.3"
+anyhow = "1"
+serde_json = "1"
+# Arti's TLS needs a process-wide crypto provider; ring cross-compiles to Android easily.
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter", "ansi"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 
-[features]
-# Enables the real Arti client (Phase 6). Without it the ABI returns NOT_IMPLEMENTED.
-arti = []
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+# Debug builds of Arti's crypto are far too slow to verify a consensus.
+[profile.dev.package."*"]
+opt-level = 2
