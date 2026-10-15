@@ -14,6 +14,7 @@ See [PLAN.md](PLAN.md) for the architecture and roadmap.
 | `core/engine` | Runs sing-box in-process: start/stop, live profile switching, traffic stats, latency tests |
 | `core/control` | UI ↔ core protocol (loopback TCP, JSON lines, token auth); tunnel stops when no UI is connected |
 | `core/netcheck` | "Is there internet at all?" check, so we report *no internet* instead of failing over |
+| `core/mobile` | gomobile entry point for Android: runs the control server in-process and plugs `VpnService` into sing-box |
 | `cmd/omnitun-svc` | Core daemon the desktop app launches (exits when the app dies) |
 | `cmd/omnitun` | Developer CLI for the core |
 | `tor/` | Rust Tor module (Arti) with a C ABI |
@@ -27,6 +28,9 @@ See [PLAN.md](PLAN.md) for the architecture and roadmap.
 ./scripts/go.ps1 run ./cmd/omnitun import links.txt
 ./scripts/go.ps1 run ./cmd/omnitun config links.txt
 ./scripts/go.ps1 run ./cmd/omnitun run links.txt   # SOCKS5/HTTP proxy on 127.0.0.1:2080
+
+# Android core (.aar) — from Git Bash; needs Android SDK/NDK + JDK 17
+scripts/build-android-core.sh            # all ABIs; or: scripts/build-android-core.sh android/arm64
 
 # Rust
 cd tor && cargo test

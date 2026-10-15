@@ -56,6 +56,9 @@ type Config struct {
 	OnState func(State)
 	// OnLog receives sing-box log lines.
 	OnLog func(level, message string)
+	// Platform provides TUN, socket protection and interface monitoring on
+	// mobile OSes (see core/mobile). Nil on desktop.
+	Platform adapter.PlatformInterface
 }
 
 // Engine owns at most one running sing-box instance.
@@ -132,6 +135,9 @@ func (e *Engine) newBox(cfg map[string]any) (*box.Box, context.Context, context.
 		return nil, nil, nil, err
 	}
 	ctx, cancel := context.WithCancel(include.Context(context.Background()))
+	if e.cfg.Platform != nil {
+		service.MustRegister[adapter.PlatformInterface](ctx, e.cfg.Platform)
+	}
 	options, err := parseOptions(ctx, cfg)
 	if err != nil {
 		cancel()
@@ -284,7 +290,7 @@ func (e *Engine) TestLatency(ctx context.Context, profiles []*profile.Profile, t
 	delete(cfg, "inbounds")
 	delete(cfg, "dns")
 	delete(cfg, "route")
-	tmp := New(Config{DataDir: filepath.Join(e.dataDir(), "latency")})
+	tmp := New(Config{DataDir: filepath.Join(e.dataDir(), "latency"), Platform: e.cfg.Platform})
 	instance, _, cancel, err := tmp.newBox(cfg)
 	if err != nil {
 		return nil, err

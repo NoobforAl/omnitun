@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -140,7 +141,8 @@ class SettingsState {
 
 class SettingsController extends Notifier<SettingsState> {
   @override
-  SettingsState build() => const SettingsState();
+  // Android captures all traffic by default; desktop starts in proxy mode (TUN needs admin rights there).
+  SettingsState build() => SettingsState(tunMode: Platform.isAndroid);
 
   void update(SettingsState Function(SettingsState) f) => state = f(state);
 }

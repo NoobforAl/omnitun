@@ -60,6 +60,9 @@ class DaemonEngine implements VpnEngine {
     return _connect(control['addr'] as String, control['token'] as String, null);
   }
 
+  /// Connects to a core whose address and token are already known (Android in-process core).
+  static Future<DaemonEngine> attachTo(String addr, String token) => _connect(addr, token, null);
+
   static Future<DaemonEngine> _connect(String addr, String token, Process? process) async {
     final i = addr.lastIndexOf(':');
     final socket = await Socket.connect(addr.substring(0, i), int.parse(addr.substring(i + 1)),

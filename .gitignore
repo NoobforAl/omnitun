@@ -21,3 +21,6 @@ coverage.out
 *.iml
 .DS_Store
 Thumbs.db
+
+# gomobile output (scripts/build-android-core.sh)
+/app/android/app/libs/

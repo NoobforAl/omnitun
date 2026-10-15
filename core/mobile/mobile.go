@@ -1,0 +1,93 @@
+// Package mobile is the gomobile-bound entry point for Android (and later iOS).
+//
+// It runs the same control server as omnitun-svc inside the app process, so
+// the Flutter UI talks to it exactly like on desktop, and plugs the OS VPN
+// API into sing-box through Platform.
+package mobile
+
+import (
+	"encoding/json"
+	"sync"
+	"time"
+
+	"github.com/NoobforAl/omnitun/core/control"
+	"github.com/NoobforAl/omnitun/core/engine"
+)
+
+// Platform is implemented natively (Kotlin VpnService on Android).
+// gomobile restricts signatures to basic types, so structured data is JSON.
+type Platform interface {
+	// OpenTun establishes the VPN interface described by tunJSON (see tunConfig)
+	// and returns its file descriptor. The caller keeps ownership of the fd.
+	OpenTun(tunJSON string) (int32, error)
+	// Protect makes a socket bypass the VPN (VpnService.protect).
+	Protect(fd int32) error
+	// Interfaces returns the device's network interfaces as JSON (see netInterface).
+	Interfaces() (string, error)
+	// StartMonitor begins reporting default-network changes to listener.
+	StartMonitor(listener DefaultNetworkListener) error
+	// CloseMonitor stops reporting.
+	CloseMonitor() error
+	// StateChanged reports the engine status: "connecting", "connected", "disconnected" or "error".
+	// The native side stops its VPN service on "disconnected" and "error".
+	StateChanged(status string)
+}
+
+// DefaultNetworkListener receives default-network updates from the platform.
+// index is -1 when there is no network.
+type DefaultNetworkListener interface {
+	UpdateDefaultInterface(name string, index int32, expensive bool, constrained bool)
+}
+
+var (
+	mu   sync.Mutex
+	srv  *control.Server
+	info string
+)
+
+// Start launches the in-process control server (idempotent) and returns
+// {"addr":"127.0.0.1:port","token":"..."} for the UI to connect to.
+func Start(dataDir string, platform Platform) (string, error) {
+	mu.Lock()
+	defer mu.Unlock()
+	if srv != nil {
+		return info, nil
+	}
+	s, err := control.NewServer(control.ServerConfig{
+		DataDir:  dataDir,
+		Grace:    5 * time.Second,
+		Platform: newPlatformWrapper(platform),
+		OnState:  func(st engine.State) { platform.StateChanged(string(st.Status)) },
+	})
+	if err != nil {
+		return "", err
+	}
+	addr, err := s.Listen("127.0.0.1:0")
+	if err != nil {
+		return "", err
+	}
+	go s.Serve()
+	b, _ := json.Marshal(map[string]string{"addr": addr.String(), "token": s.Token()})
+	srv, info = s, string(b)
+	return info, nil
+}
+
+// StopTunnel stops the running tunnel but keeps the server (e.g. VPN revoked by the OS).
+func StopTunnel() {
+	mu.Lock()
+	s := srv
+	mu.Unlock()
+	if s != nil {
+		s.Engine().Stop()
+	}
+}
+
+// Stop shuts everything down.
+func Stop() {
+	mu.Lock()
+	defer mu.Unlock()
+	if srv != nil {
+		srv.Close()
+		srv, info = nil, ""
+	}
+}

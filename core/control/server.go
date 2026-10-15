@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sagernet/sing-box/adapter"
+
 	"github.com/NoobforAl/omnitun/core/engine"
 	"github.com/NoobforAl/omnitun/core/importer"
 	"github.com/NoobforAl/omnitun/core/netcheck"
@@ -40,6 +42,10 @@ type ServerConfig struct {
 	Logf func(format string, args ...any)
 	// NetCheck reports whether the underlying network is up. Nil uses netcheck.Online.
 	NetCheck func(ctx context.Context) error
+	// Platform is passed to the engine (mobile only).
+	Platform adapter.PlatformInterface
+	// OnState is called on every engine state change, after clients are notified.
+	OnState func(engine.State)
 }
 
 // Server owns the engine and serves UI clients.
@@ -88,8 +94,14 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 	}
 	s := &Server{cfg: cfg, clients: map[*client]struct{}{}}
 	s.engine = engine.New(engine.Config{
-		DataDir: cfg.DataDir,
-		OnState: func(st engine.State) { s.broadcast(Event{Event: "state", Data: st}) },
+		DataDir:  cfg.DataDir,
+		Platform: cfg.Platform,
+		OnState: func(st engine.State) {
+			s.broadcast(Event{Event: "state", Data: st})
+			if cfg.OnState != nil {
+				cfg.OnState(st)
+			}
+		},
 		OnLog: func(level, msg string) {
 			s.broadcast(Event{Event: "log", Data: LogEntry{Time: time.Now(), Level: level, Message: msg}})
 		},
