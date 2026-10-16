@@ -95,11 +95,13 @@ func Run(s *store.Store) error {
 func newModel(mgr *manager.Manager) (*model, error) {
 	t := table.New(
 		table.WithColumns([]table.Column{
-			{Title: "Name", Width: 18},
-			{Title: "Status", Width: 9},
+			{Title: "Name", Width: 16},
+			{Title: "Status", Width: 10},
 			{Title: "Expires", Width: 11},
+			{Title: "Used (month)", Width: 12},
 			{Title: "Quota", Width: 10},
-			{Title: "Note", Width: 20},
+			{Title: "Online", Width: 7},
+			{Title: "Note", Width: 16},
 		}),
 		table.WithFocused(true),
 		table.WithHeight(12),
@@ -174,6 +176,21 @@ func expiry(u manager.UserInfo) string {
 	return u.ExpiresAt.Local().Format("2006-01-02")
 }
 
+// humanBytes formats a byte count (1 GB = 2^30 bytes, like quotas).
+func humanBytes(n int64) string {
+	const k = 1024.0
+	f := float64(n)
+	switch {
+	case f >= k*k*k:
+		return fmt.Sprintf("%.2f GB", f/(k*k*k))
+	case f >= k*k:
+		return fmt.Sprintf("%.1f MB", f/(k*k))
+	case f >= k:
+		return fmt.Sprintf("%.1f KB", f/k)
+	}
+	return fmt.Sprintf("%d B", n)
+}
+
 func quota(u manager.UserInfo) string {
 	if u.QuotaGB <= 0 {
 		return "unlimited"
@@ -184,7 +201,11 @@ func quota(u manager.UserInfo) string {
 func (m *model) refreshRows() {
 	rows := make([]table.Row, 0, len(m.users))
 	for _, u := range m.users {
-		rows = append(rows, table.Row{u.Name, u.Status, expiry(u), quota(u), u.Note})
+		online := "-"
+		if u.Usage.Connections > 0 {
+			online = strconv.Itoa(u.Usage.Connections)
+		}
+		rows = append(rows, table.Row{u.Name, u.Status, expiry(u), humanBytes(u.Usage.MonthBytes), quota(u), online, u.Note})
 	}
 	m.table.SetRows(rows)
 	// An empty table leaves the cursor at -1; select the first row once there is one.
@@ -399,6 +420,14 @@ func (m *model) updateUsers(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if u != nil {
 			m.confirmReset(u.Name)
 		}
+	case "u":
+		if u != nil {
+			name := u.Name
+			m.confirm = &prompt{label: "Restart " + name + "'s traffic count for this month? (y/N)", submit: func(m *model, _ string) error {
+				m.do("usage reset for "+name, func() error { _, err := m.mgr.ResetUsage(name); return err })
+				return nil
+			}}
+		}
 	default:
 		var cmd tea.Cmd
 		m.table, cmd = m.table.Update(msg)
@@ -578,7 +607,7 @@ func (m *model) usersView() string {
 	} else {
 		b.WriteString(m.table.View() + "\n")
 	}
-	b.WriteString(dimStyle.Render("enter links & QR · a add · e enable/disable · x expiry · g quota · n note · r new credentials · d delete · tab next · q quit"))
+	b.WriteString(dimStyle.Render("enter links & QR · a add · e enable/disable · x expiry · g quota · n note · u reset usage · r new credentials · d delete · tab next · q quit"))
 	return b.String()
 }
 
@@ -631,6 +660,11 @@ func (m *model) serverView() string {
 	i := m.info
 	b.WriteString(fmt.Sprintf("%s  %s\n", titleStyle.Render(i.Name), i.PublicHost))
 	b.WriteString(fmt.Sprintf("users %d (%d active) · protocols on %d", i.Users, i.ActiveUsers, i.Protocols))
+	if i.Running {
+		b.WriteString(okStyle.Render(fmt.Sprintf(" · running, %d connection(s)", i.Connections)))
+	} else {
+		b.WriteString(errStyle.Render(" · server not running"))
+	}
 	if i.SubscriptionPort > 0 {
 		b.WriteString(fmt.Sprintf(" · subscriptions on port %d", i.SubscriptionPort))
 	}

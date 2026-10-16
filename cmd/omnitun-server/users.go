@@ -27,11 +27,30 @@ func quota(u manager.UserInfo) string {
 	return strconv.FormatFloat(u.QuotaGB, 'f', -1, 64) + " GB"
 }
 
+// humanBytes formats a byte count (1 GB = 2^30 bytes, like quotas).
+func humanBytes(n int64) string {
+	const k = 1024.0
+	f := float64(n)
+	switch {
+	case f >= k*k*k:
+		return fmt.Sprintf("%.2f GB", f/(k*k*k))
+	case f >= k*k:
+		return fmt.Sprintf("%.1f MB", f/(k*k))
+	case f >= k:
+		return fmt.Sprintf("%.1f KB", f/k)
+	}
+	return fmt.Sprintf("%d B", n)
+}
+
 func printUsers(users []manager.UserInfo) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tSTATUS\tEXPIRES\tQUOTA\tCREATED\tNOTE")
+	fmt.Fprintln(w, "NAME\tSTATUS\tEXPIRES\tUSED (MONTH)\tQUOTA\tONLINE\tNOTE")
 	for _, u := range users {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", u.Name, u.Status, expiry(u), quota(u), u.CreatedAt.Format("2006-01-02"), u.Note)
+		online := "-"
+		if u.Usage.Connections > 0 {
+			online = fmt.Sprintf("%d conn", u.Usage.Connections)
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", u.Name, u.Status, expiry(u), humanBytes(u.Usage.MonthBytes), quota(u), online, u.Note)
 	}
 	w.Flush()
 }
@@ -174,7 +193,43 @@ func newUserCmd(o *options) *cobra.Command {
 		},
 	}
 
-	cmd.AddCommand(add, list, del, toggle("enable", true), toggle("disable", false), expire, quotaCmd, note, reset)
+	var resetUsage bool
+	usage := &cobra.Command{
+		Use:   "usage <name>",
+		Short: "Show a user's traffic; --reset restarts this month's count",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			m := o.manager()
+			var u *manager.UserInfo
+			var err error
+			if resetUsage {
+				u, err = m.ResetUsage(args[0])
+			} else {
+				u, err = m.User(args[0])
+			}
+			if err != nil {
+				return err
+			}
+			return o.print(u, func() {
+				fmt.Printf("%s (%s)\n", u.Name, u.Status)
+				fmt.Printf("this month   %s  (up %s, down %s)   quota %s\n", humanBytes(u.Usage.MonthBytes),
+					humanBytes(u.Usage.MonthUp), humanBytes(u.Usage.MonthDown), quota(*u))
+				fmt.Printf("all time     %s\n", humanBytes(u.Usage.TotalBytes))
+				if u.Usage.Connections > 0 {
+					fmt.Printf("online       %d connection(s), up %s/s, down %s/s\n", u.Usage.Connections,
+						humanBytes(u.Usage.UpBps), humanBytes(u.Usage.DownBps))
+				} else if u.Usage.LastSeen != nil {
+					fmt.Printf("last seen    %s\n", u.Usage.LastSeen.Local().Format("2006-01-02 15:04"))
+				}
+				if resetUsage {
+					fmt.Println("(a running server applies the reset within seconds)")
+				}
+			})
+		},
+	}
+	usage.Flags().BoolVar(&resetUsage, "reset", false, "restart this month's count and unblock the user")
+
+	cmd.AddCommand(add, list, del, usage, toggle("enable", true), toggle("disable", false), expire, quotaCmd, note, reset)
 	return cmd
 }
 

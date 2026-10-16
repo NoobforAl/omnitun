@@ -118,6 +118,11 @@ func TestUserLifecycle(t *testing.T) {
 		t.Errorf("ovpn = %q", ovpn)
 	}
 
+	c.ok("POST", "/api/v1/users/alice/usage/reset", nil, 200)
+	if status, _ := c.do("POST", "/api/v1/users/ghost/usage/reset", nil, "Bearer "+token); status != 404 {
+		t.Errorf("usage reset of a missing user = %d, want 404", status)
+	}
+
 	var list []manager.UserInfo
 	json.Unmarshal(c.ok("GET", "/api/v1/users", nil, 200), &list)
 	if len(list) != 1 {

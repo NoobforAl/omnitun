@@ -30,6 +30,27 @@ func freeTCP(t *testing.T) int {
 	return l.Addr().(*net.TCPAddr).Port
 }
 
+// freeBoth returns a port free for both TCP and UDP (Shadowsocks uses both;
+// on Windows a port free for one can lie in a reserved range for the other).
+func freeBoth(t *testing.T) int {
+	t.Helper()
+	for range 50 {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		port := l.Addr().(*net.TCPAddr).Port
+		c, err := net.ListenPacket("udp", net.JoinHostPort("0.0.0.0", strconv.Itoa(port)))
+		l.Close()
+		if err == nil {
+			c.Close()
+			return port
+		}
+	}
+	t.Fatal("no port free for both TCP and UDP")
+	return 0
+}
+
 func freeUDP(t *testing.T) int {
 	t.Helper()
 	c, err := net.ListenPacket("udp", "127.0.0.1:0")
@@ -54,7 +75,7 @@ func setup(t *testing.T) (*store.Store, *Server) {
 		PublicHost: "127.0.0.1",
 		Ports: map[string]int{
 			store.VLESSReality: freeTCP(t),
-			store.Shadowsocks:  freeTCP(t),
+			store.Shadowsocks:  freeBoth(t),
 			store.Trojan:       freeTCP(t),
 			store.Hysteria2:    freeUDP(t),
 			store.TUIC:         freeUDP(t),

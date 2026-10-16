@@ -108,20 +108,28 @@ type User struct {
 	QuotaGB   float64   `json:"quota_gb,omitempty"`
 	Note      string    `json:"note,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
+	// QuotaExceeded is set by the running server when the user has used
+	// QuotaGB this month; the user can't connect until the month rolls over,
+	// the quota is raised or the usage is reset.
+	QuotaExceeded bool `json:"quota_exceeded,omitempty"`
+	// UsageResetAt asks the running server to restart this month's count.
+	UsageResetAt *time.Time `json:"usage_reset_at,omitempty"`
 }
 
 // Active reports whether the user may connect now.
 func (u *User) Active(now time.Time) bool {
-	return u.Enabled && (u.ExpiresAt == nil || now.Before(*u.ExpiresAt))
+	return u.Enabled && !u.QuotaExceeded && (u.ExpiresAt == nil || now.Before(*u.ExpiresAt))
 }
 
-// Status is "active", "disabled" or "expired".
+// Status is "active", "disabled", "expired" or "over-quota".
 func (u *User) Status(now time.Time) string {
 	switch {
 	case !u.Enabled:
 		return "disabled"
 	case u.ExpiresAt != nil && !now.Before(*u.ExpiresAt):
 		return "expired"
+	case u.QuotaExceeded:
+		return "over-quota"
 	}
 	return "active"
 }

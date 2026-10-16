@@ -13,6 +13,7 @@ import (
 	"github.com/NoobforAl/omnitun/core/importer"
 	"github.com/NoobforAl/omnitun/core/profile"
 	"github.com/NoobforAl/omnitun/core/singbox"
+	"github.com/NoobforAl/omnitun/server/stats"
 	"github.com/NoobforAl/omnitun/server/store"
 )
 
@@ -131,15 +132,17 @@ func SubscriptionHandler(s *store.Store) http.Handler {
 			return
 		}
 		info := ""
+		var up, down int64
+		if snap, err := stats.Read(s.Dir); err == nil && snap.Users[user.Name] != nil {
+			up, down = snap.Users[user.Name].MonthUp, snap.Users[user.Name].MonthDown
+		}
 		if user.QuotaGB > 0 {
 			info += fmt.Sprintf("total=%d; ", int64(user.QuotaGB*(1<<30)))
 		}
 		if user.ExpiresAt != nil {
 			info += fmt.Sprintf("expire=%d; ", user.ExpiresAt.Unix())
 		}
-		if info != "" {
-			w.Header().Set("Subscription-Userinfo", "upload=0; download=0; "+strings.TrimSuffix(info, "; "))
-		}
+		w.Header().Set("Subscription-Userinfo", fmt.Sprintf("upload=%d; download=%d", up, down)+strings.TrimSuffix("; "+info, "; "))
 		w.Header().Set("Profile-Update-Interval", "12")
 		w.Header().Set("Profile-Title", "base64:"+base64.StdEncoding.EncodeToString([]byte(st.Server.Name)))
 		w.Header().Set("Cache-Control", "no-store")

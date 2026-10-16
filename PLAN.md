@@ -373,9 +373,11 @@ Step 1 — one service layer for every front end
 - [x] CLI tests (cobra command tree against a temp data dir)
 
 Step 2 — accounting and safety
-- [ ] Per-user traffic accounting and quota **enforcement** (disable the user at the cap, reset monthly), shown in CLI/TUI/API
+- [x] Per-user traffic accounting and quota **enforcement**: sing-box connection counters summed per user (`server/stats`, `stats.json`), monthly quota (UTC calendar month, GB = 2^30 bytes) blocks the user until the month rolls over, the quota is raised or `user usage <name> --reset`; shown in CLI (`user list`, `user usage`), TUI, API (`usage` on users, `POST /users/{name}/usage/reset`) and in the subscription `Subscription-Userinfo` header; covered for VLESS, Trojan, Shadowsocks/ShadowTLS, Hysteria2, TUIC, AnyTLS, Naive (**not OpenVPN yet**: its endpoint does not report the user)
 - [ ] File locking for concurrent CLI/TUI/API writes; backup/export/import of the state
-- [ ] Live status: connected clients, traffic per user and protocol, logs (API + TUI)
+- [x] Live status: running/not running, connections and speed per user (CLI `status`/`user list`, TUI, API `server`)
+- [ ] Traffic per protocol and server logs (API + TUI)
+- [ ] OpenVPN per-user accounting (read the endpoint's status/management output)
 
 Step 3 — more protocols and setup
 - [ ] **Shared protocol registry** used by both the server and the client: one definition per protocol (name, transports, default port, server options, client profile fields, link format); "create a server" and "connect to a server" use the same schema, so adding a protocol is one place

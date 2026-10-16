@@ -162,6 +162,14 @@ func New(o Options) http.Handler {
 	})
 
 	huma.Register(a, huma.Operation{
+		OperationID: "reset-user-usage", Method: http.MethodPost, Path: "/api/v1/users/{name}/usage/reset",
+		Summary: "Restart this month's traffic count and unblock the user (lifetime totals stay)", Security: bearer,
+	}, func(ctx context.Context, in *userPath) (*body[*manager.UserInfo], error) {
+		u, err := m.ResetUsage(in.Name)
+		return &body[*manager.UserInfo]{Body: u}, toHTTP(err)
+	})
+
+	huma.Register(a, huma.Operation{
 		OperationID: "get-user-links", Method: http.MethodGet, Path: "/api/v1/users/{name}/links",
 		Summary: "Share links and subscription URL", Security: bearer,
 	}, func(ctx context.Context, in *userPath) (*body[*manager.LinkSet], error) {

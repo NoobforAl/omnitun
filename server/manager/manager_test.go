@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NoobforAl/omnitun/server/stats"
 	"github.com/NoobforAl/omnitun/server/store"
 )
 
@@ -143,5 +144,61 @@ func TestAPISettings(t *testing.T) {
 	bad := 0
 	if _, err := m.SetAPI(APIPatch{Port: &bad}); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("bad port: %v", err)
+	}
+}
+
+func TestUsageAndQuotaFlag(t *testing.T) {
+	m := newManager(t)
+	if _, err := m.AddUser(NewUser{Name: "alice"}); err != nil {
+		t.Fatal(err)
+	}
+	// The running server would write these numbers.
+	tr := stats.NewTracker(m.Store.Dir)
+	tr.Add("alice", 2<<20, 8<<20)
+	tr.SetLive(map[string]stats.Live{"alice": {Connections: 3, UpBps: 5, DownBps: 9}})
+	if err := tr.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	u, err := m.User("alice")
+	if err != nil || u.Usage.MonthBytes != 10<<20 || u.Usage.TotalBytes != 10<<20 || u.Usage.Connections != 3 {
+		t.Fatalf("usage = %+v err = %v", u.Usage, err)
+	}
+	if info, _ := m.Server(); !info.Running || info.Connections != 3 {
+		t.Fatalf("server = %+v", info)
+	}
+
+	// A quota below the month's usage blocks at once, raising it frees the user.
+	low := 5.0 / 1024 // 5 MB
+	u, _ = m.UpdateUser("alice", UserPatch{QuotaGB: &low})
+	if u.Status != "over-quota" {
+		t.Fatalf("status = %s", u.Status)
+	}
+	high := 1.0
+	if u, _ = m.UpdateUser("alice", UserPatch{QuotaGB: &high}); u.Status != "active" {
+		t.Fatalf("status after raising = %s", u.Status)
+	}
+
+	// Reset asks the server to restart the month and unblocks.
+	m.UpdateUser("alice", UserPatch{QuotaGB: &low})
+	u, err = m.ResetUsage("alice")
+	if err != nil || u.Status != "active" || u.Usage.MonthBytes != 0 || u.Usage.TotalBytes != 10<<20 {
+		t.Fatalf("after reset = %+v err = %v", u, err)
+	}
+	st, _ := m.Store.Load()
+	if st.User("alice").UsageResetAt == nil {
+		t.Fatal("no reset request stored for the server")
+	}
+	if _, err := m.ResetUsage("ghost"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing user: %v", err)
+	}
+
+	// Once the server stops, live numbers disappear.
+	tr.Stop()
+	if u, _ = m.User("alice"); u.Usage.Connections != 0 {
+		t.Fatalf("connections after stop = %d", u.Usage.Connections)
+	}
+	if info, _ := m.Server(); info.Running {
+		t.Fatal("server still reported as running")
 	}
 }

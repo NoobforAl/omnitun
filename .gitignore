@@ -24,3 +24,6 @@ Thumbs.db
 
 # gomobile output (scripts/build-android-core.sh)
 /app/android/app/libs/
+
+# sing-box cache created by tests
+cache.db

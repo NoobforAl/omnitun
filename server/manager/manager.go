@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/NoobforAl/omnitun/server/serverconf"
+	"github.com/NoobforAl/omnitun/server/stats"
 	"github.com/NoobforAl/omnitun/server/store"
 )
 
@@ -50,6 +51,25 @@ type ServerInfo struct {
 	SubscriptionPort int  `json:"subscription_port"`
 	SelfSigned       bool `json:"self_signed_certificate"`
 	Protocols        int  `json:"enabled_protocols"`
+	// Running is true while `run` is serving (it writes stats every few seconds).
+	Running bool `json:"running"`
+	// Connections is the number of live client connections.
+	Connections int `json:"connections"`
+	// StartedAt is when the running server started.
+	StartedAt *time.Time `json:"started_at,omitempty"`
+}
+
+// Usage is a user's traffic. Bytes are from the server's point of view:
+// "up" is sent by the client, "down" is sent to it.
+type Usage struct {
+	MonthBytes  int64      `json:"month_bytes" doc:"Traffic this calendar month (UTC); counted against the quota"`
+	MonthUp     int64      `json:"month_up_bytes"`
+	MonthDown   int64      `json:"month_down_bytes"`
+	TotalBytes  int64      `json:"total_bytes" doc:"All traffic since the user was created"`
+	Connections int        `json:"connections" doc:"Live connections"`
+	UpBps       int64      `json:"up_bps"`
+	DownBps     int64      `json:"down_bps"`
+	LastSeen    *time.Time `json:"last_seen,omitempty"`
 }
 
 // ProtocolInfo is one protocol's settings.
@@ -63,12 +83,13 @@ type ProtocolInfo struct {
 // UserInfo is one account without its secrets.
 type UserInfo struct {
 	Name      string     `json:"name"`
-	Status    string     `json:"status" enum:"active,disabled,expired"`
+	Status    string     `json:"status" enum:"active,disabled,expired,over-quota"`
 	Enabled   bool       `json:"enabled"`
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	QuotaGB   float64    `json:"quota_gb" doc:"Data cap in GB, 0 = unlimited"`
 	Note      string     `json:"note,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`
+	Usage     Usage      `json:"usage"`
 }
 
 // Link is a share link for one protocol.
@@ -106,8 +127,20 @@ func (m *Manager) Init(o InitOptions) (*ServerInfo, error) {
 	return m.serverInfo(st), nil
 }
 
+// snapshot reads the traffic numbers written by the running server (empty
+// when it never ran).
+func (m *Manager) snapshot() stats.Snapshot {
+	snap, err := stats.Read(m.Store.Dir)
+	if err != nil {
+		return stats.Snapshot{Users: map[string]*stats.User{}}
+	}
+	return snap
+}
+
 func (m *Manager) serverInfo(st *store.State) *ServerInfo {
+	snap := m.snapshot()
 	info := &ServerInfo{
+		Running:     snap.Running(m.Now()),
 		Name:        st.Server.Name,
 		PublicHost:  st.Server.PublicHost,
 		Users:       len(st.Users),
@@ -116,6 +149,13 @@ func (m *Manager) serverInfo(st *store.State) *ServerInfo {
 	}
 	if st.Server.Subscription.Enabled {
 		info.SubscriptionPort = st.Server.Subscription.Port
+	}
+	if info.Running {
+		started := snap.StartedAt
+		info.StartedAt = &started
+		for _, u := range snap.Users {
+			info.Connections += u.Connections
+		}
 	}
 	for _, p := range st.Server.Protocols {
 		if p.Enabled {
@@ -194,11 +234,25 @@ func (m *Manager) SetProtocol(key string, patch ProtocolPatch) (*ProtocolInfo, e
 	return &out, nil
 }
 
-func userInfo(u *store.User, now time.Time) UserInfo {
-	return UserInfo{
+func userInfo(u *store.User, now time.Time, snap stats.Snapshot) UserInfo {
+	info := UserInfo{
 		Name: u.Name, Status: u.Status(now), Enabled: u.Enabled, ExpiresAt: u.ExpiresAt,
 		QuotaGB: u.QuotaGB, Note: u.Note, CreatedAt: u.CreatedAt,
 	}
+	if s := snap.Users[u.Name]; s != nil {
+		info.Usage = Usage{
+			MonthBytes: s.MonthTotal(), MonthUp: s.MonthUp, MonthDown: s.MonthDown,
+			TotalBytes: s.Up + s.Down, Connections: s.Connections, UpBps: s.UpBps, DownBps: s.DownBps,
+		}
+		if !s.LastSeen.IsZero() {
+			seen := s.LastSeen
+			info.Usage.LastSeen = &seen
+		}
+		if !snap.Running(now) { // numbers of a stopped server are not live
+			info.Usage.Connections, info.Usage.UpBps, info.Usage.DownBps = 0, 0, 0
+		}
+	}
+	return info
 }
 
 // Users lists all accounts.
@@ -207,9 +261,10 @@ func (m *Manager) Users() ([]UserInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	snap := m.snapshot()
 	out := make([]UserInfo, 0, len(st.Users))
 	for _, u := range st.Users {
-		out = append(out, userInfo(u, m.Now()))
+		out = append(out, userInfo(u, m.Now(), snap))
 	}
 	return out, nil
 }
@@ -224,7 +279,7 @@ func (m *Manager) User(name string) (*UserInfo, error) {
 	if u == nil {
 		return nil, notFound("no user %q", name)
 	}
-	info := userInfo(u, m.Now())
+	info := userInfo(u, m.Now(), m.snapshot())
 	return &info, nil
 }
 
@@ -255,7 +310,7 @@ func (m *Manager) AddUser(n NewUser) (*UserInfo, error) {
 			u.ExpiresAt = &t
 		}
 		u.QuotaGB, u.Note = n.QuotaGB, n.Note
-		out = userInfo(u, m.Now())
+		out = userInfo(u, m.Now(), stats.Snapshot{})
 		return nil
 	})
 	if err != nil {
@@ -279,6 +334,7 @@ func (m *Manager) UpdateUser(name string, p UserPatch) (*UserInfo, error) {
 		return nil, invalid("days and quota cannot be negative")
 	}
 	var out UserInfo
+	snap := m.snapshot()
 	err := m.Store.Update(func(st *store.State) error {
 		u := st.User(name)
 		if u == nil {
@@ -297,11 +353,14 @@ func (m *Manager) UpdateUser(name string, p UserPatch) (*UserInfo, error) {
 		}
 		if p.QuotaGB != nil {
 			u.QuotaGB = *p.QuotaGB
+			// Apply the new cap at once; the running server re-checks it too.
+			used := float64(monthTotal(snap, u.Name))
+			u.QuotaExceeded = u.QuotaGB > 0 && used >= u.QuotaGB*stats.GiB
 		}
 		if p.Note != nil {
 			u.Note = *p.Note
 		}
-		out = userInfo(u, m.Now())
+		out = userInfo(u, m.Now(), snap)
 		return nil
 	})
 	if err != nil {
@@ -329,7 +388,30 @@ func (m *Manager) ResetUser(name string) (*UserInfo, error) {
 			return notFound("no user %q", name)
 		}
 		store.ResetCredentials(u)
-		out = userInfo(u, m.Now())
+		out = userInfo(u, m.Now(), m.snapshot())
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ResetUsage restarts a user's count for this month (lifetime totals stay)
+// and lets them back in if they were blocked for exceeding the quota. A
+// running server applies it within seconds.
+func (m *Manager) ResetUsage(name string) (*UserInfo, error) {
+	var out UserInfo
+	err := m.Store.Update(func(st *store.State) error {
+		u := st.User(name)
+		if u == nil {
+			return notFound("no user %q", name)
+		}
+		now := m.Now().UTC()
+		u.UsageResetAt = &now
+		u.QuotaExceeded = false
+		out = userInfo(u, m.Now(), m.snapshot())
+		out.Usage.MonthBytes, out.Usage.MonthUp, out.Usage.MonthDown = 0, 0, 0
 		return nil
 	})
 	if err != nil {
@@ -427,4 +509,11 @@ func (m *Manager) SetAPI(p APIPatch) (store.API, error) {
 		return nil
 	})
 	return out, err
+}
+
+func monthTotal(snap stats.Snapshot, name string) int64 {
+	if u := snap.Users[name]; u != nil {
+		return u.MonthTotal()
+	}
+	return 0
 }

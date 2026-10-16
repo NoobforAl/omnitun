@@ -56,6 +56,11 @@ func newStatusCmd(o *options) *cobra.Command {
 			return o.print(info, func() {
 				fmt.Printf("%s (%s)\n", info.Name, info.PublicHost)
 				fmt.Printf("users: %d (%d active)   protocols enabled: %d\n", info.Users, info.ActiveUsers, info.Protocols)
+				if info.Running {
+					fmt.Printf("server: running, %d connection(s) now\n", info.Connections)
+				} else {
+					fmt.Println("server: not running (start it with: omnitun-server run)")
+				}
 				if info.SubscriptionPort > 0 {
 					fmt.Printf("subscriptions on port %d\n", info.SubscriptionPort)
 				}

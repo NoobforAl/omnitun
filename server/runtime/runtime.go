@@ -15,11 +15,14 @@ import (
 	"time"
 
 	box "github.com/sagernet/sing-box"
+	"github.com/sagernet/sing-box/common/trafficcontrol"
 	"github.com/sagernet/sing-box/include"
 	"github.com/sagernet/sing-box/option"
 	sjson "github.com/sagernet/sing/common/json"
+	"github.com/sagernet/sing/service"
 
 	"github.com/NoobforAl/omnitun/server/serverconf"
+	"github.com/NoobforAl/omnitun/server/stats"
 	"github.com/NoobforAl/omnitun/server/store"
 )
 
@@ -33,6 +36,11 @@ type Server struct {
 	cancel   context.CancelFunc
 	sub      *http.Server
 	loaded   time.Time // state file mod time of the running config
+
+	tracker *stats.Tracker // per-user traffic, shared by every sing-box run
+	accMu   sync.Mutex     // guards the collector's tick against the final flush
+	coll    *collector     // the running instance's collector (guarded by accMu)
+	accStop context.CancelFunc
 }
 
 // New prepares a server for the store.
@@ -51,6 +59,10 @@ func (s *Server) Start() error {
 	if err != nil {
 		return err
 	}
+	s.tracker = stats.NewTracker(s.store.Dir)
+	accCtx, accCancel := context.WithCancel(context.Background())
+	s.accStop = accCancel
+	go s.accountingLoop(accCtx)
 	if renewed, err := store.RenewSelfSignedCert(s.store, st); err != nil {
 		return fmt.Errorf("renew certificate: %w", err)
 	} else if renewed {
@@ -89,10 +101,17 @@ func (s *Server) startBoxLocked(st *store.State) error {
 	opts, err := sjson.UnmarshalExtendedContext[option.Options](ctx, raw)
 	if err == nil {
 		var instance *box.Box
-		instance, err = box.New(box.Options{Context: ctx, Options: opts})
+		// The platform writer makes sing-box create its traffic manager,
+		// which the accounting reads.
+		instance, err = box.New(box.Options{Context: ctx, Options: opts, PlatformLogWriter: discardLog{}})
 		if err == nil {
 			if err = instance.Start(); err == nil {
 				s.instance, s.cancel = instance, cancel
+				if tm := service.PtrFromContext[trafficcontrol.Manager](ctx); tm != nil {
+					s.accMu.Lock()
+					s.coll = newCollector(tm, s.tracker)
+					s.accMu.Unlock()
+				}
 				s.logf("serving %d protocol(s) for %d user(s)", len(inbounds)+len(endpoints), len(st.ActiveUsers(time.Now())))
 				return nil
 			}
@@ -104,6 +123,13 @@ func (s *Server) startBoxLocked(st *store.State) error {
 }
 
 func (s *Server) stopBoxLocked() {
+	// Count what the connections moved since the last tick before they close.
+	s.accMu.Lock()
+	if s.coll != nil {
+		s.coll.tick()
+		s.coll = nil
+	}
+	s.accMu.Unlock()
 	if s.instance != nil {
 		s.instance.Close()
 		s.cancel()
@@ -179,6 +205,14 @@ func (s *Server) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.stopBoxLocked()
+	if s.accStop != nil {
+		s.accStop()
+	}
+	if s.tracker != nil {
+		if err := s.tracker.Stop(); err != nil {
+			s.logf("save stats: %v", err)
+		}
+	}
 	var err error
 	if s.sub != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
