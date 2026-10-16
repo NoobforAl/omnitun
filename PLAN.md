@@ -353,19 +353,35 @@ omnitun/
 - [ ] Advanced things (protocol, logs, split tunneling, DNS, bridges) stay out of the main flow, inside Settings
 - [ ] Same design on desktop (one narrow window / tray popup) and Android; keep the failover toast and the connection progress ring (Phase 4)
 
-### Phase 8 — Server (`omnitun-server`)
+### Phase 8 — Server (`omnitun-server`): CLI, TUI and web API
+**Order (2026-10-16): the server comes first, then the protocol layer, then the app GUI.** The GUI (Phase 7) waits until the server and the shared protocol interface are done.
+
+Done so far
 - [x] `init` with Reality keys, Shadowsocks-2022 key, self-signed certificate
 - [x] Users: add / list / delete / enable / disable / expiry / quota / note / new credentials
 - [x] Protocols: VLESS+Reality, Shadowsocks-2022, Trojan, Hysteria2, TUIC, AnyTLS, ShadowTLS v3, NaiveProxy, OpenVPN UDP/TCP (all verified end-to-end with the Omnitun client)
 - [x] Per-user links + terminal QR codes; one subscription URL per user with quota/expiry headers
 - [x] `run` with live reload on changes and expiry; `service` prints a systemd unit
 - [x] TUI: users, links + QR, protocol on/off and ports
-- [ ] Per-user traffic accounting and quota **enforcement** (today the quota is only reported)
+
+Step 1 — one service layer for every front end
+- [ ] `server/manager`: every operation (init, protocols, users, links, status, reload) as typed methods with JSON-tagged results; the CLI, the TUI and the web API only call it, so they always behave the same
+- [ ] **CLI on cobra** (help, shell completion, `--json` output, `--data`, consistent errors); same commands as today
+- [ ] **Web API on huma + chi** (OpenAPI 3 generated, validation, `/docs`): `/api/v1/server`, `/protocols`, `/users`, `/users/{name}` (get, patch, delete), `/users/{name}/reset`, `/users/{name}/links`, `/users/{name}/ovpn/{proto}`, `/reload`; bearer token (`omnitun-server api token`), listens on 127.0.0.1 by default, optional TLS; started by `run`
+- [ ] **TUI on Bubble Tea** (+ bubbles, huh forms): same features through the manager, plus server status, per-user traffic, logs, API token view
+- [ ] Tests for the manager, the API (httptest) and the CLI
+
+Step 2 — accounting and safety
+- [ ] Per-user traffic accounting and quota **enforcement** (disable the user at the cap, reset monthly), shown in CLI/TUI/API
+- [ ] File locking for concurrent CLI/TUI/API writes; backup/export/import of the state
+- [ ] Live status: connected clients, traffic per user and protocol, logs (API + TUI)
+
+Step 3 — more protocols and setup
+- [ ] **Shared protocol registry** used by both the server and the client: one definition per protocol (name, transports, default port, server options, client profile fields, link format); "create a server" and "connect to a server" use the same schema, so adding a protocol is one place
 - [ ] ACME/Let's Encrypt certificates for a domain (no more `insecure=1`); HTTPS for the subscription endpoint
 - [ ] WireGuard / AmneziaWG server, Tor bridge (obfs4/WebTunnel), IKEv2 / SSTP via system packages
+- [ ] Easy v2ray-style setup: `init` wizard (choose protocols, domain, ports), import an existing v2ray/xray config and its users, one-command install
 - [ ] Firewall/NAT setup (nftables), `install` command that writes and enables the systemd unit
-- [ ] File locking for concurrent CLI/TUI writes; backup/export of the state
-- [ ] TUI: live server status, traffic per user, logs
 
 ### Phase 9 — Polish & release
 - [ ] Translations (en, fa, ru, zh, ar) with right-to-left layout

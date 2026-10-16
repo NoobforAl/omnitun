@@ -78,6 +78,7 @@ func Init(s *Store, opts InitOptions) (*State, error) {
 			},
 		},
 	}
+	st.Server.API = API{Listen: "127.0.0.1", Port: DefaultAPIPort, Token: RandomHex(24)}
 	if st.Server.OpenVPN, err = NewOpenVPN(opts.Name); err != nil {
 		return nil, err
 	}

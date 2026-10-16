@@ -108,5 +108,9 @@ func (st *State) migrate() (bool, error) {
 			changed = true
 		}
 	}
+	if st.Server.API.Token == "" {
+		st.Server.API = API{Listen: "127.0.0.1", Port: DefaultAPIPort, Token: RandomHex(24)}
+		changed = true
+	}
 	return changed, nil
 }

@@ -64,6 +64,18 @@ type Subscription struct {
 	Path string `json:"path"`
 }
 
+// API is the management web API (see server/api). It is off until enabled and
+// listens on the loopback interface by default; the bearer token is required.
+type API struct {
+	Enabled bool   `json:"enabled"`
+	Listen  string `json:"listen"`
+	Port    int    `json:"port"`
+	Token   string `json:"token"`
+}
+
+// DefaultAPIPort is the web API's default port.
+const DefaultAPIPort = 2097
+
 // Server settings.
 type Server struct {
 	Name string `json:"name"`
@@ -80,6 +92,7 @@ type Server struct {
 	SelfSigned   bool         `json:"self_signed"`
 	Subscription Subscription `json:"subscription"`
 	OpenVPN      OpenVPN      `json:"openvpn"`
+	API          API          `json:"api"`
 }
 
 // User is one account. Every protocol uses the same user with its own credentials.
