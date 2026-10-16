@@ -52,7 +52,7 @@ jobs:
         with:
           go-version-file: go.mod
       - run: scripts/build-server-release.sh ${{ github.sha }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: omnitun-server-linux
           path: dist/
@@ -75,7 +75,7 @@ jobs:
       - run: go mod download
       - run: python3 scripts/gen-notices.py --check
       - run: python3 scripts/gen-notices.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: third-party-notices
           path: THIRD_PARTY_NOTICES.md
