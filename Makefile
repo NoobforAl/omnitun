@@ -1,3 +1,18 @@
+# On Windows, recipes run in Git's sh, never in WSL: a plain `bash` on PATH can be
+# C:\Windows\System32\bash.exe, the WSL launcher, which fails with "execvpe(/bin/bash)".
+ifeq ($(OS),Windows_NT)
+GIT_SH := $(firstword $(wildcard C:/PROGRA~1/Git/usr/bin/sh.exe C:/PROGRA~2/Git/usr/bin/sh.exe $(subst \,/,$(USERPROFILE))/scoop/apps/git/current/usr/bin/sh.exe))
+ifeq ($(GIT_SH),)
+$(error Git for Windows (its sh.exe) is needed to run this Makefile; install it, or run make from Git Bash)
+endif
+SHELL := $(GIT_SH)
+BASH := $(dir $(GIT_SH))bash.exe
+BAT := .bat
+else
+BASH := bash
+BAT :=
+endif
+
 # sing-box feature tags used by every Go build and test.
 TAGS := with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_openvpn,with_openconnect,with_acme,badlinkname,tfogo_checklinkname0
 LDFLAGS := -s -w -checklinkname=0
@@ -22,7 +37,7 @@ app-test:
 
 # Static Linux server binaries (amd64, arm64) and SHA256SUMS in dist/.
 server-release:
-	scripts/build-server-release.sh
+	$(BASH) scripts/build-server-release.sh
 
 # Regenerates the license list the app shows (Settings > Open-source licenses).
 # Run it after changing dependencies; CI checks that every license is known.
@@ -56,7 +71,8 @@ endif
 SERVER := bin/omnitun-server$(EXE) --data $(DEV_DATA)
 ADB := $(SDK)/platform-tools/adb$(EXE)
 # Flutter: the one on PATH, else ~/flutter/bin (resolved by the shell, so Windows paths survive).
-FLUTTER_SH := FLUTTER="$$(command -v flutter || echo "$$HOME/flutter/bin/flutter")"
+# flutter.bat / dart.bat on Windows: the extensionless flutter and dart are bash scripts (`env bash`), which can find WSL.
+FLUTTER_SH := FLUTTER="$$(command -v flutter$(BAT) || echo "$$HOME/flutter/bin/flutter$(BAT)")"
 
 help:
 	@sed -n '/^# Development/,/^# -----/p' Makefile | sed 's/^# \{0,1\}//' | grep -v '^---'
@@ -83,7 +99,7 @@ dev-web: dev-build $(DEV_DATA)/state.json
 # is signed with the release key (a debug build cannot replace it).
 dev-android:
 	@"$(ADB)" devices | grep -w device >/dev/null || { echo "no Android device: connect a phone with USB debugging"; exit 1; }
-	scripts/build-android-core.sh android/arm64
+	$(BASH) scripts/build-android-core.sh android/arm64
 	$(FLUTTER_SH); cd app && "$$FLUTTER" run --release --target-platform android-arm64
 
 dev-clean:
@@ -95,5 +111,5 @@ fix:
 	gofmt -s -w $$(git ls-files '*.go')
 	go fix -tags "$(TAGS)" ./...
 	go vet -tags "$(TAGS)" ./...
-	$(FLUTTER_SH); cd app && "$$FLUTTER" pub get >/dev/null && "$$(dirname "$$FLUTTER")/dart" fix --apply && "$$FLUTTER" analyze --no-fatal-infos
+	$(FLUTTER_SH); cd app && "$$FLUTTER" pub get >/dev/null && "$$(dirname "$$FLUTTER")/dart$(BAT)" fix --apply && "$$FLUTTER" analyze --no-fatal-infos
 	-cd tor && cargo fmt
