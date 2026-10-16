@@ -379,7 +379,7 @@ func (s *Server) dispatch(req Request) (any, error) {
 		}
 		res, err := importer.Import(p.Text)
 		if err != nil {
-			return nil, &Error{Code: CodeImportFailed, Message: err.Error()}
+			return nil, importError(err)
 		}
 		return res, nil
 	case "forms":
@@ -402,7 +402,7 @@ func (s *Server) dispatch(req Request) (any, error) {
 			built, err = profile.FromValues(p.Protocol, p.Values)
 		}
 		if err != nil {
-			return nil, &Error{Code: CodeBadRequest, Message: err.Error()}
+			return nil, badRequest(err)
 		}
 		return built, nil
 	case "profile_values":
@@ -496,11 +496,7 @@ func (s *Server) dispatch(req Request) (any, error) {
 		defer cancel()
 		res, err := s.fetchSubscription(ctx, p)
 		if err != nil {
-			code := CodeSubscriptionFailed
-			if errors.Is(err, subscription.ErrAuth) {
-				code = CodeAuthFailed
-			}
-			return nil, &Error{Code: code, Message: err.Error()}
+			return nil, subscriptionError(err)
 		}
 		return res, nil
 	case "test":

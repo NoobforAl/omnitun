@@ -6,10 +6,13 @@ library;
 
 /// Thrown for typed failures reported by the core; [message] is fit to show.
 class EngineException implements Exception {
-  EngineException(this.code, this.message);
+  EngineException(this.code, this.message, [this.args = const {}]);
 
   final String code;
   final String message;
+
+  /// Values a translated message needs (a field label, an HTTP status).
+  final Map<String, String> args;
 
   @override
   String toString() => '$code: $message';
@@ -147,11 +150,15 @@ class ExitInfo {
 
 /// One line of a bypass list that cannot be used.
 class BypassIssue {
-  const BypassIssue(this.line, this.text, this.message);
+  const BypassIssue(this.line, this.text, this.message, {this.code = '', this.limit = 0});
 
   final int line;
   final String text;
   final String message;
+
+  /// Names [message] for translation (see l10n/errors.dart); empty from an older core.
+  final String code;
+  final int limit;
 }
 
 /// What a bypass list holds, as counted by the core.
@@ -169,14 +176,20 @@ class BypassReport {
     ranges: (j['ranges'] as num?)?.toInt() ?? 0,
     issues: [
       for (final i in (j['issues'] as List? ?? const []))
-        BypassIssue((i['line'] as num).toInt(), i['text'] as String, i['message'] as String),
+        BypassIssue(
+          (i['line'] as num).toInt(),
+          i['text'] as String,
+          i['message'] as String,
+          code: i['code'] as String? ?? '',
+          limit: (i['limit'] as num?)?.toInt() ?? 0,
+        ),
     ],
   );
 }
 
 /// One connection stage (see PLAN.md 3.3 #6). [percent] runs 0-100.
 class ConnectProgress {
-  const ConnectProgress(this.stage, this.percent, {this.profile, this.detail});
+  const ConnectProgress(this.stage, this.percent, {this.profile, this.detail, this.detailCode, this.detailN = 0, this.detailM = 0});
 
   final String stage;
   final int percent;
@@ -187,11 +200,19 @@ class ConnectProgress {
   /// Finer-grained status that replaces the stage label, e.g. "Connecting to Tor 40%".
   final String? detail;
 
+  /// Names [detail] for translation, with its numbers (percent; attempt of attempts).
+  final String? detailCode;
+  final int detailN;
+  final int detailM;
+
   factory ConnectProgress.fromJson(Map<String, dynamic> j) => ConnectProgress(
         j['stage'] as String,
         (j['percent'] as num).toInt(),
         profile: j['profile'] as String?,
         detail: j['detail'] as String?,
+        detailCode: j['detail_code'] as String?,
+        detailN: (j['detail_n'] as num?)?.toInt() ?? 0,
+        detailM: (j['detail_m'] as num?)?.toInt() ?? 0,
       );
 }
 
@@ -258,9 +279,12 @@ class EngineState {
 }
 
 class ImportResult {
-  const ImportResult(this.profiles, this.errors);
+  const ImportResult(this.profiles, this.errors, {this.failure});
   final List<ProfileInfo> profiles;
   final List<String> errors;
+
+  /// Why nothing could be imported, with the core's code, so it can be shown in the user's language.
+  final EngineException? failure;
 }
 
 /// Provider metadata from a subscription response (all optional).

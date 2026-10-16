@@ -1,6 +1,7 @@
 package singbox
 
 import (
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -172,4 +173,25 @@ func testProfile(t *testing.T) *profile.Profile {
 
 func contains(list []string, v string) bool {
 	return slices.Contains(list, v)
+}
+
+func TestBypassIssuesHaveCodes(t *testing.T) {
+	_, issues := ParseBypassList("regexp:\nregexp:(\nfull:bad name\ngeosite:cn\n!!!\n")
+	want := []string{BypassEmptyExpression, BypassBadExpression, BypassBadName, BypassGeoUnsupported, BypassBadEntry}
+	if len(issues) != len(want) {
+		t.Fatalf("issues: %+v", issues)
+	}
+	for i, code := range want {
+		if issues[i].Code != code || issues[i].Message == "" {
+			t.Errorf("line %d: %+v, want code %s", i+1, issues[i], code)
+		}
+	}
+	var many strings.Builder
+	for i := 0; i <= MaxBypassEntries; i++ {
+		fmt.Fprintf(&many, "d%d.example.com\n", i)
+	}
+	_, issues = ParseBypassList(many.String())
+	if len(issues) != 1 || issues[0].Code != BypassTooMany || issues[0].Limit != MaxBypassEntries {
+		t.Fatalf("too many: %+v", issues)
+	}
 }

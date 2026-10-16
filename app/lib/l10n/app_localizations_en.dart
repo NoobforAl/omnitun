@@ -1317,4 +1317,108 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noticesLoadFailed => 'The license list could not be read.';
+
+  @override
+  String formRequired(String label) {
+    return '$label is required';
+  }
+
+  @override
+  String formNotNumber(String label) {
+    return '$label must be a whole number';
+  }
+
+  @override
+  String formNotBool(String label) {
+    return '$label must be on or off';
+  }
+
+  @override
+  String formBadChoice(String label, String value, String choices) {
+    return '$label: $value is not one of $choices';
+  }
+
+  @override
+  String get formRealityOnlyVless => 'Reality is only available for VLESS';
+
+  @override
+  String formUnknownSecurity(String value) {
+    return 'Unknown security: $value';
+  }
+
+  @override
+  String get formReservedBytes =>
+      'Reserved bytes must be numbers from 0 to 255';
+
+  @override
+  String get formRealityKeyRequired =>
+      'The Reality public key is required when Security is Reality';
+
+  @override
+  String get importUnsupported =>
+      'This is not a server link, subscription or config that Omnitun can read';
+
+  @override
+  String importUnsupportedScheme(String scheme) {
+    return 'Links that start with $scheme:// are not supported';
+  }
+
+  @override
+  String get importXrayServer =>
+      'This is an Xray server config. Import it on the server (omnitun-server import xray), not as a client profile';
+
+  @override
+  String get subAuthFailed =>
+      'The subscription rejected the sign-in. Check the username, password or token';
+
+  @override
+  String subHttp(String status) {
+    return 'The subscription server answered HTTP $status';
+  }
+
+  @override
+  String get subTooLarge => 'The subscription is larger than 10 MB';
+
+  @override
+  String get subBadUrl => 'That is not a valid subscription address';
+
+  @override
+  String get bypassIssueEmptyExpression => 'empty expression';
+
+  @override
+  String get bypassIssueBadExpression => 'not a valid expression';
+
+  @override
+  String get bypassIssueBadName => 'not a valid name';
+
+  @override
+  String get bypassIssueGeo =>
+      'geo lists are not supported; list the domains or ranges';
+
+  @override
+  String get bypassIssueBadEntry => 'not a domain, address or range';
+
+  @override
+  String bypassIssueTooMany(int limit) {
+    return 'more than $limit entries: the rest is ignored';
+  }
+
+  @override
+  String get torStarting => 'Starting Tor';
+
+  @override
+  String torBootstrap(int percent) {
+    return 'Connecting to Tor $percent%';
+  }
+
+  @override
+  String get torCircuit => 'Building a Tor circuit';
+
+  @override
+  String torRetry(int attempt, int attempts) {
+    return 'Retrying Tor ($attempt/$attempts)';
+  }
+
+  @override
+  String get importNoServer => 'No valid server was found in this text';
 }

@@ -2287,6 +2287,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The license list could not be read.'**
   String get noticesLoadFailed;
+
+  /// No description provided for @formRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} is required'**
+  String formRequired(String label);
+
+  /// No description provided for @formNotNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} must be a whole number'**
+  String formNotNumber(String label);
+
+  /// No description provided for @formNotBool.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} must be on or off'**
+  String formNotBool(String label);
+
+  /// No description provided for @formBadChoice.
+  ///
+  /// In en, this message translates to:
+  /// **'{label}: {value} is not one of {choices}'**
+  String formBadChoice(String label, String value, String choices);
+
+  /// No description provided for @formRealityOnlyVless.
+  ///
+  /// In en, this message translates to:
+  /// **'Reality is only available for VLESS'**
+  String get formRealityOnlyVless;
+
+  /// No description provided for @formUnknownSecurity.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown security: {value}'**
+  String formUnknownSecurity(String value);
+
+  /// No description provided for @formReservedBytes.
+  ///
+  /// In en, this message translates to:
+  /// **'Reserved bytes must be numbers from 0 to 255'**
+  String get formReservedBytes;
+
+  /// No description provided for @formRealityKeyRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'The Reality public key is required when Security is Reality'**
+  String get formRealityKeyRequired;
+
+  /// No description provided for @importUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This is not a server link, subscription or config that Omnitun can read'**
+  String get importUnsupported;
+
+  /// No description provided for @importUnsupportedScheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Links that start with {scheme}:// are not supported'**
+  String importUnsupportedScheme(String scheme);
+
+  /// No description provided for @importXrayServer.
+  ///
+  /// In en, this message translates to:
+  /// **'This is an Xray server config. Import it on the server (omnitun-server import xray), not as a client profile'**
+  String get importXrayServer;
+
+  /// No description provided for @subAuthFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The subscription rejected the sign-in. Check the username, password or token'**
+  String get subAuthFailed;
+
+  /// No description provided for @subHttp.
+  ///
+  /// In en, this message translates to:
+  /// **'The subscription server answered HTTP {status}'**
+  String subHttp(String status);
+
+  /// No description provided for @subTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'The subscription is larger than 10 MB'**
+  String get subTooLarge;
+
+  /// No description provided for @subBadUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'That is not a valid subscription address'**
+  String get subBadUrl;
+
+  /// No description provided for @bypassIssueEmptyExpression.
+  ///
+  /// In en, this message translates to:
+  /// **'empty expression'**
+  String get bypassIssueEmptyExpression;
+
+  /// No description provided for @bypassIssueBadExpression.
+  ///
+  /// In en, this message translates to:
+  /// **'not a valid expression'**
+  String get bypassIssueBadExpression;
+
+  /// No description provided for @bypassIssueBadName.
+  ///
+  /// In en, this message translates to:
+  /// **'not a valid name'**
+  String get bypassIssueBadName;
+
+  /// No description provided for @bypassIssueGeo.
+  ///
+  /// In en, this message translates to:
+  /// **'geo lists are not supported; list the domains or ranges'**
+  String get bypassIssueGeo;
+
+  /// No description provided for @bypassIssueBadEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'not a domain, address or range'**
+  String get bypassIssueBadEntry;
+
+  /// No description provided for @bypassIssueTooMany.
+  ///
+  /// In en, this message translates to:
+  /// **'more than {limit} entries: the rest is ignored'**
+  String bypassIssueTooMany(int limit);
+
+  /// No description provided for @torStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting Tor'**
+  String get torStarting;
+
+  /// No description provided for @torBootstrap.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to Tor {percent}%'**
+  String torBootstrap(int percent);
+
+  /// No description provided for @torCircuit.
+  ///
+  /// In en, this message translates to:
+  /// **'Building a Tor circuit'**
+  String get torCircuit;
+
+  /// No description provided for @torRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retrying Tor ({attempt}/{attempts})'**
+  String torRetry(int attempt, int attempts);
+
+  /// No description provided for @importNoServer.
+  ///
+  /// In en, this message translates to:
+  /// **'No valid server was found in this text'**
+  String get importNoServer;
 }
 
 class _AppLocalizationsDelegate

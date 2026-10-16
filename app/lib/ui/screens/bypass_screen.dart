@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/engine.dart';
+import '../../l10n/errors.dart';
 import '../../l10n/l10n.dart';
 import '../../state/providers.dart';
 
@@ -356,7 +357,7 @@ class _BypassEditScreenState extends ConsumerState<BypassEditScreen> {
                     style: TextStyle(color: scheme.error),
                   ),
                   for (final i in report.issues.take(8))
-                    Text('  ${i.line}: ${i.text} — ${i.message}', style: Theme.of(context).textTheme.bodySmall),
+                    Text('  ${i.line}: ${i.text} — ${bypassIssueText(context.l10n, i)}', style: Theme.of(context).textTheme.bodySmall),
                   if (report.issues.length > 8) Text('  ${context.l10n.bypassMoreIssues(report.issues.length - 8)}'),
                 ],
               ],

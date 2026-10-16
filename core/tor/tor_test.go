@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -100,4 +101,26 @@ func TestLiveTor(t *testing.T) {
 		t.Fatalf("not via Tor: %s", body)
 	}
 	t.Logf("Tor exit %s", r.IP)
+}
+
+func TestTransportLogKeepsOnlyProblems(t *testing.T) {
+	var got []string
+	SetTransportLog(func(line string) { got = append(got, line) })
+	defer SetTransportLog(nil)
+	for _, line := range []string{
+		"WebRTC: Collecting a new Snowflake. Currently at [1/1]",
+		"Rendezvous using Broker at: https://snowflake-broker.example/",
+		"Domain fronting using a randomly selected domain from: [a b]",
+		"NAT Type: restricted",
+		"Received answer: {\"sdp\":\"...\"}",
+	} {
+		log.Print(line)
+	}
+	if len(got) != 0 {
+		t.Fatalf("routine lines got through: %v", got)
+	}
+	log.Print("WebRTC: Unable to get a snowflake\nrendezvous failed: timeout")
+	if len(got) != 2 || got[0] != "transport: WebRTC: Unable to get a snowflake" || got[1] != "transport: rendezvous failed: timeout" {
+		t.Fatalf("problem lines: %q", got)
+	}
 }

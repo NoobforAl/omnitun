@@ -97,7 +97,13 @@ class DaemonEngine implements VpnEngine {
       if (c == null) return;
       final err = msg['error'] as Map<String, dynamic>?;
       if (err != null) {
-        c.completeError(EngineException(err['code'] as String, err['message'] as String));
+        c.completeError(
+          EngineException(
+            err['code'] as String,
+            err['message'] as String,
+            {for (final e in (err['args'] as Map? ?? const {}).entries) '${e.key}': '${e.value}'},
+          ),
+        );
       } else {
         c.complete(msg['result']);
       }
@@ -228,7 +234,7 @@ class DaemonEngine implements VpnEngine {
       final errors = [for (final e in (res['errors'] as List? ?? const [])) e as String];
       return ImportResult(profiles, errors);
     } on EngineException catch (e) {
-      return ImportResult(const [], [e.message]);
+      return ImportResult(const [], [e.message], failure: e);
     }
   }
 

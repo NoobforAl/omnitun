@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/engine.dart';
+import '../../l10n/errors.dart';
 import '../../l10n/l10n.dart';
 import '../../state/providers.dart';
 import '../../state/subscriptions.dart';
@@ -240,7 +241,7 @@ class _SubscriptionHeader extends ConsumerWidget {
           if (sub.lastError != null)
             Padding(
               padding: const EdgeInsets.only(top: 2, right: 12),
-              child: Text(l.subRefreshFailed('${sub.lastError}'),
+              child: Text(l.subRefreshFailed(sub.lastErrorText(l)),
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error)),
             ),
         ],
@@ -346,7 +347,9 @@ class _ImportSheetState extends ConsumerState<_ImportSheet> {
     setState(() {
       _busy = false;
       _message = result.profiles.isEmpty && result.errors.isNotEmpty
-          ? context.l10n.importNothing(result.errors.first)
+          ? context.l10n.importNothing(
+              result.failure != null ? describeError(context.l10n, result.failure!) : result.errors.first,
+            )
           : context.l10n.importPartial(added, result.errors.length);
     });
   }

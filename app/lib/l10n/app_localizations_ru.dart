@@ -1350,4 +1350,109 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get noticesLoadFailed => 'Не удалось прочитать список лицензий.';
+
+  @override
+  String formRequired(String label) {
+    return 'Поле «$label» обязательно';
+  }
+
+  @override
+  String formNotNumber(String label) {
+    return 'Поле «$label» должно быть целым числом';
+  }
+
+  @override
+  String formNotBool(String label) {
+    return 'Поле «$label» должно быть включено или выключено';
+  }
+
+  @override
+  String formBadChoice(String label, String value, String choices) {
+    return '$label: «$value» нет среди вариантов: $choices';
+  }
+
+  @override
+  String get formRealityOnlyVless => 'Reality доступен только для VLESS';
+
+  @override
+  String formUnknownSecurity(String value) {
+    return 'Неизвестная защита: $value';
+  }
+
+  @override
+  String get formReservedBytes =>
+      'Зарезервированные байты должны быть числами от 0 до 255';
+
+  @override
+  String get formRealityKeyRequired =>
+      'При защите Reality нужен открытый ключ Reality';
+
+  @override
+  String get importUnsupported =>
+      'Это не ссылка на сервер, не подписка и не конфигурация, которую Omnitun может прочитать';
+
+  @override
+  String importUnsupportedScheme(String scheme) {
+    return 'Ссылки, начинающиеся с $scheme://, не поддерживаются';
+  }
+
+  @override
+  String get importXrayServer =>
+      'Это конфигурация сервера Xray. Импортируйте её на сервере (omnitun-server import xray), а не как клиентский профиль';
+
+  @override
+  String get subAuthFailed =>
+      'Подписка отклонила вход. Проверьте имя пользователя, пароль или токен';
+
+  @override
+  String subHttp(String status) {
+    return 'Сервер подписки ответил HTTP $status';
+  }
+
+  @override
+  String get subTooLarge => 'Подписка больше 10 МБ';
+
+  @override
+  String get subBadUrl => 'Это не похоже на адрес подписки';
+
+  @override
+  String get bypassIssueEmptyExpression => 'пустое выражение';
+
+  @override
+  String get bypassIssueBadExpression => 'недопустимое выражение';
+
+  @override
+  String get bypassIssueBadName => 'недопустимое имя';
+
+  @override
+  String get bypassIssueGeo =>
+      'гео-списки не поддерживаются; перечислите домены или диапазоны';
+
+  @override
+  String get bypassIssueBadEntry => 'это не домен, не адрес и не диапазон';
+
+  @override
+  String bypassIssueTooMany(int limit) {
+    return 'больше $limit записей: остальные игнорируются';
+  }
+
+  @override
+  String get torStarting => 'Запуск Tor';
+
+  @override
+  String torBootstrap(int percent) {
+    return 'Подключение к Tor: $percent%';
+  }
+
+  @override
+  String get torCircuit => 'Построение цепочки Tor';
+
+  @override
+  String torRetry(int attempt, int attempts) {
+    return 'Повторная попытка Tor ($attempt/$attempts)';
+  }
+
+  @override
+  String get importNoServer =>
+      'В этом тексте нет ни одного подходящего сервера';
 }

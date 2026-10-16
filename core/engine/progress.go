@@ -39,7 +39,20 @@ type Progress struct {
 	Profile string `json:"profile,omitempty"`
 	// Detail is a finer-grained status, e.g. Tor's bootstrap step.
 	Detail string `json:"detail,omitempty"`
+	// DetailCode names Detail for translation (the Detail* constants); DetailN
+	// and DetailM are the numbers in it (percent; attempt and attempts).
+	DetailCode string `json:"detail_code,omitempty"`
+	DetailN    int    `json:"detail_n,omitempty"`
+	DetailM    int    `json:"detail_m,omitempty"`
 }
+
+// Codes of the finer-grained statuses.
+const (
+	DetailTorStarting  = "TOR_STARTING"
+	DetailTorBootstrap = "TOR_BOOTSTRAP" // N is the percent
+	DetailTorCircuit   = "TOR_CIRCUIT"
+	DetailTorRetry     = "TOR_RETRY" // N of M
+)
 
 func progress(stage, profile string) *Progress {
 	return &Progress{Stage: stage, Percent: stagePercent[stage], Profile: profile}

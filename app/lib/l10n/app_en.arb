@@ -702,5 +702,110 @@
         "type": "int"
       }
     }
-  }
+  },
+  "formRequired": "{label} is required",
+  "@formRequired": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "formNotNumber": "{label} must be a whole number",
+  "@formNotNumber": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "formNotBool": "{label} must be on or off",
+  "@formNotBool": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "formBadChoice": "{label}: {value} is not one of {choices}",
+  "@formBadChoice": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      },
+      "choices": {
+        "type": "String"
+      }
+    }
+  },
+  "formRealityOnlyVless": "Reality is only available for VLESS",
+  "formUnknownSecurity": "Unknown security: {value}",
+  "@formUnknownSecurity": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "formReservedBytes": "Reserved bytes must be numbers from 0 to 255",
+  "formRealityKeyRequired": "The Reality public key is required when Security is Reality",
+  "importUnsupported": "This is not a server link, subscription or config that Omnitun can read",
+  "importUnsupportedScheme": "Links that start with {scheme}:// are not supported",
+  "@importUnsupportedScheme": {
+    "placeholders": {
+      "scheme": {
+        "type": "String"
+      }
+    }
+  },
+  "importXrayServer": "This is an Xray server config. Import it on the server (omnitun-server import xray), not as a client profile",
+  "subAuthFailed": "The subscription rejected the sign-in. Check the username, password or token",
+  "subHttp": "The subscription server answered HTTP {status}",
+  "@subHttp": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "subTooLarge": "The subscription is larger than 10 MB",
+  "subBadUrl": "That is not a valid subscription address",
+  "bypassIssueEmptyExpression": "empty expression",
+  "bypassIssueBadExpression": "not a valid expression",
+  "bypassIssueBadName": "not a valid name",
+  "bypassIssueGeo": "geo lists are not supported; list the domains or ranges",
+  "bypassIssueBadEntry": "not a domain, address or range",
+  "bypassIssueTooMany": "more than {limit} entries: the rest is ignored",
+  "@bypassIssueTooMany": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "torStarting": "Starting Tor",
+  "torBootstrap": "Connecting to Tor {percent}%",
+  "@torBootstrap": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "torCircuit": "Building a Tor circuit",
+  "torRetry": "Retrying Tor ({attempt}/{attempts})",
+  "@torRetry": {
+    "placeholders": {
+      "attempt": {
+        "type": "int"
+      },
+      "attempts": {
+        "type": "int"
+      }
+    }
+  },
+  "importNoServer": "No valid server was found in this text"
 }

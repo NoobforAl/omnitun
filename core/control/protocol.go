@@ -51,12 +51,23 @@ const (
 	CodeSubscriptionFailed = "SUBSCRIPTION_FAILED"
 	CodeAuthFailed         = "AUTH_FAILED"
 	CodeLookupFailed       = "LOOKUP_FAILED"
+
+	// Specific failures of import and subscriptions (the Message is English;
+	// see Error.Args for the numbers a translation needs).
+	CodeImportUnsupported = "IMPORT_UNSUPPORTED" // args: scheme, when the text was a link
+	CodeImportNothing     = "IMPORT_NOTHING"     // no valid server in the text
+	CodeImportXrayServer  = "IMPORT_XRAY_SERVER"
+	CodeSubHTTP           = "SUB_HTTP" // args: status
+	CodeSubTooLarge       = "SUB_TOO_LARGE"
+	CodeSubBadURL         = "SUB_BAD_URL"
 )
 
 // Error is a typed failure.
 type Error struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	// Args are the values a translated message needs (a label, a status).
+	Args map[string]string `json:"args,omitempty"`
 }
 
 func (e *Error) Error() string { return e.Code + ": " + e.Message }

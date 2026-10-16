@@ -1366,4 +1366,108 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get noticesLoadFailed => 'تعذّرت قراءة قائمة التراخيص.';
+
+  @override
+  String formRequired(String label) {
+    return '$label مطلوب';
+  }
+
+  @override
+  String formNotNumber(String label) {
+    return 'يجب أن يكون $label عددًا صحيحًا';
+  }
+
+  @override
+  String formNotBool(String label) {
+    return 'يجب أن يكون $label مفعّلًا أو متوقفًا';
+  }
+
+  @override
+  String formBadChoice(String label, String value, String choices) {
+    return '$label: ‎$value‎ ليس من بين $choices';
+  }
+
+  @override
+  String get formRealityOnlyVless => 'Reality‎ متاح فقط مع VLESS';
+
+  @override
+  String formUnknownSecurity(String value) {
+    return 'حماية غير معروفة: ‎$value';
+  }
+
+  @override
+  String get formReservedBytes =>
+      'يجب أن تكون البايتات المحجوزة أعدادًا من 0 إلى 255';
+
+  @override
+  String get formRealityKeyRequired =>
+      'المفتاح العام لـ Reality‎ مطلوب عندما تكون الحماية Reality';
+
+  @override
+  String get importUnsupported =>
+      'هذا ليس رابط خادم أو اشتراكًا أو إعدادًا يستطيع Omnitun‎ قراءته';
+
+  @override
+  String importUnsupportedScheme(String scheme) {
+    return 'الروابط التي تبدأ بـ ‎$scheme://‎ غير مدعومة';
+  }
+
+  @override
+  String get importXrayServer =>
+      'هذا إعداد خادم Xray‎. استورده على الخادم (‎omnitun-server import xray‎) لا كملف تعريف عميل';
+
+  @override
+  String get subAuthFailed =>
+      'رفض الاشتراك تسجيل الدخول. تحقق من اسم المستخدم أو كلمة المرور أو الرمز';
+
+  @override
+  String subHttp(String status) {
+    return 'ردّ خادم الاشتراك بـ ‎HTTP $status';
+  }
+
+  @override
+  String get subTooLarge => 'حجم الاشتراك أكبر من 10 ميغابايت';
+
+  @override
+  String get subBadUrl => 'هذا ليس عنوان اشتراك صالحًا';
+
+  @override
+  String get bypassIssueEmptyExpression => 'تعبير فارغ';
+
+  @override
+  String get bypassIssueBadExpression => 'تعبير غير صالح';
+
+  @override
+  String get bypassIssueBadName => 'اسم غير صالح';
+
+  @override
+  String get bypassIssueGeo =>
+      'القوائم الجغرافية غير مدعومة؛ اذكر النطاقات أو المدى';
+
+  @override
+  String get bypassIssueBadEntry => 'ليس نطاقًا ولا عنوانًا ولا مدى';
+
+  @override
+  String bypassIssueTooMany(int limit) {
+    return 'أكثر من $limit إدخالًا: يُتجاهل الباقي';
+  }
+
+  @override
+  String get torStarting => 'جارٍ تشغيل ‎Tor';
+
+  @override
+  String torBootstrap(int percent) {
+    return 'جارٍ الاتصال بـ ‎Tor‎ $percent%';
+  }
+
+  @override
+  String get torCircuit => 'جارٍ إنشاء مسار ‎Tor';
+
+  @override
+  String torRetry(int attempt, int attempts) {
+    return 'إعادة محاولة ‎Tor‎ ($attempt/$attempts)';
+  }
+
+  @override
+  String get importNoServer => 'لم يُعثر على أي خادم صالح في هذا النص';
 }

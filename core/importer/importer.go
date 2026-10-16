@@ -14,6 +14,19 @@ import (
 // ErrUnsupported is returned for input that no parser recognises.
 var ErrUnsupported = errors.New("unsupported config format")
 
+// ErrNoProfiles is returned when the text held links but none of them was valid.
+var ErrNoProfiles = errors.New("no valid profiles")
+
+// ErrXrayServer is returned for the config of an Xray server (not a client).
+var ErrXrayServer = errors.New("this is an Xray server config; import it on the server (omnitun-server import xray), not as a client profile")
+
+// UnsupportedError is a link of a scheme nothing here can read.
+type UnsupportedError struct{ Scheme string }
+
+func (e *UnsupportedError) Error() string { return ErrUnsupported.Error() + ": " + e.Scheme + "://" }
+
+func (e *UnsupportedError) Unwrap() error { return ErrUnsupported }
+
 // Result is the outcome of importing a blob of text.
 type Result struct {
 	Profiles []*profile.Profile `json:"profiles"`
@@ -36,7 +49,7 @@ func Import(text string) (*Result, error) {
 		case "xray":
 			return ImportXray(text)
 		case "xray-server":
-			return nil, errors.New("this is an Xray server config; import it on the server (omnitun-server import xray), not as a client profile")
+			return nil, ErrXrayServer
 		}
 		return ImportSingBoxJSON(text)
 	}
@@ -80,7 +93,7 @@ func Import(text string) (*Result, error) {
 	}
 	if len(res.Profiles) == 0 {
 		if len(res.Errors) > 0 {
-			return res, fmt.Errorf("no valid profiles: %s", res.Errors[0])
+			return res, fmt.Errorf("%w: %s", ErrNoProfiles, res.Errors[0])
 		}
 		return nil, ErrUnsupported
 	}
@@ -127,7 +140,7 @@ func ParseLink(link string) (*profile.Profile, error) {
 	case "tor":
 		p, err = parseTorLink(link)
 	default:
-		return nil, fmt.Errorf("%w: %s://", ErrUnsupported, scheme)
+		return nil, &UnsupportedError{Scheme: scheme}
 	}
 	if err != nil {
 		return nil, err

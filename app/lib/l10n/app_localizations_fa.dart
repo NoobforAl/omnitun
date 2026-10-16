@@ -1319,4 +1319,108 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get noticesLoadFailed => 'فهرست مجوزها خوانده نشد.';
+
+  @override
+  String formRequired(String label) {
+    return '$label الزامی است';
+  }
+
+  @override
+  String formNotNumber(String label) {
+    return '$label باید یک عدد صحیح باشد';
+  }
+
+  @override
+  String formNotBool(String label) {
+    return '$label باید روشن یا خاموش باشد';
+  }
+
+  @override
+  String formBadChoice(String label, String value, String choices) {
+    return '$label: ‎$value‎ جزو $choices نیست';
+  }
+
+  @override
+  String get formRealityOnlyVless => 'Reality‎ فقط برای VLESS‎ در دسترس است';
+
+  @override
+  String formUnknownSecurity(String value) {
+    return 'امنیت ناشناخته: ‎$value';
+  }
+
+  @override
+  String get formReservedBytes =>
+      'بایت‌های رزرو باید عددهایی از ۰ تا ۲۵۵ باشند';
+
+  @override
+  String get formRealityKeyRequired =>
+      'وقتی امنیت روی Reality‎ است، کلید عمومی آن الزامی است';
+
+  @override
+  String get importUnsupported =>
+      'این پیوند سرور، اشتراک یا پیکربندی‌ای نیست که Omnitun‎ بتواند بخواند';
+
+  @override
+  String importUnsupportedScheme(String scheme) {
+    return 'پیوندهایی که با ‎$scheme://‎ شروع می‌شوند پشتیبانی نمی‌شوند';
+  }
+
+  @override
+  String get importXrayServer =>
+      'این پیکربندی سرور Xray‎ است. آن را روی سرور وارد کنید (‎omnitun-server import xray‎)، نه به‌عنوان نمایه کلاینت';
+
+  @override
+  String get subAuthFailed =>
+      'اشتراک ورود را نپذیرفت. نام کاربری، گذرواژه یا توکن را بررسی کنید';
+
+  @override
+  String subHttp(String status) {
+    return 'سرور اشتراک با ‎HTTP $status‎ پاسخ داد';
+  }
+
+  @override
+  String get subTooLarge => 'اشتراک بزرگ‌تر از ۱۰ مگابایت است';
+
+  @override
+  String get subBadUrl => 'این نشانی اشتراک معتبر نیست';
+
+  @override
+  String get bypassIssueEmptyExpression => 'عبارت خالی است';
+
+  @override
+  String get bypassIssueBadExpression => 'عبارت معتبر نیست';
+
+  @override
+  String get bypassIssueBadName => 'نام معتبر نیست';
+
+  @override
+  String get bypassIssueGeo =>
+      'فهرست‌های جغرافیایی پشتیبانی نمی‌شوند؛ دامنه‌ها یا بازه‌ها را بنویسید';
+
+  @override
+  String get bypassIssueBadEntry => 'دامنه، نشانی یا بازه نیست';
+
+  @override
+  String bypassIssueTooMany(int limit) {
+    return 'بیش از $limit مورد: بقیه نادیده گرفته می‌شود';
+  }
+
+  @override
+  String get torStarting => 'در حال راه‌اندازی ‎Tor';
+
+  @override
+  String torBootstrap(int percent) {
+    return 'در حال اتصال به ‎Tor‎ $percent%';
+  }
+
+  @override
+  String get torCircuit => 'در حال ساختن مسیر ‎Tor';
+
+  @override
+  String torRetry(int attempt, int attempts) {
+    return 'تلاش دوباره برای ‎Tor‎ ($attempt/$attempts)';
+  }
+
+  @override
+  String get importNoServer => 'در این متن هیچ سرور معتبری پیدا نشد';
 }

@@ -47,7 +47,21 @@ type BypassIssue struct {
 	Line    int    `json:"line"` // 1-based
 	Text    string `json:"text"`
 	Message string `json:"message"`
+	// Code names Message for translation (the Bypass* constants); Limit is the
+	// number in BypassTooMany.
+	Code  string `json:"code,omitempty"`
+	Limit int    `json:"limit,omitempty"`
 }
+
+// Codes of the problems a line of a bypass list can have.
+const (
+	BypassEmptyExpression = "EMPTY_EXPRESSION"
+	BypassBadExpression   = "BAD_EXPRESSION"
+	BypassBadName         = "BAD_NAME"
+	BypassGeoUnsupported  = "GEO_UNSUPPORTED"
+	BypassBadEntry        = "BAD_ENTRY"
+	BypassTooMany         = "TOO_MANY"
+)
 
 func (i BypassIssue) Error() string {
 	return fmt.Sprintf("line %d: %s (%s)", i.Line, i.Message, i.Text)
@@ -68,9 +82,12 @@ func ParseBypassList(text string) (*BypassList, []BypassIssue) {
 		if line == "" {
 			continue
 		}
-		bad := func(msg string) { issues = append(issues, BypassIssue{Line: n + 1, Text: clip(raw), Message: msg}) }
+		bad := func(code, msg string) {
+			issues = append(issues, BypassIssue{Line: n + 1, Text: clip(raw), Message: msg, Code: code})
+		}
 		if b.Count() >= MaxBypassEntries {
-			bad(fmt.Sprintf("more than %d entries: the rest is ignored", MaxBypassEntries))
+			bad(BypassTooMany, fmt.Sprintf("more than %d entries: the rest is ignored", MaxBypassEntries))
+			issues[len(issues)-1].Limit = MaxBypassEntries
 			break
 		}
 		if seen[strings.ToLower(line)] {
@@ -83,16 +100,16 @@ func ParseBypassList(text string) (*BypassList, []BypassIssue) {
 		case hasKind && strings.EqualFold(kind, "regexp"):
 			value = strings.TrimSpace(value)
 			if value == "" {
-				bad("empty expression")
+				bad(BypassEmptyExpression, "empty expression")
 			} else if _, err := regexp.Compile(value); err != nil {
-				bad("not a valid expression")
+				bad(BypassBadExpression, "not a valid expression")
 			} else {
 				b.Regex = append(b.Regex, value)
 			}
 		case hasKind && (strings.EqualFold(kind, "full") || strings.EqualFold(kind, "domain") || strings.EqualFold(kind, "keyword")):
 			value = strings.ToLower(strings.TrimSpace(value))
 			if !validName(value, strings.EqualFold(kind, "keyword")) {
-				bad("not a valid name")
+				bad(BypassBadName, "not a valid name")
 				continue
 			}
 			switch strings.ToLower(kind) {
@@ -104,7 +121,7 @@ func ParseBypassList(text string) (*BypassList, []BypassIssue) {
 				b.Keyword = append(b.Keyword, value)
 			}
 		case hasKind && (strings.EqualFold(kind, "geosite") || strings.EqualFold(kind, "geoip")):
-			bad("geo lists are not supported; list the domains or ranges")
+			bad(BypassGeoUnsupported, "geo lists are not supported; list the domains or ranges")
 		default:
 			if p, err := netip.ParsePrefix(line); err == nil {
 				b.CIDRs = append(b.CIDRs, p.Masked())
@@ -113,7 +130,7 @@ func ParseBypassList(text string) (*BypassList, []BypassIssue) {
 			} else if name := strings.ToLower(strings.TrimPrefix(line, ".")); validName(name, false) {
 				b.Suffix = append(b.Suffix, name)
 			} else {
-				bad("not a domain, address or range")
+				bad(BypassBadEntry, "not a domain, address or range")
 			}
 		}
 	}

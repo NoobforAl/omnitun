@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 
 import '../engine/engine.dart';
+import '../state/countries.dart';
+import '../state/country_names.dart';
 import '../ui/theme.dart';
 import 'app_localizations.dart';
 
@@ -9,6 +11,10 @@ export 'app_localizations.dart';
 /// `context.l10n.something`: the app's translations.
 extension L10nContext on BuildContext {
   AppLocalizations get l10n => AppLocalizations.of(this);
+
+  /// A country's name in the language of the app (English where there is no translation).
+  String countryName(String code) =>
+      countryNamesByLanguage[Localizations.localeOf(this).languageCode]?[code] ?? countryNames[code] ?? code;
 }
 
 /// What to show as a profile's address (Tor has no server).

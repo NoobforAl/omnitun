@@ -141,7 +141,7 @@ class MockEngine implements VpnEngine {
     final p = protocol ?? profile!.protocol;
     for (final f in (await forms()).firstWhere((f) => f.protocol == p).fields) {
       if (f.required && (merged[f.key] ?? '').toString().trim().isEmpty) {
-        throw EngineException('BAD_REQUEST', '${f.label} is required');
+        throw EngineException('FORM_REQUIRED', '${f.label} is required', {'label': f.label});
       }
     }
     final server = (merged['server'] ?? '').toString();
@@ -174,7 +174,7 @@ class MockEngine implements VpnEngine {
       final line = lines[i].split('#').first.trim();
       if (line.isEmpty) continue;
       if (line.contains(' ')) {
-        issues.add(BypassIssue(i + 1, line, 'not a domain, address or range'));
+        issues.add(BypassIssue(i + 1, line, 'not a domain, address or range', code: 'BAD_ENTRY'));
       } else {
         entries++;
       }

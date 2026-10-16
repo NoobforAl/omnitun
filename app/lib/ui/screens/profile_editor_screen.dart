@@ -4,9 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/engine.dart';
+import '../../l10n/errors.dart';
 import '../../l10n/form_text.dart';
 import '../../l10n/l10n.dart';
-import '../../state/countries.dart';
 import '../../state/providers.dart';
 import '../widgets/country_flag.dart';
 import 'location_screen.dart';
@@ -24,7 +24,7 @@ class NewServerScreen extends ConsumerWidget {
       body: forms.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
-          child: Padding(padding: const EdgeInsets.all(24), child: Text(messageOf(e))),
+          child: Padding(padding: const EdgeInsets.all(24), child: Text(describeError(context.l10n, e))),
         ),
         data: (list) => ListView(
           children: [
@@ -48,9 +48,6 @@ class NewServerScreen extends ConsumerWidget {
     );
   }
 }
-
-/// What to tell the user about an error from the core.
-String messageOf(Object e) => e is EngineException ? e.message : e.toString().replaceFirst(RegExp(r'^[A-Za-z]+: '), '');
 
 /// Edits a profile, or creates one of [protocol]. The fields come from the core
 /// (`forms`), so every protocol has the same kind of editor and the core checks the values.
@@ -113,7 +110,7 @@ class _ProfileEditorScreenState extends ConsumerState<ProfileEditorScreen> {
         }
       });
     } catch (e) {
-      if (mounted) setState(() => _loadError = e is _NoEditor ? context.l10n.formNoEditor(_protocol) : messageOf(e));
+      if (mounted) setState(() => _loadError = e is _NoEditor ? context.l10n.formNoEditor(_protocol) : describeError(context.l10n, e));
     }
   }
 
@@ -144,7 +141,7 @@ class _ProfileEditorScreenState extends ConsumerState<ProfileEditorScreen> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _saveError = messageOf(e);
+          _saveError = describeError(context.l10n, e);
         });
       }
     }
@@ -204,7 +201,7 @@ class _ProfileEditorScreenState extends ConsumerState<ProfileEditorScreen> {
                 contentPadding: EdgeInsets.zero,
                 leading: CountryFlag(code),
                 title: Text(context.l10n.countryRow),
-                subtitle: Text(code == null ? context.l10n.countryAuto : countryNames[code] ?? code),
+                subtitle: Text(code == null ? context.l10n.countryAuto : context.countryName(code)),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () async {
                   final picked = await pickCountry(context, code);

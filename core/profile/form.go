@@ -122,7 +122,7 @@ func number(key, label string, ptr intPtr, opts ...func(*Field)) Field {
 			}
 			n, err := strconv.Atoi(v)
 			if err != nil || n < 0 {
-				return fmt.Errorf("%s must be a whole number", label)
+				return formErr(FormNotNumber, "%s must be a whole number", label).arg("label", label)
 			}
 			*ptr(p, true) = n
 			return nil
@@ -148,7 +148,7 @@ func toggle(key, label string, ptr boolPtr, opts ...func(*Field)) Field {
 					*b = false
 				}
 			default:
-				return fmt.Errorf("%s must be true or false", label)
+				return formErr(FormNotBool, "%s must be true or false", label).arg("label", label)
 			}
 			return nil
 		},
@@ -408,7 +408,7 @@ func security(withReality bool) Field {
 				t.Enabled, t.Reality = true, nil
 			case "reality":
 				if !withReality {
-					return fmt.Errorf("reality is only available for VLESS")
+					return formErr(FormRealityOnlyVLESS, "reality is only available for VLESS")
 				}
 				t := tlsOf(p, true)
 				t.Enabled = true
@@ -416,7 +416,7 @@ func security(withReality bool) Field {
 					t.Reality = &Reality{}
 				}
 			default:
-				return fmt.Errorf("unknown security %q", v)
+				return formErr(FormUnknownSecurity, "unknown security %q", v).arg("value", v)
 			}
 			return nil
 		},
@@ -450,7 +450,7 @@ func reserved() Field {
 			for _, it := range items {
 				n, err := strconv.Atoi(it)
 				if err != nil || n < 0 || n > 255 {
-					return fmt.Errorf("reserved bytes must be numbers from 0 to 255")
+					return formErr(FormReservedBytes, "reserved bytes must be numbers from 0 to 255")
 				}
 				out = append(out, n)
 			}
@@ -815,7 +815,8 @@ func (p *Profile) Apply(values map[string]string) error {
 			continue
 		}
 		if f.Kind == FieldChoice && v != "" && !slices.Contains(f.Choices, v) {
-			return fmt.Errorf("%s: %q is not one of %s", f.Label, v, strings.Join(f.Choices, ", "))
+			return formErr(FormBadChoice, "%s: %q is not one of %s", f.Label, v, strings.Join(f.Choices, ", ")).
+				arg("label", f.Label).arg("value", v).arg("choices", strings.Join(f.Choices, ", "))
 		}
 		if err := f.set(p, v); err != nil {
 			return err
@@ -837,11 +838,11 @@ func FromValues(protocol string, values map[string]string) (*Profile, error) {
 	fs, _ := FormFor(protocol)
 	for _, f := range fs {
 		if f.Required && strings.TrimSpace(f.get(p)) == "" {
-			return nil, fmt.Errorf("%s is required", f.Label)
+			return nil, formErr(FormRequired, "%s is required", f.Label).arg("label", f.Label)
 		}
 	}
 	if p.TLS != nil && p.TLS.Reality != nil && p.TLS.Reality.PublicKey == "" {
-		return nil, fmt.Errorf("Reality public key is required when Security is reality")
+		return nil, formErr(FormRealityKeyRequired, "Reality public key is required when Security is reality")
 	}
 	if p.Name == "" {
 		p.Name = p.Server

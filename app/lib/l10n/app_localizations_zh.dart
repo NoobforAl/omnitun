@@ -1276,4 +1276,103 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get noticesLoadFailed => '无法读取许可列表。';
+
+  @override
+  String formRequired(String label) {
+    return '$label为必填项';
+  }
+
+  @override
+  String formNotNumber(String label) {
+    return '$label必须是整数';
+  }
+
+  @override
+  String formNotBool(String label) {
+    return '$label必须为开或关';
+  }
+
+  @override
+  String formBadChoice(String label, String value, String choices) {
+    return '$label：$value 不在 $choices 之中';
+  }
+
+  @override
+  String get formRealityOnlyVless => 'Reality 仅适用于 VLESS';
+
+  @override
+  String formUnknownSecurity(String value) {
+    return '未知的安全方式：$value';
+  }
+
+  @override
+  String get formReservedBytes => '保留字节必须是 0 到 255 之间的数字';
+
+  @override
+  String get formRealityKeyRequired => '安全方式为 Reality 时必须填写 Reality 公钥';
+
+  @override
+  String get importUnsupported => '这不是 Omnitun 能读取的服务器链接、订阅或配置';
+
+  @override
+  String importUnsupportedScheme(String scheme) {
+    return '不支持以 $scheme:// 开头的链接';
+  }
+
+  @override
+  String get importXrayServer =>
+      '这是 Xray 服务器配置。请在服务器上导入（omnitun-server import xray），不要作为客户端配置导入';
+
+  @override
+  String get subAuthFailed => '订阅拒绝了登录。请检查用户名、密码或令牌';
+
+  @override
+  String subHttp(String status) {
+    return '订阅服务器返回了 HTTP $status';
+  }
+
+  @override
+  String get subTooLarge => '订阅超过 10 MB';
+
+  @override
+  String get subBadUrl => '这不是有效的订阅地址';
+
+  @override
+  String get bypassIssueEmptyExpression => '表达式为空';
+
+  @override
+  String get bypassIssueBadExpression => '不是有效的表达式';
+
+  @override
+  String get bypassIssueBadName => '不是有效的名称';
+
+  @override
+  String get bypassIssueGeo => '不支持地理列表；请列出域名或地址段';
+
+  @override
+  String get bypassIssueBadEntry => '不是域名、地址或地址段';
+
+  @override
+  String bypassIssueTooMany(int limit) {
+    return '超过 $limit 条：其余的被忽略';
+  }
+
+  @override
+  String get torStarting => '正在启动 Tor';
+
+  @override
+  String torBootstrap(int percent) {
+    return '正在连接 Tor $percent%';
+  }
+
+  @override
+  String get torCircuit => '正在建立 Tor 线路';
+
+  @override
+  String torRetry(int attempt, int attempts) {
+    return '重试 Tor（$attempt/$attempts）';
+  }
+
+  @override
+  String get importNoServer => '在这段文字中没有找到有效的服务器';
 }

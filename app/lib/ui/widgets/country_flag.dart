@@ -26,7 +26,7 @@ class CountryFlag extends StatelessWidget {
     final c = code;
     final emoji = c != null && defaultTargetPlatform != TargetPlatform.windows;
     return Semantics(
-      label: label ?? (c == null ? context.l10n.unknownCountry : (countryNames[c] ?? c)),
+      label: label ?? (c == null ? context.l10n.unknownCountry : context.countryName(c)),
       excludeSemantics: true,
       child: Container(
         width: size,

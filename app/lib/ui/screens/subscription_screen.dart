@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/errors.dart';
 import '../../l10n/l10n.dart';
 import '../../state/subscriptions.dart';
 
@@ -101,7 +102,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = e.toString().replaceFirst(RegExp(r'^(Bad state|EngineException|[A-Z_]+): '), '');
+          _error = describeError(l, e);
         });
       }
     }

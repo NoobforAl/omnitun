@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../engine/engine.dart';
+import '../l10n/app_localizations.dart';
+import '../l10n/errors.dart';
 import 'providers.dart';
 
 /// How a subscription request authenticates (mirrors core/subscription.Auth).
@@ -50,6 +52,8 @@ class Subscription {
     this.info = const SubscriptionInfo(),
     this.updatedAt,
     this.lastError,
+    this.lastErrorCode,
+    this.lastErrorArgs = const {},
     this.via = defaultVia,
   });
 
@@ -63,6 +67,14 @@ class Subscription {
   final SubscriptionInfo info;
   final DateTime? updatedAt;
   final String? lastError;
+
+  /// The core's code and values for [lastError], so it can be shown in the user's language.
+  final String? lastErrorCode;
+  final Map<String, String> lastErrorArgs;
+
+  /// [lastError] in the language of the app.
+  String lastErrorText(AppLocalizations l) =>
+      (lastErrorCode == null ? null : translateCode(l, lastErrorCode!, lastErrorArgs)) ?? '$lastError';
 
   /// How it is downloaded: 'direct', 'auto' (through the VPN when direct fails and the VPN is up)
   /// or 'tunnel' (always through the VPN, for providers that are blocked).
@@ -83,6 +95,8 @@ class Subscription {
     SubscriptionInfo? info,
     DateTime? updatedAt,
     String? lastError,
+    String? lastErrorCode,
+    Map<String, String>? lastErrorArgs,
     String? via,
     bool clearError = false,
   }) =>
@@ -94,6 +108,8 @@ class Subscription {
         info: info ?? this.info,
         updatedAt: updatedAt ?? this.updatedAt,
         lastError: clearError ? null : lastError ?? this.lastError,
+        lastErrorCode: clearError ? null : (lastError != null ? lastErrorCode : this.lastErrorCode),
+        lastErrorArgs: clearError ? const {} : (lastError != null ? (lastErrorArgs ?? const {}) : this.lastErrorArgs),
         via: via ?? this.via,
       );
 
@@ -105,6 +121,8 @@ class Subscription {
         'info': info.toJson(),
         if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
         if (lastError != null) 'last_error': lastError,
+        if (lastErrorCode != null) 'last_error_code': lastErrorCode,
+        if (lastErrorArgs.isNotEmpty) 'last_error_args': lastErrorArgs,
         'via': via,
       };
 
@@ -116,6 +134,8 @@ class Subscription {
         info: SubscriptionInfo.fromJson(Map<String, dynamic>.from(j['info'] as Map? ?? const {})),
         updatedAt: DateTime.tryParse(j['updated_at'] as String? ?? ''),
         lastError: j['last_error'] as String?,
+        lastErrorCode: j['last_error_code'] as String?,
+        lastErrorArgs: {for (final e in (j['last_error_args'] as Map? ?? const {}).entries) '${e.key}': '${e.value}'},
         via: j['via'] as String? ?? defaultVia,
       );
 }
@@ -176,7 +196,13 @@ class SubscriptionsController extends Notifier<List<Subscription>> {
       _put(sub.copyWith(info: result.info, updatedAt: DateTime.now(), clearError: true));
       return result.profiles.length;
     } catch (e) {
-      _put(sub.copyWith(lastError: _message(e)));
+      _put(
+        sub.copyWith(
+          lastError: _message(e),
+          lastErrorCode: e is EngineException ? e.code : null,
+          lastErrorArgs: e is EngineException ? e.args : null,
+        ),
+      );
       rethrow;
     } finally {
       _refreshing.remove(id);

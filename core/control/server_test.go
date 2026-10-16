@@ -222,7 +222,7 @@ func TestProfileEditorMethods(t *testing.T) {
 	}
 
 	var ce *Error
-	if err := c.Call(t.Context(), "build_profile", BuildProfileParams{Protocol: profile.Trojan, Values: map[string]string{"server": "x"}}, nil); !errors.As(err, &ce) || ce.Code != CodeBadRequest || !strings.Contains(ce.Message, "Password is required") {
+	if err := c.Call(t.Context(), "build_profile", BuildProfileParams{Protocol: profile.Trojan, Values: map[string]string{"server": "x"}}, nil); !errors.As(err, &ce) || ce.Code != profile.FormRequired || ce.Args["label"] != "Password" || !strings.Contains(ce.Message, "Password is required") {
 		t.Fatalf("missing field: %v", err)
 	}
 	if err := c.Call(t.Context(), "export_link", ProfileParams{}, nil); !errors.As(err, &ce) || ce.Code != CodeBadRequest {

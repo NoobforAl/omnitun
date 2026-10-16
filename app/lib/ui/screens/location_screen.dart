@@ -83,9 +83,11 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
         query.isEmpty ||
         p.name.toLowerCase().contains(query) ||
         p.server.toLowerCase().contains(query) ||
-        (g.code != null && (countryNames[g.code]?.toLowerCase().contains(query) ?? false));
+        (g.code != null &&
+            (context.countryName(g.code!).toLowerCase().contains(query) ||
+                (countryNames[g.code]?.toLowerCase().contains(query) ?? false)));
 
-    final groups = groupByCountry(profiles, countryOf, (c) => countryNames[c] ?? c);
+    final groups = groupByCountry(profiles, countryOf, context.countryName);
     final shown = [
       for (final g in groups)
         if (g.profiles.any((p) => matches(g, p))) g,
@@ -202,7 +204,7 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
     bool Function(CountryGroup, ProfileInfo) matches,
     bool searching,
   ) {
-    final name = g.code == null ? context.l10n.otherGroup : countryNames[g.code] ?? g.code!;
+    final name = g.code == null ? context.l10n.otherGroup : context.countryName(g.code!);
     final expanded = searching || _open.contains(g.code);
     final inCountry = g.code != null && choice == countryChoice(g.code!);
     final count = g.profiles.length;
@@ -375,8 +377,14 @@ class _CountryDialogState extends State<_CountryDialog> {
   Widget build(BuildContext context) {
     final q = _query.text.trim().toLowerCase();
     final entries =
-        countryNames.entries
-            .where((e) => q.isEmpty || e.value.toLowerCase().contains(q) || e.key.toLowerCase() == q)
+        [for (final code in countryNames.keys) MapEntry(code, context.countryName(code))]
+            .where(
+              (e) =>
+                  q.isEmpty ||
+                  e.value.toLowerCase().contains(q) ||
+                  countryNames[e.key]!.toLowerCase().contains(q) ||
+                  e.key.toLowerCase() == q,
+            )
             .toList()
           ..sort((a, b) => a.value.compareTo(b.value));
     return AlertDialog(

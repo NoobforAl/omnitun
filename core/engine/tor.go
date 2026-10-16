@@ -101,7 +101,7 @@ func (e *Engine) startTorLocked(p *profile.Profile, profiles []*profile.Profile,
 	name := e.name(p.ID)
 	e.logf("info", "starting Tor (%s)", name)
 	e.setState(State{Status: StatusStarting, Selected: p.ID, Progress: &Progress{
-		Stage: StageEngineStart, Percent: torPercentFrom, Profile: name, Detail: "Starting Tor",
+		Stage: StageEngineStart, Percent: torPercentFrom, Profile: name, Detail: "Starting Tor", DetailCode: DetailTorStarting,
 	}})
 
 	// Each Tor profile keeps its own directory cache. Guard state is dropped on
@@ -114,7 +114,7 @@ func (e *Engine) startTorLocked(p *profile.Profile, profiles []*profile.Profile,
 		var err error
 		for attempt := 1; attempt <= torAttempts; attempt++ {
 			if attempt > 1 {
-				e.torProgress(run, name, 0, fmt.Sprintf("Retrying Tor (%d/%d)", attempt, torAttempts))
+				e.torProgress(run, name, 0, Progress{Detail: fmt.Sprintf("Retrying Tor (%d/%d)", attempt, torAttempts), DetailCode: DetailTorRetry, DetailN: attempt, DetailM: torAttempts})
 				os.RemoveAll(filepath.Join(torDir, "state"))
 			}
 			actx, acancel := context.WithTimeout(ctx, torAttemptTimeout)
@@ -174,28 +174,29 @@ func (e *Engine) currentTor() *torRun {
 }
 
 // torProgress publishes Tor's bootstrap in the connection ring.
-func (e *Engine) torProgress(run *torRun, name string, percent int, detail string) {
+func (e *Engine) torProgress(run *torRun, name string, percent int, detail Progress) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.torRun != run || e.state.Status != StatusStarting {
 		return
 	}
 	s := e.state
-	s.Progress = &Progress{
-		Stage: StageEngineStart, Profile: name, Detail: detail,
-		Percent: torPercentFrom + (torPercentTo-torPercentFrom)*percent/100,
-	}
+	detail.Stage, detail.Profile = StageEngineStart, name
+	detail.Percent = torPercentFrom + (torPercentTo-torPercentFrom)*percent/100
+	s.Progress = &detail
 	e.setState(s)
 }
 
 // startTorOnce starts Tor and waits until it can carry a connection: its
 // bootstrap finishes and a test connection through a fresh circuit works.
 func (e *Engine) startTorOnce(ctx context.Context, run *torRun, dir string, bridges []string, name string) (*tor.Process, error) {
+	// Snowflake and the other transports log through the standard logger; only their problems reach the app log.
+	tor.SetTransportLog(func(line string) { e.logf("warn", "%s", line) })
 	proc, err := tor.Start(tor.Config{
 		DataDir: dir,
 		Bridges: bridges,
 		OnBootstrap: func(percent int, status string) {
-			e.torProgress(run, name, percent*9/10, fmt.Sprintf("Connecting to Tor %d%%", percent))
+			e.torProgress(run, name, percent*9/10, Progress{Detail: fmt.Sprintf("Connecting to Tor %d%%", percent), DetailCode: DetailTorBootstrap, DetailN: percent})
 		},
 		Logf: func(format string, args ...any) { e.logf("warn", format, args...) },
 	})
@@ -203,7 +204,7 @@ func (e *Engine) startTorOnce(ctx context.Context, run *torRun, dir string, brid
 		return nil, err
 	}
 	if err = proc.Ready(ctx); err == nil {
-		e.torProgress(run, name, 92, "Building a Tor circuit")
+		e.torProgress(run, name, 92, Progress{Detail: "Building a Tor circuit", DetailCode: DetailTorCircuit})
 		err = tor.CheckCircuit(ctx, proc.SocksAddr)
 	}
 	if err != nil {

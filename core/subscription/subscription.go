@@ -88,6 +88,19 @@ type Result struct {
 // ErrAuth is returned for 401/403 responses.
 var ErrAuth = errors.New("subscription authentication failed")
 
+// ErrTooLarge is returned for an answer over the size limit.
+var ErrTooLarge = errors.New("subscription is larger than 10 MB")
+
+// ErrBadURL is returned for an address that is not an http(s) URL.
+var ErrBadURL = errors.New("invalid subscription URL")
+
+// HTTPError is an answer other than 200 (401 and 403 are ErrAuth).
+type HTTPError struct{ Status int }
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("subscription server returned HTTP %d", e.Status)
+}
+
 // Fetch downloads and parses a subscription. rootCAs may be nil to use the
 // system pool (Android needs an explicit pool, see engine.Config.CertificateStore).
 func Fetch(ctx context.Context, req Request, rootCAs *x509.CertPool) (*Result, error) {
@@ -115,7 +128,7 @@ func FetchVia(ctx context.Context, req Request, rootCAs *x509.CertPool, dial Dia
 		return fetchNordVPN(ctx, u, req, rootCAs, dial)
 	}
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return nil, fmt.Errorf("invalid subscription URL %q", req.URL)
+		return nil, fmt.Errorf("%w %q", ErrBadURL, req.URL)
 	}
 	if req.Auth.Type == AuthQuery {
 		key := req.Auth.QueryKey
@@ -161,14 +174,14 @@ func FetchVia(ctx context.Context, req Request, rootCAs *x509.CertPool, dial Dia
 	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
 		return nil, fmt.Errorf("%w (HTTP %d)", ErrAuth, resp.StatusCode)
 	case resp.StatusCode != http.StatusOK:
-		return nil, fmt.Errorf("subscription server returned HTTP %d", resp.StatusCode)
+		return nil, &HTTPError{Status: resp.StatusCode}
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
 	if err != nil {
 		return nil, fmt.Errorf("read subscription: %w", err)
 	}
 	if len(body) > maxBody {
-		return nil, errors.New("subscription is larger than 10 MB")
+		return nil, ErrTooLarge
 	}
 
 	parsed, err := importer.Import(string(body))

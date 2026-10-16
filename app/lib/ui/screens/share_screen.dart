@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../engine/engine.dart';
+import '../../l10n/errors.dart';
 import '../../l10n/l10n.dart';
 import '../../state/providers.dart';
-import 'profile_editor_screen.dart';
 
 /// A server's share link as text and as a QR code, for another device.
 class ShareScreen extends ConsumerStatefulWidget {
@@ -38,7 +38,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  context.l10n.shareFailed(messageOf(snap.error!)),
+                  context.l10n.shareFailed(describeError(context.l10n, snap.error!)),
                   textAlign: TextAlign.center,
                 ),
               ),
