@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NoobforAl/omnitun/core/protocols"
 	"github.com/NoobforAl/omnitun/core/singbox"
 	"github.com/NoobforAl/omnitun/server/stats"
 	"github.com/NoobforAl/omnitun/server/store"
@@ -84,20 +85,23 @@ func SubscriptionHandler(s *store.Store) http.Handler {
 			http.Error(w, "account disabled or expired", http.StatusForbidden)
 			return
 		}
-		// /<path>/<token>/openvpn-tcp.ovpn: a single OpenVPN config file.
+		// /<path>/<token>/openvpn-tcp.ovpn, /wireguard.conf, ...: one config file.
 		if len(parts) == 3 {
-			proto, ok := strings.CutSuffix(parts[2], ".ovpn")
+			proto, ok := protocols.FileKeyByName(parts[2])
 			if !ok {
 				http.NotFound(w, r)
 				return
 			}
-			text, err := OVPN(st, user, proto)
+			name, text, err := File(st, user, proto)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusNotFound)
 				return
 			}
-			w.Header().Set("Content-Type", "application/x-openvpn-profile")
-			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", st.Server.Name+"-"+proto+".ovpn"))
+			w.Header().Set("Content-Type", "application/octet-stream")
+			if strings.HasSuffix(name, ".ovpn") {
+				w.Header().Set("Content-Type", "application/x-openvpn-profile")
+			}
+			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", name))
 			w.Header().Set("Cache-Control", "no-store")
 			io.WriteString(w, text)
 			return

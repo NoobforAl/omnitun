@@ -52,7 +52,7 @@ func (e errString) Error() string { return string(e) }
 // message the user can act on.
 func TestTorBridgeWithoutFingerprintIsReported(t *testing.T) {
 	var logs []string
-	e := New(Config{DataDir: t.TempDir(), OnLog: func(level, msg string) { logs = append(logs, level+" "+msg) }})
+	e := New(Config{DataDir: tempDir(t), OnLog: func(level, msg string) { logs = append(logs, level+" "+msg) }})
 	p := &profile.Profile{Name: "Tor", Protocol: profile.Tor, Tor: &profile.TorOpts{
 		Bridges: []string{"meek_lite 192.0.2.20:80 url=https://x.example front=y"},
 	}}
@@ -70,7 +70,7 @@ func TestTorBridgeWithoutFingerprintIsReported(t *testing.T) {
 // With failover on, a failing Tor profile must stop with an error instead of
 // quietly switching to a non-Tor profile.
 func TestTorDoesNotFailOverToOtherProfiles(t *testing.T) {
-	e := New(Config{DataDir: t.TempDir()})
+	e := New(Config{DataDir: tempDir(t)})
 	tp := &profile.Profile{Name: "Tor", Protocol: profile.Tor, Tor: &profile.TorOpts{Bridges: []string{"meek_lite 192.0.2.20:80 url=x"}}}
 	ss := &profile.Profile{Name: "SS", Protocol: profile.Shadowsocks, Server: "127.0.0.1", Port: 1, Method: "aes-128-gcm", Password: "x"}
 	tp.EnsureID()

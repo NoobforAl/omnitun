@@ -37,6 +37,7 @@ func Env(st *store.State, s *store.Store) protocols.Env {
 			CA: srv.OpenVPN.CA, ServerCert: srv.OpenVPN.ServerCert,
 			ServerKey: srv.OpenVPN.ServerKey, TLSCrypt: srv.OpenVPN.TLSCrypt,
 		},
+		WireGuard: wireGuardEnv(srv),
 	}
 	if data, err := os.ReadFile(env.CertPath); err == nil {
 		env.CertPEM = string(data)
@@ -83,7 +84,16 @@ func ACMEDir(s *store.Store) string { return s.Path("acme") }
 
 // Account maps a user to the credentials the protocols use.
 func Account(u *store.User) protocols.Account {
-	return protocols.Account{Name: u.Name, UUID: u.UUID, Password: u.Password, SSKey: u.SSKey}
+	return protocols.Account{
+		Name: u.Name, UUID: u.UUID, Password: u.Password, SSKey: u.SSKey,
+		WGPrivateKey: u.WGPrivateKey, WGPublicKey: u.WGPublicKey, WGAddress: u.WGAddress,
+	}
+}
+
+func wireGuardEnv(srv store.Server) protocols.WireGuard {
+	return protocols.WireGuard{
+		PrivateKey: srv.WireGuard.PrivateKey, PublicKey: srv.WireGuard.PublicKey, Address: store.WireGuardServerAddress(),
+	}
 }
 
 func accounts(users []*store.User) []protocols.Account {
@@ -140,25 +150,36 @@ func usesCertificate(st *store.State) bool {
 	return false
 }
 
-// OVPN returns a single-file OpenVPN client config for the user, with the
-// credentials inline (OpenVPN 2.6+, Omnitun). proto is store.OpenVPNUDP or store.OpenVPNTCP.
-func OVPN(st *store.State, u *store.User, proto string) (string, error) {
-	p := st.Server.Protocols[proto]
-	pr, ok := protocols.Get(proto)
-	if !store.IsOpenVPN(proto) || p == nil || !ok {
-		return "", fmt.Errorf("unknown OpenVPN protocol %q", proto)
-	}
-	if !p.Enabled {
-		return "", fmt.Errorf("%s is disabled (enable it with: proto enable %s)", proto, proto)
+// File returns the config file a user can download for a protocol (the
+// OpenVPN .ovpn, the WireGuard .conf): its name and content.
+func File(st *store.State, u *store.User, key string) (name, content string, err error) {
+	p := st.Server.Protocols[key]
+	pr, ok := protocols.Get(key)
+	if p == nil || !ok {
+		return "", "", fmt.Errorf("unknown protocol %q", key)
 	}
 	fp, ok := pr.(protocols.FileProtocol)
 	if !ok {
-		return "", fmt.Errorf("%s has no config file", proto)
+		return "", "", fmt.Errorf("%s has no config file", key)
 	}
-	_, content, err := fp.File(protocols.Env{
+	if !p.Enabled {
+		return "", "", fmt.Errorf("%s is disabled (enable it with: proto enable %s)", key, key)
+	}
+	env := protocols.Env{
 		Name: st.Server.Name, Host: st.Server.PublicHost,
-		OpenVPN: protocols.OpenVPN{CA: st.Server.OpenVPN.CA, TLSCrypt: st.Server.OpenVPN.TLSCrypt},
-	}, p.Port, Account(u))
+		OpenVPN:   protocols.OpenVPN{CA: st.Server.OpenVPN.CA, TLSCrypt: st.Server.OpenVPN.TLSCrypt},
+		WireGuard: wireGuardEnv(st.Server),
+	}
+	return fp.File(env, p.Port, Account(u))
+}
+
+// OVPN returns a user's OpenVPN client config (proto is store.OpenVPNUDP or
+// store.OpenVPNTCP), credentials inline (OpenVPN 2.6+, Omnitun).
+func OVPN(st *store.State, u *store.User, proto string) (string, error) {
+	if !store.IsOpenVPN(proto) {
+		return "", fmt.Errorf("unknown OpenVPN protocol %q", proto)
+	}
+	_, content, err := File(st, u, proto)
 	return content, err
 }
 
@@ -198,6 +219,7 @@ func Links(st *store.State, u *store.User) []Link {
 			PublicKey: st.Server.Reality.PublicKey, ShortID: st.Server.Reality.ShortID, Handshake: st.Server.Reality.Handshake,
 		},
 		SSServerKey: st.Server.SSServerKey,
+		WireGuard:   wireGuardEnv(st.Server),
 	}
 	var out []Link
 	for _, key := range store.AllProtocols {
@@ -219,15 +241,19 @@ func Links(st *store.State, u *store.User) []Link {
 	return out
 }
 
-// OVPNURL is where the user downloads the .ovpn file for proto, or "" if
-// subscriptions are disabled.
-func OVPNURL(st *store.State, u *store.User, proto string) string {
+// FileURL is where the user downloads a protocol's config file, or "" if
+// subscriptions are disabled or the protocol has no file.
+func FileURL(st *store.State, u *store.User, key string) string {
+	pr, ok := protocols.Get(key)
 	sub := SubscriptionURL(st, u)
-	if sub == "" {
+	if !ok || sub == "" || pr.Spec().FileExt == "" {
 		return ""
 	}
-	return sub + "/" + proto + ".ovpn"
+	return sub + "/" + key + pr.Spec().FileExt
 }
+
+// OVPNURL is where the user downloads the .ovpn file for proto.
+func OVPNURL(st *store.State, u *store.User, proto string) string { return FileURL(st, u, proto) }
 
 // SubscriptionURL is the user's subscription link, or "" if disabled.
 func SubscriptionURL(st *store.State, u *store.User) string {

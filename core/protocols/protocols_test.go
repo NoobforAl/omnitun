@@ -17,10 +17,14 @@ func testEnv() Env {
 		Reality:     Reality{PrivateKey: "priv", PublicKey: "pub", ShortID: "ab12", Handshake: "www.microsoft.com:443"},
 		SSServerKey: "c2VydmVyLWtleS0xMjM0NQ==",
 		OpenVPN:     OpenVPN{CA: "CA\n", ServerCert: "CERT", ServerKey: "KEY", TLSCrypt: "CRYPT\n"},
+		WireGuard:   WireGuard{PrivateKey: "c2VydmVyLXByaXZhdGU=", PublicKey: "c2VydmVyLXB1YmxpYw==", Address: "10.30.0.1/16"},
 	}
 }
 
-var alice = Account{Name: "alice", UUID: "b831381d-6324-4d53-ad4f-8cda48b30811", Password: "pw", SSKey: "YWxpY2Uta2V5LTEyMzQ1Ng=="}
+var alice = Account{
+	Name: "alice", UUID: "b831381d-6324-4d53-ad4f-8cda48b30811", Password: "pw", SSKey: "YWxpY2Uta2V5LTEyMzQ1Ng==",
+	WGPrivateKey: "YWxpY2UtcHJpdmF0ZQ==", WGPublicKey: "YWxpY2UtcHVibGlj", WGAddress: "10.30.0.2/32",
+}
 
 func TestRegistry(t *testing.T) {
 	keys := Keys()
@@ -59,7 +63,8 @@ func TestEveryProtocolIsCoherent(t *testing.T) {
 				t.Fatal("no inbound")
 			}
 			raw, err := json.Marshal(cfg)
-			if err != nil || !strings.Contains(string(raw), "alice") {
+			// Users appear by name, or (WireGuard peers) by public key.
+			if err != nil || !(strings.Contains(string(raw), "alice") || strings.Contains(string(raw), alice.WGPublicKey)) {
 				t.Fatalf("config has no user: %v %s", err, raw)
 			}
 

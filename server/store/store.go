@@ -36,6 +36,7 @@ const (
 	Naive        = "naive"     // NaiveProxy (HTTP/2 CONNECT over TLS)
 	OpenVPNUDP   = "openvpn-udp"
 	OpenVPNTCP   = "openvpn-tcp"
+	WireGuardKey = "wireguard"
 )
 
 // AllProtocols in display order (the order of the protocol registry).
@@ -118,6 +119,7 @@ type Server struct {
 	SelfSigned   bool         `json:"self_signed"`
 	Subscription Subscription `json:"subscription"`
 	OpenVPN      OpenVPN      `json:"openvpn"`
+	WireGuard    WireGuard    `json:"wireguard"`
 	API          API          `json:"api"`
 	ACME         ACME         `json:"acme"`
 }
@@ -142,6 +144,10 @@ type User struct {
 	// QuotaGB this month; the user can't connect until the month rolls over,
 	// the quota is raised or the usage is reset.
 	QuotaExceeded bool `json:"quota_exceeded,omitempty"`
+	// WireGuard identity and tunnel address of this user.
+	WGPrivateKey string `json:"wg_private_key,omitempty"`
+	WGPublicKey  string `json:"wg_public_key,omitempty"`
+	WGAddress    string `json:"wg_address,omitempty"`
 	// UsageResetAt asks the running server to restart this month's count.
 	UsageResetAt *time.Time `json:"usage_reset_at,omitempty"`
 }
@@ -363,6 +369,9 @@ func AddUser(st *State, name string) (*User, error) {
 		Enabled:   true,
 		CreatedAt: time.Now().UTC(),
 	}
+	if err := giveWireGuard(st, u); err != nil {
+		return nil, err
+	}
 	st.Users = append(st.Users, u)
 	return u, nil
 }
@@ -381,6 +390,8 @@ func DeleteUser(st *State, name string) error {
 // (e.g. after a link leaked); old links stop working.
 func ResetCredentials(u *User) {
 	u.UUID, u.Password, u.SSKey, u.SubToken = NewUUID(), RandomHex(16), RandomBase64(16), RandomHex(16)
+	// New WireGuard keys too; the tunnel address stays.
+	u.WGPrivateKey, u.WGPublicKey, _ = NewWireGuardKeys()
 }
 
 // RandomHex returns n random bytes as hex.

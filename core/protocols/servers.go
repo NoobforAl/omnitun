@@ -17,7 +17,7 @@ func init() {
 	// The order is the display and failover order: Reality first (needs no
 	// certificate and looks like a real site), UDP protocols last.
 	for _, p := range []Protocol{
-		vlessReality{}, shadowsocks{}, trojan{}, hysteria2{}, tuic{}, anyTLS{}, shadowTLS{}, naive{},
+		vlessReality{}, shadowsocks{}, trojan{}, hysteria2{}, tuic{}, anyTLS{}, shadowTLS{}, naive{}, wireguard{},
 		openvpn{udp: true}, openvpn{},
 	} {
 		register(p)
@@ -336,7 +336,7 @@ func (o openvpn) Spec() Spec {
 		Key: o.key(), Name: "OpenVPN " + strings.ToUpper(o.network()), Label: "OpenVPN " + strings.ToUpper(o.network()),
 		Profile:     profile.OpenVPN,
 		Description: "Works with any OpenVPN app (.ovpn file); users sign in with name and password.",
-		Transport:   o.network(), DefaultPort: 1194, ShareLink: false,
+		Transport:   o.network(), DefaultPort: 1194, ShareLink: false, FileExt: ".ovpn",
 	}
 }
 

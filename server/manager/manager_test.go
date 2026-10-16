@@ -324,3 +324,68 @@ func TestProtocolTrafficAndLogs(t *testing.T) {
 		}
 	}
 }
+
+func TestNotesCannotDriveTheTerminal(t *testing.T) {
+	m := newManager(t)
+	esc := string(rune(27))
+	u, err := m.AddUser(NewUser{Name: "alice", Note: "ok" + esc + "[2J" + esc + "]0;x" + string(rune(7)) + "‮ line\none"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range u.Note {
+		if r < ' ' || r == 0x202e || r == 0x7f {
+			t.Fatalf("note %q keeps %U", u.Note, r)
+		}
+	}
+	if !strings.HasPrefix(u.Note, "ok") || !strings.Contains(u.Note, "line one") {
+		t.Fatalf("readable text lost: %q", u.Note)
+	}
+	note := "a" + esc + "[31mb\r\nc"
+	u, _ = m.UpdateUser("alice", UserPatch{Note: &note})
+	if strings.ContainsRune(u.Note, 27) || strings.ContainsAny(u.Note, "\r\n") {
+		t.Fatalf("update kept control characters: %q", u.Note)
+	}
+}
+
+func TestConfigFiles(t *testing.T) {
+	m := newManager(t)
+	if _, err := m.AddUser(NewUser{Name: "alice"}); err != nil {
+		t.Fatal(err)
+	}
+	set, _ := m.Links("alice")
+	if set.Files["wireguard"] == "" || !strings.HasSuffix(set.Files["wireguard"], "/wireguard.conf") ||
+		!strings.HasSuffix(set.Files["openvpn-udp"], "/openvpn-udp.ovpn") || set.OVPN["openvpn-tcp"] == "" {
+		t.Fatalf("files = %v ovpn = %v", set.Files, set.OVPN)
+	}
+	found := false
+	for _, l := range set.Links {
+		found = found || (l.Protocol == "wireguard" && strings.HasPrefix(l.URL, "wireguard://"))
+	}
+	if !found {
+		t.Fatalf("no WireGuard share link in %v", set.Links)
+	}
+
+	name, conf, err := m.File("alice", "wireguard")
+	if err != nil || !strings.HasSuffix(name, "-wireguard.conf") {
+		t.Fatalf("file: %q %v", name, err)
+	}
+	for _, want := range []string{"[Interface]", "PrivateKey = ", "Address = 10.30.0.2/32", "[Peer]", "Endpoint = 203.0.113.7:51820", "AllowedIPs = 0.0.0.0/0, ::/0"} {
+		if !strings.Contains(conf, want) {
+			t.Errorf("the .conf lacks %q:\n%s", want, conf)
+		}
+	}
+	if _, ovpn, err := m.File("alice", "udp"); err != nil || !strings.Contains(ovpn, "remote 203.0.113.7") {
+		t.Fatalf("udp shorthand: %v", err)
+	}
+	if _, _, err := m.File("alice", "trojan"); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("a protocol without a file: %v", err)
+	}
+	if _, _, err := m.File("alice", "nope"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("unknown protocol: %v", err)
+	}
+	off := false
+	m.SetProtocol("wireguard", ProtocolPatch{Enabled: &off})
+	if _, _, err := m.File("alice", "wireguard"); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("a disabled protocol: %v", err)
+	}
+}

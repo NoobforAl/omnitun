@@ -179,6 +179,28 @@ func New(o Options) http.Handler {
 	})
 
 	huma.Register(a, huma.Operation{
+		OperationID: "get-user-file", Method: http.MethodGet, Path: "/api/v1/users/{name}/files/{proto}",
+		Summary: "The user's config file for a protocol (OpenVPN .ovpn, WireGuard .conf)", Security: bearer,
+	}, func(ctx context.Context, in *struct {
+		Name  string `path:"name" doc:"User name"`
+		Proto string `path:"proto" doc:"Protocol key, e.g. wireguard or openvpn-udp"`
+	}) (*struct {
+		ContentType        string `header:"Content-Type"`
+		ContentDisposition string `header:"Content-Disposition"`
+		Body               []byte
+	}, error) {
+		filename, text, err := m.File(in.Name, in.Proto)
+		if err != nil {
+			return nil, toHTTP(err)
+		}
+		return &struct {
+			ContentType        string `header:"Content-Type"`
+			ContentDisposition string `header:"Content-Disposition"`
+			Body               []byte
+		}{ContentType: "application/octet-stream", ContentDisposition: `attachment; filename="` + filename + `"`, Body: []byte(text)}, nil
+	})
+
+	huma.Register(a, huma.Operation{
 		OperationID: "get-user-ovpn", Method: http.MethodGet, Path: "/api/v1/users/{name}/ovpn/{proto}",
 		Summary: "The user's OpenVPN config file", Security: bearer,
 	}, func(ctx context.Context, in *struct {

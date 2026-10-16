@@ -37,7 +37,7 @@ func TestStartStopProxyMode(t *testing.T) {
 		t.Run(p.Name, func(t *testing.T) {
 			var states []Status
 			var mu sync.Mutex
-			e := New(Config{DataDir: t.TempDir(), SkipHandshake: true, OnState: func(s State) {
+			e := New(Config{DataDir: tempDir(t), SkipHandshake: true, OnState: func(s State) {
 				mu.Lock()
 				defer mu.Unlock()
 				if n := len(states); n == 0 || states[n-1] != s.Status {
@@ -68,7 +68,7 @@ func TestStartStopProxyMode(t *testing.T) {
 		})
 	}
 	// All profiles together form one selector/urltest group.
-	e := New(Config{DataDir: t.TempDir(), SkipHandshake: true})
+	e := New(Config{DataDir: tempDir(t), SkipHandshake: true})
 	if err := e.Start(profiles, singbox.Options{ListenPort: freePort(t), LogLevel: "error"}); err != nil {
 		t.Fatal(err)
 	}

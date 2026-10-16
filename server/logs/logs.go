@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 const (
@@ -23,6 +24,35 @@ const (
 )
 
 var ansi = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+// clean makes text safe to print on a terminal: colour codes are removed and
+// every control or invisible formatting character (ESC, BEL, backspace, the
+// C1 range, bidi overrides, zero-width marks) is dropped, so a user name or a
+// request header logged by the server cannot move the cursor, rewrite the
+// screen or disguise a line. With collapse, runs of whitespace become one space.
+func clean(s string, collapse bool) string {
+	s = ansi.ReplaceAllString(s, "")
+	var b strings.Builder
+	space := false
+	for _, r := range s {
+		switch {
+		case unicode.IsSpace(r) && !collapse:
+			if r == ' ' {
+				b.WriteByte(' ')
+			}
+		case unicode.IsSpace(r):
+			space = true
+		case unicode.IsControl(r) || unicode.Is(unicode.Cf, r):
+		default:
+			if space && b.Len() > 0 {
+				b.WriteByte(' ')
+			}
+			space = false
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
 
 // Log is an append-only log file.
 type Log struct {
@@ -72,8 +102,7 @@ func (l *Log) Write(level, message string) {
 	if l == nil {
 		return
 	}
-	message = strings.Join(strings.Fields(ansi.ReplaceAllString(message, "")), " ")
-	line := fmt.Sprintf("%s %-5s %s\n", l.now().Format("2006-01-02 15:04:05"), strings.ToUpper(level), message)
+	line := fmt.Sprintf("%s %-5s %s\n", l.now().Format("2006-01-02 15:04:05"), strings.ToUpper(clean(level, true)), clean(message, true))
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.openLocked() != nil {
@@ -117,7 +146,7 @@ func Tail(dir string, n int) ([]string, error) {
 		sc := bufio.NewScanner(bytes.NewReader(data))
 		sc.Buffer(make([]byte, 64<<10), 1<<20)
 		for sc.Scan() {
-			lines = append(lines, sc.Text())
+			lines = append(lines, clean(sc.Text(), false)) // also covers a log written by something else
 		}
 	}
 	if len(lines) > n {

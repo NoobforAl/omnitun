@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -235,15 +236,18 @@ func newUserCmd(o *options) *cobra.Command {
 
 func newLinkCmd(o *options) *cobra.Command {
 	var qr, subOnly bool
-	var ovpn string
+	var file, ovpn string
 	cmd := &cobra.Command{
 		Use:   "link <name>",
 		Short: "Show a user's share links, subscription URL and QR codes",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			m := o.manager()
-			if ovpn != "" {
-				text, err := m.OVPN(args[0], ovpn)
+			if file == "" && ovpn != "" {
+				file = "openvpn-" + ovpn
+			}
+			if file != "" {
+				_, text, err := m.File(args[0], file)
 				if err != nil {
 					return err
 				}
@@ -259,7 +263,8 @@ func newLinkCmd(o *options) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&qr, "qr", false, "show QR codes")
 	cmd.Flags().BoolVar(&subOnly, "sub", false, "only the subscription URL")
-	cmd.Flags().StringVar(&ovpn, "ovpn", "", "print the user's OpenVPN config file: udp or tcp")
+	cmd.Flags().StringVar(&file, "file", "", "print the user's config file for a protocol: wireguard, openvpn-udp or openvpn-tcp")
+	cmd.Flags().StringVar(&ovpn, "ovpn", "", "print the user's OpenVPN config file: udp or tcp (same as --file openvpn-udp|tcp)")
 	return cmd
 }
 
@@ -282,14 +287,16 @@ func printLinkSet(set *manager.LinkSet, qr, subOnly bool) {
 	for _, l := range set.Links {
 		show(l.Protocol+":", l.URL)
 	}
-	for _, proto := range []string{"openvpn-udp", "openvpn-tcp"} {
-		url, on := set.OVPN[proto]
-		switch {
-		case !on:
-		case url != "":
-			show(proto+" (.ovpn file for any OpenVPN app):", url)
-		default:
-			fmt.Printf("%s: link %s --ovpn %s > %s.ovpn\n\n", proto, set.User, strings.TrimPrefix(proto, "openvpn-"), proto)
+	keys := make([]string, 0, len(set.Files))
+	for key := range set.Files {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if url := set.Files[key]; url != "" {
+			show(key+" (config file download):", url)
+		} else {
+			fmt.Printf("%s: omnitun-server link %s --file %s > %s\n\n", key, set.User, key, key)
 		}
 	}
 }

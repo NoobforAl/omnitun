@@ -73,7 +73,7 @@ func TestEndToEndShadowsocks(t *testing.T) {
 		t.Fatal(err)
 	}
 	proxyPort := freePort(t)
-	e := New(Config{DataDir: t.TempDir(), CertificateStore: "mozilla"})
+	e := New(Config{DataDir: tempDir(t), CertificateStore: "mozilla"})
 	err = e.Start(res.Profiles, singbox.Options{
 		ListenPort:   proxyPort,
 		LogLevel:     "error",

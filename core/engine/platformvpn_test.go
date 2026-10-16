@@ -46,7 +46,7 @@ func TestPlatformVPN(t *testing.T) {
 	fp := &fakePlatform{}
 	var mu sync.Mutex
 	var last State
-	e := New(Config{DataDir: t.TempDir(), PlatformVPN: fp, SkipHandshake: true, OnState: func(s State) {
+	e := New(Config{DataDir: tempDir(t), PlatformVPN: fp, SkipHandshake: true, OnState: func(s State) {
 		mu.Lock()
 		last = s
 		mu.Unlock()

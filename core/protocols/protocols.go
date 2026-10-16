@@ -46,8 +46,11 @@ type Spec struct {
 	// NeedsCertificate marks protocols that use the server's TLS certificate.
 	NeedsCertificate bool `json:"needs_certificate"`
 	// ShareLink is false for protocols that travel as a config file (OpenVPN).
-	ShareLink bool     `json:"share_link"`
-	Options   []Option `json:"options,omitempty"`
+	ShareLink bool `json:"share_link"`
+	// FileExt is the extension of the config file users can download (".ovpn",
+	// ".conf"); empty when the protocol has none.
+	FileExt string   `json:"file_ext,omitempty"`
+	Options []Option `json:"options,omitempty"`
 }
 
 // Reality is the VLESS+Reality key material and the site it impersonates.
@@ -80,17 +83,32 @@ type Env struct {
 	// SSServerKey is the Shadowsocks-2022 server key (base64).
 	SSServerKey string
 	OpenVPN     OpenVPN
+	WireGuard   WireGuard
 }
 
 // Account is one user's credentials; every protocol uses the ones it needs.
 type Account struct {
 	Name, UUID, Password, SSKey string
+	// WireGuard key pair (base64) and tunnel address ("10.30.0.2/32").
+	WGPrivateKey, WGPublicKey, WGAddress string
 }
 
 // Config is the sing-box configuration a protocol adds to the server.
 type Config struct {
 	Inbounds  []map[string]any
 	Endpoints []map[string]any
+}
+
+// FileKeyByName finds the protocol that serves a download name such as
+// "openvpn-tcp.ovpn" or "wireguard.conf".
+func FileKeyByName(name string) (string, bool) {
+	for _, p := range registry {
+		s := p.Spec()
+		if s.FileExt != "" && name == s.Key+s.FileExt {
+			return s.Key, true
+		}
+	}
+	return "", false
 }
 
 // Protocol is implemented once per protocol.

@@ -73,3 +73,34 @@ func TestRotationKeepsTheNewestLines(t *testing.T) {
 		t.Fatalf("got %d lines", len(many))
 	}
 }
+
+// A name or header a client controls must not be able to drive the terminal
+// of whoever reads the log.
+func TestControlCharactersAreRemoved(t *testing.T) {
+	dir := tempDir(t)
+	l := Open(dir)
+	esc := string(rune(27))
+	hostile := "login failed for " + esc + "[2J" + esc + "]0;owned" + string(rune(7)) + " user\x08\x08\x08root" +
+		"‮ gnp.exe " + "a​b " + string(rune(0x9b)) + "31m"
+	l.Write("info", hostile)
+	l.Close()
+	lines, _ := Tail(dir, 1)
+	if len(lines) != 1 {
+		t.Fatalf("lines = %q", lines)
+	}
+	for _, r := range lines[0] {
+		if r < ' ' || r == 0x7f || (r >= 0x80 && r <= 0x9f) || r == 0x202e || r == 0x200b {
+			t.Fatalf("control character %U survived: %q", r, lines[0])
+		}
+	}
+	if !strings.Contains(lines[0], "login failed for") || !strings.Contains(lines[0], "root") {
+		t.Fatalf("the readable text was lost: %q", lines[0])
+	}
+
+	// A file written by something else is cleaned when read.
+	os.WriteFile(l.path(), []byte("2026-01-01 00:00:00 INFO  "+esc+"[31mred"+esc+"[0m\n2026-01-01 00:00:01 INFO  "+esc+"[2Jwipe\n"), 0o600)
+	lines, _ = Tail(dir, 5)
+	if len(lines) != 2 || strings.ContainsRune(lines[0]+lines[1], 27) {
+		t.Fatalf("read-side cleaning failed: %q", lines)
+	}
+}

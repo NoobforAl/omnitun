@@ -22,7 +22,7 @@ func TestLiveLatency(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := New(Config{DataDir: t.TempDir(), CertificateStore: "mozilla", OnLog: func(l, m string) { t.Log(l, m) }})
+	e := New(Config{DataDir: tempDir(t), CertificateStore: "mozilla", OnLog: func(l, m string) { t.Log(l, m) }})
 	results, err := e.TestLatency(t.Context(), res.Profiles, os.Getenv("OMNITUN_LIVE_URL"))
 	if err != nil {
 		t.Fatal(err)
@@ -45,7 +45,7 @@ func TestLiveNetCheck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := New(Config{DataDir: t.TempDir(), SkipHandshake: true, OnLog: func(l, m string) { t.Log(l, m) }})
+	e := New(Config{DataDir: tempDir(t), SkipHandshake: true, OnLog: func(l, m string) { t.Log(l, m) }})
 	if err := e.Start(res.Profiles, singbox.Options{LogLevel: "error"}); err != nil {
 		t.Fatal(err)
 	}

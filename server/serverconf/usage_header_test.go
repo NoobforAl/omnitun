@@ -44,3 +44,33 @@ func TestSubscriptionUserinfoHasUsage(t *testing.T) {
 		}
 	}
 }
+
+func TestSubscriptionServesConfigFiles(t *testing.T) {
+	s := store.Open(t.TempDir())
+	if _, err := store.Init(s, store.InitOptions{PublicHost: "203.0.113.7"}); err != nil {
+		t.Fatal(err)
+	}
+	var token, path string
+	s.Update(func(st *store.State) error {
+		u, err := store.AddUser(st, "alice")
+		token, path = u.SubToken, st.Server.Subscription.Path
+		return err
+	})
+	get := func(file string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		SubscriptionHandler(s).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/"+path+"/"+token+"/"+file, nil))
+		return rec
+	}
+	if rec := get("wireguard.conf"); rec.Code != 200 || !strings.Contains(rec.Body.String(), "[Interface]") ||
+		!strings.Contains(rec.Header().Get("Content-Disposition"), "wireguard.conf") {
+		t.Fatalf("wireguard.conf: %d %q %v", rec.Code, rec.Body.String(), rec.Header())
+	}
+	if rec := get("openvpn-udp.ovpn"); rec.Code != 200 || !strings.Contains(rec.Body.String(), "auth-user-pass") {
+		t.Fatalf("openvpn-udp.ovpn: %d", rec.Code)
+	}
+	for _, bad := range []string{"trojan.conf", "wireguard.ovpn", "wireguard", "../state.json"} {
+		if rec := get(bad); rec.Code != 404 {
+			t.Errorf("%s -> %d, want 404", bad, rec.Code)
+		}
+	}
+}

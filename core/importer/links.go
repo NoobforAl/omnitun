@@ -315,6 +315,9 @@ func parseWireGuardLink(link string) (*profile.Profile, error) {
 		Address:       splitList(firstNonEmpty(q.Get("address"), q.Get("ip"))),
 	}
 	wg.MTU, _ = strconv.Atoi(q.Get("mtu"))
+	wg.AllowedIPs = splitList(firstNonEmpty(q.Get("allowedips"), q.Get("allowed_ips")))
+	wg.DNS = splitList(q.Get("dns"))
+	wg.Keepalive, _ = strconv.Atoi(firstNonEmpty(q.Get("keepalive"), q.Get("persistent_keepalive")))
 	for _, r := range splitList(q.Get("reserved")) {
 		n, err := strconv.Atoi(r)
 		if err != nil {

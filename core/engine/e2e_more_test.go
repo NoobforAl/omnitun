@@ -44,7 +44,7 @@ func checkThrough(t *testing.T, link string) {
 	}
 	p := res.Profiles[0]
 	proxyPort := freePort(t)
-	e := New(Config{DataDir: t.TempDir()})
+	e := New(Config{DataDir: tempDir(t)})
 	if err := e.Start(res.Profiles, singbox.Options{
 		ListenPort: proxyPort, LogLevel: "error", Selected: p.ID,
 		TestURL: web.URL + "/probe", ProxyPrivate: true,
@@ -196,7 +196,7 @@ func TestSSHRejectsWrongHostKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := New(Config{DataDir: t.TempDir()})
+	e := New(Config{DataDir: tempDir(t)})
 	if err := e.Start(res.Profiles, singbox.Options{
 		ListenPort: freePort(t), LogLevel: "error", Selected: res.Profiles[0].ID, TestURL: "http://127.0.0.1:1/",
 	}); err != nil {

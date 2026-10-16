@@ -50,6 +50,7 @@ func TestExportRoundTrip(t *testing.T) {
 		"sstp verified":  "sstp://alice:pw@203.0.113.7:443?insecure=0#sstp2",
 		"ikev2 psk":      "ikev2://203.0.113.7:4500?auth=psk&psk=secret&remote_id=server.test&tcp=1#ikev2",
 		"ikev2 eap":      "ikev2://bob:eap-secret@203.0.113.7:500?auth=eap#eap",
+		"wireguard":      "wireguard://UFJJVkFURUtFWQ%3D%3D@203.0.113.7:51820?publickey=UEVFUlBVQg%3D%3D&address=10.30.0.2%2F32&allowedips=0.0.0.0%2F0%2C%3A%3A%2F0&dns=1.1.1.1&mtu=1380&keepalive=25&reserved=1%2C2%2C3#wg",
 		"tor":            "tor://",
 		"tor snowflake":  "tor://snowflake",
 		"vmess":          "",
@@ -77,7 +78,7 @@ func TestExportRoundTrip(t *testing.T) {
 }
 
 func TestExportRejectsConfigFileProtocols(t *testing.T) {
-	for _, proto := range []string{profile.WireGuard, profile.AmneziaWG, profile.OpenVPN} {
+	for _, proto := range []string{profile.AmneziaWG, profile.OpenVPN} {
 		if _, err := Export(&profile.Profile{Protocol: proto}); !errors.Is(err, ErrNoLink) {
 			t.Errorf("%s: err = %v", proto, err)
 		}

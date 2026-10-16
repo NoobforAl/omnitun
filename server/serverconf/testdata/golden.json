@@ -3,6 +3,26 @@
     "endpoints": [
       {
         "address": [
+          "10.30.0.1/16"
+        ],
+        "listen_port": 51820,
+        "mtu": 1380,
+        "name": "wg-server",
+        "peers": [
+          {
+            "allowed_ips": [
+              "10.30.0.2/32"
+            ],
+            "public_key": "YWxpY2UtcHVibGlj"
+          }
+        ],
+        "private_key": "c2VydmVyLXByaXZhdGU=",
+        "system": false,
+        "tag": "wireguard",
+        "type": "wireguard"
+      },
+      {
+        "address": [
           "10.18.0.1/16"
         ],
         "listen": "::",
@@ -277,11 +297,36 @@
     {
       "protocol": "naive",
       "url": "naive+https://alice:alicepassword@203.0.113.7:8447/#Lab%20Naive"
+    },
+    {
+      "protocol": "wireguard",
+      "url": "wireguard://YWxpY2UtcHJpdmF0ZQ==@203.0.113.7:51820?publickey=c2VydmVyLXB1YmxpYw%3D%3D\u0026address=10.30.0.2%2F32\u0026allowedips=0.0.0.0%2F0%2C%3A%3A%2F0\u0026dns=1.1.1.1%2C8.8.8.8\u0026mtu=1380\u0026keepalive=25#Lab%20WireGuard"
     }
   ],
   "ovpn_udp": "# Lab (openvpn-udp) for alice\nclient\ndev tun\nproto udp\nremote 203.0.113.7 1194\nnobind\npersist-key\npersist-tun\nresolv-retry infinite\nremote-cert-tls server\ndata-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305\nverb 3\nauth-user-pass\n\u003cauth-user-pass\u003e\nalice\nalicepassword\n\u003c/auth-user-pass\u003e\n\u003cca\u003e\nCA-PEM\n\u003c/ca\u003e\n\u003ctls-crypt\u003e\nTLS-CRYPT\n\u003c/tls-crypt\u003e\n",
   "subscription": {
     "endpoints": [
+      {
+        "address": [
+          "10.30.0.2/32"
+        ],
+        "mtu": 1380,
+        "peers": [
+          {
+            "address": "203.0.113.7",
+            "allowed_ips": [
+              "0.0.0.0/0",
+              "::/0"
+            ],
+            "persistent_keepalive_interval": 25,
+            "port": 51820,
+            "public_key": "c2VydmVyLXB1YmxpYw=="
+          }
+        ],
+        "private_key": "YWxpY2UtcHJpdmF0ZQ==",
+        "tag": "Lab WireGuard",
+        "type": "wireguard"
+      },
       {
         "data_ciphers": [
           "AES-256-GCM",

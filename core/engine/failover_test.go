@@ -83,7 +83,7 @@ func TestFailoverSwitchesToWorkingProfile(t *testing.T) {
 			dead, live, testURL := failoverSetup(t)
 			var log stateLog
 			e := New(Config{
-				DataDir:       t.TempDir(),
+				DataDir:       tempDir(t),
 				OnState:       log.add,
 				NetCheck:      func(context.Context, netcheck.DialFunc) error { return nil },
 				SkipHandshake: skipHandshake,
@@ -111,7 +111,7 @@ func TestFailoverSwitchesToWorkingProfile(t *testing.T) {
 func TestHandshakeProgress(t *testing.T) {
 	_, live, testURL := failoverSetup(t)
 	var log stateLog
-	e := New(Config{DataDir: t.TempDir(), OnState: log.add})
+	e := New(Config{DataDir: tempDir(t), OnState: log.add})
 	if err := e.Start(live.AsSlice(), singbox.Options{
 		ListenPort: freePort(t), LogLevel: "error", ProxyPrivate: true, Selected: live.ID, TestURL: testURL,
 	}); err != nil {
@@ -142,7 +142,7 @@ func TestHandshakeFailureStopsTunnel(t *testing.T) {
 	dead, _, testURL := failoverSetup(t)
 	var log stateLog
 	e := New(Config{
-		DataDir:  t.TempDir(),
+		DataDir:  tempDir(t),
 		OnState:  log.add,
 		NetCheck: func(context.Context, netcheck.DialFunc) error { return nil },
 	})
@@ -167,7 +167,7 @@ func TestFailoverWaitsWhenOffline(t *testing.T) {
 	dead, live, testURL := failoverSetup(t)
 	var log stateLog
 	e := New(Config{
-		DataDir:       t.TempDir(),
+		DataDir:       tempDir(t),
 		OnState:       log.add,
 		NetCheck:      func(context.Context, netcheck.DialFunc) error { return errors.New("offline") },
 		SkipHandshake: true, // test the running-tunnel health check, not the connect handshake
@@ -202,7 +202,7 @@ func TestRotateAfter(t *testing.T) {
 // must not override the profile chosen for this run.
 func TestSelectionNotOverriddenByCache(t *testing.T) {
 	dead, live, testURL := failoverSetup(t)
-	dir := t.TempDir()
+	dir := tempDir(t)
 	e := New(Config{DataDir: dir, SkipHandshake: true})
 	opts := singbox.Options{ListenPort: freePort(t), LogLevel: "error", ProxyPrivate: true, TestURL: testURL}
 

@@ -26,10 +26,12 @@ func goldenState(t *testing.T) (*store.State, *store.Store) {
 			CertFile:    "tls.crt", KeyFile: "tls.key", SelfSigned: true,
 			Subscription: store.Subscription{Enabled: true, Listen: "0.0.0.0", Port: 2096, Path: "subpath"},
 			OpenVPN:      store.OpenVPN{CA: "CA-PEM\n", ServerCert: "SERVER-CERT", ServerKey: "SERVER-KEY", TLSCrypt: "TLS-CRYPT\n"},
+			WireGuard:    store.WireGuard{PrivateKey: "c2VydmVyLXByaXZhdGU=", PublicKey: "c2VydmVyLXB1YmxpYw=="},
 		},
 		Users: []*store.User{{
 			Name: "alice", UUID: "b831381d-6324-4d53-ad4f-8cda48b30811", Password: "alicepassword",
 			SSKey: "YWxpY2Uta2V5LTEyMzQ1Ng==", SubToken: "alicetoken", Enabled: true,
+			WGPrivateKey: "YWxpY2UtcHJpdmF0ZQ==", WGPublicKey: "YWxpY2UtcHVibGlj", WGAddress: "10.30.0.2/32",
 			CreatedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		}},
 	}

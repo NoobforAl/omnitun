@@ -18,8 +18,8 @@ import (
 	"github.com/NoobforAl/omnitun/core/profile"
 )
 
-// ErrNoLink means the protocol has no share-link format (WireGuard and
-// OpenVPN travel as config files).
+// ErrNoLink means the protocol has no share-link format (OpenVPN and
+// AmneziaWG travel as config files).
 var ErrNoLink = errors.New("this protocol has no share link; export it as a config file")
 
 // Export returns the share link for p.
@@ -51,6 +51,8 @@ func Export(p *profile.Profile) (string, error) {
 		return sstp(p), nil
 	case profile.Tor:
 		return tor(p), nil
+	case profile.WireGuard:
+		return wireguard(p)
 	}
 	return "", fmt.Errorf("%w (%s)", ErrNoLink, p.Protocol)
 }
@@ -361,4 +363,31 @@ func orDefault(s, d string) string {
 		return d
 	}
 	return s
+}
+
+func wireguard(p *profile.Profile) (string, error) {
+	g := p.WireGuard
+	if g == nil || g.PrivateKey == "" {
+		return "", errors.New("the WireGuard profile has no private key")
+	}
+	q := &query{}
+	q.add("publickey", g.PeerPublicKey)
+	q.add("presharedkey", g.PreSharedKey)
+	q.add("address", strings.Join(g.Address, ","))
+	q.add("allowedips", strings.Join(g.AllowedIPs, ","))
+	q.add("dns", strings.Join(g.DNS, ","))
+	if g.MTU > 0 {
+		q.add("mtu", strconv.Itoa(g.MTU))
+	}
+	if g.Keepalive > 0 {
+		q.add("keepalive", strconv.Itoa(g.Keepalive))
+	}
+	if len(g.Reserved) > 0 {
+		parts := make([]string, len(g.Reserved))
+		for i, r := range g.Reserved {
+			parts[i] = strconv.Itoa(r)
+		}
+		q.add("reserved", strings.Join(parts, ","))
+	}
+	return build("wireguard", url.PathEscape(g.PrivateKey), hostPort(p), "", q, p.Name), nil
 }

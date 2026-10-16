@@ -108,6 +108,21 @@ func (st *State) migrate() (bool, error) {
 			changed = true
 		}
 	}
+	if st.Server.WireGuard.PrivateKey == "" {
+		priv, pub, err := NewWireGuardKeys()
+		if err != nil {
+			return false, err
+		}
+		st.Server.WireGuard, changed = WireGuard{PrivateKey: priv, PublicKey: pub}, true
+	}
+	for _, u := range st.Users {
+		if u.WGPrivateKey == "" || u.WGAddress == "" {
+			if err := giveWireGuard(st, u); err != nil {
+				return false, err
+			}
+			changed = true
+		}
+	}
 	if st.Server.API.Token == "" {
 		st.Server.API = API{Listen: "127.0.0.1", Port: DefaultAPIPort, Token: RandomHex(24)}
 		changed = true

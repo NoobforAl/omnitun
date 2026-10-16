@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/NoobforAl/omnitun/core/protocols"
 	"github.com/NoobforAl/omnitun/server/logs"
@@ -121,6 +122,10 @@ type LinkSet struct {
 	// OVPN lists OpenVPN config files: protocol key to download URL (empty
 	// when subscriptions are off; use OVPN to get the file itself).
 	OVPN map[string]string `json:"ovpn,omitempty"`
+	// Files lists every downloadable config file (OpenVPN .ovpn, WireGuard
+	// .conf): protocol key to download URL (empty when subscriptions are off;
+	// use File to get the content itself).
+	Files map[string]string `json:"files,omitempty"`
 }
 
 // InitOptions configures a new server.
@@ -384,7 +389,7 @@ func (m *Manager) AddUser(n NewUser) (*UserInfo, error) {
 			t := m.Now().AddDate(0, 0, n.Days).UTC()
 			u.ExpiresAt = &t
 		}
-		u.QuotaGB, u.Note = n.QuotaGB, n.Note
+		u.QuotaGB, u.Note = n.QuotaGB, plainText(n.Note)
 		out = userInfo(u, m.Now(), stats.Snapshot{})
 		return nil
 	})
@@ -433,7 +438,7 @@ func (m *Manager) UpdateUser(name string, p UserPatch) (*UserInfo, error) {
 			u.QuotaExceeded = u.QuotaGB > 0 && used >= u.QuotaGB*stats.GiB
 		}
 		if p.Note != nil {
-			u.Note = *p.Note
+			u.Note = plainText(*p.Note)
 		}
 		out = userInfo(u, m.Now(), snap)
 		return nil
@@ -509,15 +514,49 @@ func (m *Manager) Links(name string) (*LinkSet, error) {
 	for _, l := range serverconf.Links(st, u) {
 		set.Links = append(set.Links, Link{Protocol: l.Protocol, URL: l.URL})
 	}
-	for _, proto := range []string{store.OpenVPNUDP, store.OpenVPNTCP} {
-		if p := st.Server.Protocols[proto]; p != nil && p.Enabled {
+	for _, spec := range protocols.Specs() {
+		if p := st.Server.Protocols[spec.Key]; spec.FileExt == "" || p == nil || !p.Enabled {
+			continue
+		}
+		if set.Files == nil {
+			set.Files = map[string]string{}
+		}
+		set.Files[spec.Key] = serverconf.FileURL(st, u, spec.Key)
+		if store.IsOpenVPN(spec.Key) {
 			if set.OVPN == nil {
 				set.OVPN = map[string]string{}
 			}
-			set.OVPN[proto] = serverconf.OVPNURL(st, u, proto)
+			set.OVPN[spec.Key] = set.Files[spec.Key]
 		}
 	}
 	return set, nil
+}
+
+// File returns a user's config file for a protocol: its suggested name and
+// content. proto is a protocol key ("wireguard", "openvpn-udp"); "udp" and
+// "tcp" mean the OpenVPN variants.
+func (m *Manager) File(name, proto string) (filename, content string, err error) {
+	st, err := m.Store.Load()
+	if err != nil {
+		return "", "", err
+	}
+	u := st.User(name)
+	if u == nil {
+		return "", "", notFound("no user %q", name)
+	}
+	if proto == "udp" || proto == "tcp" {
+		proto = "openvpn-" + proto
+	}
+	if p, ok := protocols.Get(proto); !ok {
+		return "", "", notFound("unknown protocol %q", proto)
+	} else if p.Spec().FileExt == "" {
+		return "", "", invalid("%s has no config file; use its share link", proto)
+	}
+	filename, content, err = serverconf.File(st, u, proto)
+	if err != nil {
+		return "", "", invalid("%v", err)
+	}
+	return filename, content, nil
 }
 
 // OVPN returns the user's OpenVPN config file for proto ("openvpn-udp" or
@@ -614,4 +653,21 @@ func (m *Manager) Logs(lines int) ([]string, error) {
 		return nil, invalid("lines must be between 1 and 5000")
 	}
 	return logs.Tail(m.Store.Dir, lines)
+}
+
+// plainText drops control and invisible formatting characters from free text
+// that the CLI and the TUI print later (a note cannot move the terminal's
+// cursor or hide itself); line breaks and tabs become spaces.
+func plainText(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case r == '\n' || r == '\r' || r == '\t':
+			b.WriteByte(' ')
+		case unicode.IsControl(r) || unicode.Is(unicode.Cf, r):
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return strings.TrimSpace(b.String())
 }

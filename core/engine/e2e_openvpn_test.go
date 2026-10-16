@@ -228,7 +228,7 @@ func TestEndToEndOpenVPN(t *testing.T) {
 
 			proxyPort := freePort(t)
 			var running atomic.Bool
-			e := New(Config{DataDir: t.TempDir(), OnState: func(s State) {
+			e := New(Config{DataDir: tempDir(t), OnState: func(s State) {
 				if s.Status == StatusRunning {
 					running.Store(true)
 				}

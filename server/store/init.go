@@ -74,6 +74,11 @@ func Init(s *Store, opts InitOptions) (*State, error) {
 		},
 	}
 	st.Server.API = API{Listen: "127.0.0.1", Port: DefaultAPIPort, Token: RandomHex(24)}
+	wgPriv, wgPub, err := NewWireGuardKeys()
+	if err != nil {
+		return nil, err
+	}
+	st.Server.WireGuard = WireGuard{PrivateKey: wgPriv, PublicKey: wgPub}
 	if st.Server.OpenVPN, err = NewOpenVPN(opts.Name); err != nil {
 		return nil, err
 	}
