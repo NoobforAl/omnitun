@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -57,5 +58,33 @@ func TestRenewSelfSignedCert(t *testing.T) {
 	}
 	if renewed, _ := RenewSelfSignedCert(s, st); renewed {
 		t.Fatal("fresh certificate renewed again")
+	}
+}
+
+// Updates from several goroutines (standing in for the CLI, the API and the
+// running server) must not lose each other's changes.
+func TestConcurrentUpdatesKeepEverything(t *testing.T) {
+	s := Open(t.TempDir())
+	if _, err := Init(s, InitOptions{PublicHost: "203.0.113.7"}); err != nil {
+		t.Fatal(err)
+	}
+	const n = 12
+	errs := make(chan error, n)
+	for i := range n {
+		go func() {
+			errs <- s.Update(func(st *State) error {
+				_, err := AddUser(st, fmt.Sprintf("user%d", i))
+				return err
+			})
+		}()
+	}
+	for range n {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+	}
+	st, err := s.Load()
+	if err != nil || len(st.Users) != n {
+		t.Fatalf("users = %d, want %d (err %v)", len(st.Users), n, err)
 	}
 }

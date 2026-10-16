@@ -5,6 +5,7 @@
 package store
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -15,6 +16,8 @@ import (
 	"regexp"
 	"slices"
 	"time"
+
+	"github.com/gofrs/flock"
 )
 
 const fileName = "state.json"
@@ -207,27 +210,73 @@ func (s *Store) Size() int64 {
 
 // Load reads the state.
 func (s *Store) Load() (*State, error) {
-	data, err := os.ReadFile(s.path())
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, ErrNotInitialized
-	}
-	if err != nil {
-		return nil, err
-	}
-	var st State
-	if err := json.Unmarshal(data, &st); err != nil {
-		return nil, fmt.Errorf("read %s: %w", s.path(), err)
-	}
-	changed, err := st.migrate()
+	st, changed, err := s.read()
 	if err != nil {
 		return nil, err
 	}
 	if changed {
-		if err := s.Save(&st); err != nil {
+		// Persist the migration under the lock, from a fresh read: another
+		// process may have written the file meanwhile.
+		err := s.withLock(func() error {
+			fresh, changed, err := s.read()
+			if err != nil {
+				return err
+			}
+			st = fresh
+			if changed {
+				return s.Save(st)
+			}
+			return nil
+		})
+		if err != nil {
 			return nil, err
 		}
 	}
-	return &st, nil
+	return st, nil
+}
+
+// read parses the state file and migrates it in memory.
+func (s *Store) read() (*State, bool, error) {
+	data, err := os.ReadFile(s.path())
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, ErrNotInitialized
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	var st State
+	if err := json.Unmarshal(data, &st); err != nil {
+		return nil, false, fmt.Errorf("read %s: %w", s.path(), err)
+	}
+	changed, err := st.migrate()
+	if err != nil {
+		return nil, false, err
+	}
+	return &st, changed, nil
+}
+
+// lockTimeout is how long a writer waits for another one (CLI, TUI, API or
+// the running server) to finish its update.
+const lockTimeout = 10 * time.Second
+
+// withLock runs f holding the data directory's exclusive write lock, which
+// works across processes, so two updates can't overwrite each other.
+func (s *Store) withLock(f func() error) error {
+	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
+		return err
+	}
+	lock := flock.New(filepath.Join(s.Dir, fileName+".lock"))
+	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
+	defer cancel()
+	ok, err := lock.TryLockContext(ctx, 20*time.Millisecond)
+	if err != nil {
+		return fmt.Errorf("lock %s: %w", s.Dir, err)
+	}
+	if !ok {
+		return fmt.Errorf("another omnitun-server command is writing to %s; try again", s.Dir)
+	}
+	defer lock.Unlock()
+	return f()
 }
 
 // Save writes the state atomically, readable only by the owner (it holds keys).
@@ -254,16 +303,18 @@ func (s *Store) Save(st *State) error {
 	}
 }
 
-// Update loads, applies f and saves.
+// Update loads, applies f and saves, holding the write lock throughout.
 func (s *Store) Update(f func(*State) error) error {
-	st, err := s.Load()
-	if err != nil {
-		return err
-	}
-	if err := f(st); err != nil {
-		return err
-	}
-	return s.Save(st)
+	return s.withLock(func() error {
+		st, _, err := s.read()
+		if err != nil {
+			return err
+		}
+		if err := f(st); err != nil {
+			return err
+		}
+		return s.Save(st)
+	})
 }
 
 var validName = regexp.MustCompile(`^[A-Za-z0-9._-]{1,32}$`)

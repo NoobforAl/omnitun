@@ -5,12 +5,31 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NoobforAl/omnitun/server/manager"
 	"github.com/NoobforAl/omnitun/server/store"
 )
+
+// tempDir is t.TempDir with a cleanup that retries: on Windows a virus
+// scanner or a just-released file lock can briefly keep a file open, which
+// fails t.TempDir's own cleanup.
+func tempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "omnitun-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for i := 0; i < 40 && os.RemoveAll(dir) != nil; i++ {
+			time.Sleep(50 * time.Millisecond)
+		}
+	})
+	return dir
+}
 
 const token = "test-token"
 
@@ -22,7 +41,7 @@ type client struct {
 
 func newClient(t *testing.T) *client {
 	t.Helper()
-	m := manager.New(store.Open(t.TempDir()))
+	m := manager.New(store.Open(tempDir(t)))
 	if _, err := m.Init(manager.InitOptions{PublicHost: "203.0.113.7"}); err != nil {
 		t.Fatal(err)
 	}
@@ -159,6 +178,21 @@ func TestProtocolsAndServer(t *testing.T) {
 	}
 }
 
+func TestBackupDownload(t *testing.T) {
+	c := newClient(t)
+	if status, _ := c.do("GET", "/api/v1/backup", nil, ""); status != 401 {
+		t.Fatalf("backup without a token = %d", status)
+	}
+	data := c.ok("GET", "/api/v1/backup", nil, 200)
+	dst := manager.New(store.Open(tempDir(t)))
+	if err := dst.Restore(bytes.NewReader(data), false); err != nil {
+		t.Fatalf("the downloaded backup does not restore: %v", err)
+	}
+	if info, err := dst.Server(); err != nil || info.PublicHost != "203.0.113.7" {
+		t.Fatalf("restored server = %+v err = %v", info, err)
+	}
+}
+
 func TestReloadAndDocs(t *testing.T) {
 	c := newClient(t)
 	c.ok("POST", "/api/v1/reload", nil, 204)
@@ -175,7 +209,7 @@ func TestReloadAndDocs(t *testing.T) {
 
 // A rotated or removed token must stop working on a running server at once.
 func TestTokenIsReadPerRequest(t *testing.T) {
-	m := manager.New(store.Open(t.TempDir()))
+	m := manager.New(store.Open(tempDir(t)))
 	if _, err := m.Init(manager.InitOptions{PublicHost: "203.0.113.7"}); err != nil {
 		t.Fatal(err)
 	}

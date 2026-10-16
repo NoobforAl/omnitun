@@ -4,6 +4,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"errors"
@@ -195,6 +196,25 @@ func New(o Options) http.Handler {
 			ContentType string `header:"Content-Type"`
 			Body        []byte
 		}{ContentType: "application/x-openvpn-profile", Body: []byte(text)}, nil
+	})
+
+	huma.Register(a, huma.Operation{
+		OperationID: "download-backup", Method: http.MethodGet, Path: "/api/v1/backup",
+		Summary: "Download a backup (.tar.gz) of the state, keys and certificates; it holds every secret", Security: bearer,
+	}, func(ctx context.Context, _ *struct{}) (*struct {
+		ContentType        string `header:"Content-Type"`
+		ContentDisposition string `header:"Content-Disposition"`
+		Body               []byte
+	}, error) {
+		var buf bytes.Buffer
+		if err := m.Backup(&buf); err != nil {
+			return nil, toHTTP(err)
+		}
+		return &struct {
+			ContentType        string `header:"Content-Type"`
+			ContentDisposition string `header:"Content-Disposition"`
+			Body               []byte
+		}{ContentType: "application/gzip", ContentDisposition: `attachment; filename="omnitun-server-backup.tar.gz"`, Body: buf.Bytes()}, nil
 	})
 
 	huma.Register(a, huma.Operation{

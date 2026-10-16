@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,23 @@ import (
 	"github.com/NoobforAl/omnitun/server/manager"
 	"github.com/NoobforAl/omnitun/server/store"
 )
+
+// tempDir is t.TempDir with a cleanup that retries: on Windows a virus
+// scanner or a just-released file lock can briefly keep a file open, which
+// fails t.TempDir's own cleanup.
+func tempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "omnitun-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for i := 0; i < 40 && os.RemoveAll(dir) != nil; i++ {
+			time.Sleep(50 * time.Millisecond)
+		}
+	})
+	return dir
+}
 
 // run executes the CLI against dataDir and returns its stdout.
 func run(t *testing.T, dataDir string, args ...string) (string, error) {
@@ -32,7 +50,7 @@ func run(t *testing.T, dataDir string, args ...string) (string, error) {
 }
 
 func TestCLIFlow(t *testing.T) {
-	dir := t.TempDir()
+	dir := tempDir(t)
 	if _, err := run(t, dir, "init"); err == nil {
 		t.Fatal("init without --host succeeded")
 	}
@@ -98,8 +116,31 @@ func TestCLIFlow(t *testing.T) {
 	}
 }
 
+func TestBackupRestoreCommands(t *testing.T) {
+	src, dst := tempDir(t), tempDir(t)
+	run(t, src, "init", "--host", "203.0.113.7")
+	run(t, src, "user", "add", "alice")
+	file := filepath.Join(tempDir(t), "backup.tar.gz")
+	if _, err := run(t, src, "backup", file); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(t, src, "backup", file); err == nil {
+		t.Fatal("backup overwrote an existing file")
+	}
+	if _, err := run(t, filepath.Join(dst, "data"), "restore", file); err != nil {
+		t.Fatal(err)
+	}
+	out, _ := run(t, filepath.Join(dst, "data"), "--json", "user", "list")
+	if !strings.Contains(out, `"alice"`) {
+		t.Fatalf("restored users: %s", out)
+	}
+	if _, err := run(t, filepath.Join(dst, "data"), "restore", file); exitCode(err) != 4 {
+		t.Fatalf("restore over a server: code %d", exitCode(err))
+	}
+}
+
 func TestAPICommands(t *testing.T) {
-	dir := t.TempDir()
+	dir := tempDir(t)
 	run(t, dir, "init", "--host", "203.0.113.7")
 	out, _ := run(t, dir, "--json", "api", "token")
 	var a store.API
@@ -122,7 +163,7 @@ func TestLiveTokenFollowsTheState(t *testing.T) {
 	tokenTTL = 20 * time.Millisecond
 	defer func() { tokenTTL = old }()
 
-	dir := t.TempDir()
+	dir := tempDir(t)
 	run(t, dir, "init", "--host", "203.0.113.7")
 	run(t, dir, "api", "enable")
 	m := manager.New(store.Open(dir))

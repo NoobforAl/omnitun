@@ -374,7 +374,8 @@ Step 1 — one service layer for every front end
 
 Step 2 — accounting and safety
 - [x] Per-user traffic accounting and quota **enforcement**: sing-box connection counters summed per user (`server/stats`, `stats.json`), monthly quota (UTC calendar month, GB = 2^30 bytes) blocks the user until the month rolls over, the quota is raised or `user usage <name> --reset`; shown in CLI (`user list`, `user usage`), TUI, API (`usage` on users, `POST /users/{name}/usage/reset`) and in the subscription `Subscription-Userinfo` header; covered for VLESS, Trojan, Shadowsocks/ShadowTLS, Hysteria2, TUIC, AnyTLS, Naive (**not OpenVPN yet**: its endpoint does not report the user)
-- [ ] File locking for concurrent CLI/TUI/API writes; backup/export/import of the state
+- [x] File locking (`state.json.lock`, works across processes): CLI, TUI, API and the running server can write at the same time without losing changes
+- [x] Backup and restore: `omnitun-server backup <file>` / `restore <file> [--force]` (tar.gz of state, keys and certificates; hostile archives rejected) and `GET /api/v1/backup`
 - [x] Live status: running/not running, connections and speed per user (CLI `status`/`user list`, TUI, API `server`)
 - [ ] Traffic per protocol and server logs (API + TUI)
 - [ ] OpenVPN per-user accounting (read the endpoint's status/management output)

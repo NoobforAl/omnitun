@@ -2,6 +2,7 @@ package manager
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -10,9 +11,26 @@ import (
 	"github.com/NoobforAl/omnitun/server/store"
 )
 
+// tempDir is t.TempDir with a cleanup that retries: on Windows a virus
+// scanner or a just-released file lock can briefly keep a file open, which
+// fails t.TempDir's own cleanup.
+func tempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "omnitun-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for i := 0; i < 40 && os.RemoveAll(dir) != nil; i++ {
+			time.Sleep(50 * time.Millisecond)
+		}
+	})
+	return dir
+}
+
 func newManager(t *testing.T) *Manager {
 	t.Helper()
-	m := New(store.Open(t.TempDir()))
+	m := New(store.Open(tempDir(t)))
 	if _, err := m.Init(InitOptions{PublicHost: "203.0.113.7", Name: "Test"}); err != nil {
 		t.Fatal(err)
 	}
@@ -20,7 +38,7 @@ func newManager(t *testing.T) *Manager {
 }
 
 func TestInitTwiceAndWithoutHost(t *testing.T) {
-	m := New(store.Open(t.TempDir()))
+	m := New(store.Open(tempDir(t)))
 	if _, err := m.Init(InitOptions{}); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("no host: %v", err)
 	}
@@ -30,7 +48,7 @@ func TestInitTwiceAndWithoutHost(t *testing.T) {
 	if _, err := m.Init(InitOptions{PublicHost: "example.com"}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("second init: %v", err)
 	}
-	if _, err := New(store.Open(t.TempDir())).Server(); !errors.Is(err, store.ErrNotInitialized) {
+	if _, err := New(store.Open(tempDir(t))).Server(); !errors.Is(err, store.ErrNotInitialized) {
 		t.Fatalf("uninitialised: %v", err)
 	}
 }
