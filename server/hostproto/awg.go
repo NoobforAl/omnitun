@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/amnezia-vpn/amneziawg-go/conn"
 	"github.com/amnezia-vpn/amneziawg-go/device"
@@ -32,6 +33,10 @@ type awgServer struct {
 	users map[string]string
 }
 
+// awgSessionLife is how long after its last handshake a peer counts as
+// connected (WireGuard stops using a session after 180 seconds).
+const awgSessionLife = 180 * time.Second
+
 // Usage reads each peer's counters from the device. The peers are fixed, so
 // the numbers only grow while the server runs.
 func (x awgServer) Usage() []Usage {
@@ -57,6 +62,12 @@ func (x awgServer) Usage() []Usage {
 		case "tx_bytes":
 			if cur >= 0 {
 				out[cur].Down, _ = strconv.ParseUint(v, 10, 64)
+			}
+		case "last_handshake_time_sec":
+			// WireGuard has no sessions; a peer that shook hands within the
+			// last session lifetime is the closest thing to "connected".
+			if at, _ := strconv.ParseInt(v, 10, 64); cur >= 0 && at > 0 && time.Since(time.Unix(at, 0)) < awgSessionLife {
+				out[cur].Sessions = 1
 			}
 		}
 	}

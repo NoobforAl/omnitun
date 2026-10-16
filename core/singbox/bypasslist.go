@@ -167,6 +167,28 @@ func (b *BypassList) rules() []map[string]any {
 	return out
 }
 
+// OnlyRanges reports whether the list holds addresses and ranges only, few
+// enough to be routes of their own. Then "only these use the VPN" needs no
+// name matching, and the rest of the traffic can stay out of the tunnel.
+func (b *BypassList) OnlyRanges() bool {
+	if b.Empty() || len(b.Suffix)+len(b.Full)+len(b.Keyword)+len(b.Regex) > 0 {
+		return false
+	}
+	return len(MergePrefixes(b.CIDRs)) <= RouteBudget
+}
+
+// addressRules are the rules that match addresses only; they need no packet
+// inspection, so they run before the names do.
+func (b *BypassList) addressRules() []map[string]any {
+	var out []map[string]any
+	for _, r := range b.rules() {
+		if _, ip := r["ip_cidr"]; ip {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 // domainRules are the rules that match names only (what DNS rules can use).
 func (b *BypassList) domainRules() []map[string]any {
 	var out []map[string]any

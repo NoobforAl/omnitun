@@ -38,11 +38,11 @@
   "noServers": "No servers",
   "noServersHint": "Add one to get started",
   "automatic": "Automatic",
-  "automaticHint": "Fastest server, switches if one stops working",
+  "automaticHint": "Fastest server, switches on failure",
   "anyServerInCountry": "Any server in this country",
   "torNetwork": "Tor network",
   "emptyTitle": "No profiles yet",
-  "emptyHint": "Import a config file, link or subscription to get started.",
+  "emptyHint": "Import a config, link or subscription.",
   "importConfig": "Import config",
   "failoverToast": "Switched to {to} — {from} stopped responding",
   "@failoverToast": {
@@ -131,7 +131,7 @@
   },
   "unknownCountry": "Unknown country",
   "addServerTitle": "Add a server",
-  "addServerIntro": "Choose the protocol of your server. A share link or QR code is quicker: use Import.",
+  "addServerIntro": "Pick a protocol. A link or QR is quicker: use Import.",
   "newServerTitle": "New {label} server",
   "@newServerTitle": {
     "placeholders": {
@@ -180,10 +180,10 @@
       }
     }
   },
-  "shareScanHint": "Scan it with Omnitun on another device, or copy the link.",
+  "shareScanHint": "Scan with Omnitun, or copy the link.",
   "shareCopy": "Copy link",
   "shareCopied": "Link copied",
-  "shareWarning": "The link contains this server's password or key: only share it with people who may use the server.",
+  "shareWarning": "Contains the server's password or key. Share with care.",
   "shareFailed": "This server cannot be shared as a link: {reason}",
   "@shareFailed": {
     "placeholders": {
@@ -194,13 +194,13 @@
   },
   "shareTooLong": "Too long for a QR code: copy the link",
   "obTitle1": "Private and simple",
-  "obText1": "Omnitun connects you through VPN, proxy and Tor protocols from one calm screen. Pick a place, press Connect.",
+  "obText1": "One calm screen for VPN, proxy and Tor. Pick a place, press Connect.",
   "obTitle2": "Add your servers",
-  "obText2": "Import a share link, a QR code, a config file or a subscription from your provider. You can also add a server by hand.",
+  "obText2": "Import a link, QR code, config file or subscription. Or add a server by hand.",
   "obTitle3Android": "Android will ask once",
-  "obText3Android": "The first time you connect, Android asks to allow a VPN connection. Omnitun can only protect your traffic after you accept. While connected, a notification shows the speed and a Disconnect button.",
+  "obText3Android": "Android will ask to allow a VPN connection. Accept it to be protected.",
   "obTitle3Desktop": "Ready when you are",
-  "obText3Desktop": "Omnitun starts in proxy mode, which needs no special rights. Turn on VPN mode in Settings to capture all traffic.",
+  "obText3Desktop": "Starts in proxy mode, no special rights. Turn on VPN mode in Settings to capture all traffic.",
   "obAddFirst": "Add my first server",
   "bypassTitle": "Bypass lists",
   "bypassAddTooltip": "Add a list",
@@ -218,7 +218,7 @@
       }
     }
   },
-  "bypassIntro": "Websites and addresses that should not use the VPN, for example your bank or local services. One entry per line: example.com (and its subdomains), full:www.example.com, keyword:bank, regexp:…, 203.0.113.7 or 10.0.0.0/8. Lines starting with # are ignored.",
+  "bypassIntro": "Sites and addresses that skip the VPN. One per line: example.com, full:www.example.com, keyword:bank, regexp:…, 203.0.113.7 or 10.0.0.0/8. Lines starting with # are ignored.",
   "bypassNoLists": "No lists yet.",
   "bypassTypeList": "Type a list",
   "entriesCount": "{count, plural, =1{1 entry} other{{count} entries}}",
@@ -229,11 +229,11 @@
       }
     }
   },
-  "bypassOnlyTitle": "Only the listed destinations use the VPN",
-  "bypassOnlyOn": "Everything else goes direct, outside the VPN.",
-  "bypassOnlyOff": "Off: the listed destinations go direct and everything else uses the VPN.",
-  "bypassNothing": "Nothing is bypassed until a list is on.",
-  "bypassInUse": "{count, plural, =1{1 entry is in use} other{{count} entries are in use}}. Changes apply the next time you connect.",
+  "bypassOnlyTitle": "Only listed use the VPN",
+  "bypassOnlyOn": "Everything else goes direct.",
+  "bypassOnlyOff": "Listed go direct; the rest uses the VPN.",
+  "bypassNothing": "No list is on.",
+  "bypassInUse": "{count, plural, =1{1 entry in use} other{{count} entries in use}}. Applies on next connect.",
   "@bypassInUse": {
     "placeholders": {
       "count": {
@@ -309,16 +309,16 @@
   "settingsTitle": "Settings",
   "settingsServers": "Servers",
   "manageServers": "Manage servers",
-  "manageServersHint": "Import, subscriptions, order and removal",
+  "manageServersHint": "Servers and subscriptions",
   "settingsConnection": "Connection",
   "vpnMode": "VPN mode (all traffic)",
-  "vpnModeHint": "Off = proxy only: local SOCKS/HTTP port, no VPN permission needed",
+  "vpnModeHint": "Off: proxy only, no VPN permission",
   "systemProxy": "Set system proxy",
-  "systemProxyHint": "Proxy mode: point the OS proxy settings at Omnitun while connected",
+  "systemProxyHint": "Set the system proxy while connected",
   "autoSwitch": "Auto-switch on failure",
-  "autoSwitchHint": "Try the next profile in the group when one stops working",
+  "autoSwitchHint": "Try the next server if one fails",
   "bypassLan": "Bypass local network",
-  "bypassLanHint": "LAN devices and local addresses (192.168.x.x, 10.x.x.x, …) are reached directly, not through the VPN",
+  "bypassLanHint": "Reach local devices directly (192.168.x.x, 10.x.x.x)",
   "bypassListsHint": "Websites and addresses that skip the VPN",
   "bypassListsInUse": "{count, plural, =1{1 entry in use} other{{count} entries in use}}",
   "@bypassListsInUse": {
@@ -329,8 +329,8 @@
     }
   },
   "alwaysOnTitle": "Always-on VPN and kill switch",
-  "alwaysOnHint": "Android reconnects at boot and can block all traffic while the VPN is down. In the VPN settings tap the gear next to Omnitun and turn on \"Always-on VPN\" and \"Block connections without VPN\". Connect once from this app first.",
-  "openVpnSettingsFallback": "Open Android Settings → Network → VPN, then the gear next to Omnitun",
+  "alwaysOnHint": "Reconnect at boot and block traffic if the VPN drops. Set it in Android's VPN settings (gear next to Omnitun).",
+  "openVpnSettingsFallback": "Settings → Network → VPN → gear next to Omnitun",
   "splitTunneling": "Split tunneling",
   "splitSummaryOnly": "{count, plural, =1{Only 1 selected app uses the VPN} other{Only {count} selected apps use the VPN}}",
   "@splitSummaryOnly": {
@@ -350,7 +350,7 @@
   },
   "splitSummaryOff": "All apps use the VPN",
   "remoteDns": "Remote DNS",
-  "remoteDnsHelp": "Resolver used through the tunnel. Examples: https://1.1.1.1/dns-query, tls://1.1.1.1, tcp://8.8.8.8, 9.9.9.9",
+  "remoteDnsHelp": "DNS used through the tunnel, e.g. https://1.1.1.1/dns-query or tls://1.1.1.1",
   "settingsApp": "App",
   "appearance": "Appearance",
   "themeDark": "Dark",
@@ -371,9 +371,9 @@
   "splitAll": "All apps",
   "splitOnlySelected": "Only selected",
   "splitBypassSelected": "Bypass selected",
-  "splitHelpOffMode": "Every app uses the VPN. Choose a mode to pick apps.",
-  "splitHelpOnlyNone": "No apps selected yet — until you pick some, all apps use the VPN.",
-  "splitHelpOnly": "{count, plural, =1{Only the selected app uses the VPN.} other{Only the {count} selected apps use the VPN.}}",
+  "splitHelpOffMode": "Every app uses the VPN.",
+  "splitHelpOnlyNone": "No apps picked: all use the VPN.",
+  "splitHelpOnly": "{count, plural, =1{Only 1 app uses the VPN.} other{Only {count} apps use the VPN.}}",
   "@splitHelpOnly": {
     "placeholders": {
       "count": {
@@ -381,7 +381,7 @@
       }
     }
   },
-  "splitHelpBypass": "{count, plural, =1{The selected app connects directly, without the VPN.} other{The {count} selected apps connect directly, without the VPN.}}",
+  "splitHelpBypass": "{count, plural, =1{1 app goes direct.} other{{count} apps go direct.}}",
   "@splitHelpBypass": {
     "placeholders": {
       "count": {
@@ -426,7 +426,7 @@
   "addSubscriptionTooltip": "Add subscription",
   "testLatencyTooltip": "Test latency",
   "profilesEmptyHint": "No profiles. Tap Import to add one.",
-  "profilesDragHint": "Long-press and drag to reorder. With auto-switch on, the rest of the group is tried next, in this order.",
+  "profilesDragHint": "Hold and drag to reorder. Failover follows this order.",
   "myProfiles": "My profiles",
   "subRefreshed": "{name}: {count, plural, =1{1 profile} other{{count} profiles}}",
   "@subRefreshed": {
@@ -512,7 +512,7 @@
     }
   },
   "importTitle": "Import config",
-  "importDescription": "Paste share links (vless://, trojan://, ss://, hy2://, anytls://, ssh://, sstp://, ikev2://, …), a Clash or sing-box config, a subscription, a WireGuard .conf, an OpenVPN .ovpn or Tor bridge lines — or open a file or scan a QR code.",
+  "importDescription": "Paste a link, config or subscription — or open a file or scan a QR code.",
   "importScanQr": "Scan QR",
   "importOpenFile": "Open file",
   "importPaste": "Paste",
@@ -571,9 +571,9 @@
   "subParamName": "Parameter name",
   "subToken": "Token",
   "subDownloadLabel": "Download",
-  "subDownloadHelp": "Some providers are blocked where you are; the VPN can still reach them",
+  "subDownloadHelp": "Provider blocked? The VPN can still fetch it",
   "subViaDirect": "Directly",
-  "subViaAuto": "Directly, or through the VPN if the provider is blocked",
+  "subViaAuto": "Direct, or via the VPN if blocked",
   "subViaTunnel": "Always through the VPN (connect first)",
   "subErrUrl": "Enter an http(s) subscription URL (or nordvpn://<access token>)",
   "subErrHeader": "Enter the header name",
@@ -667,11 +667,19 @@
   "hpWarpReserved": "Three numbers, as WARP configurations list them",
   "hpOneBridgePerLine": "One bridge per line, as in a torrc without \"Bridge \"",
   "exitTitle": "Show exit address and country",
-  "exitHint": "After connecting, asks api.country.is, through the VPN, which address and country it sees. Off by default.",
+  "exitHint": "Ask api.country.is for your exit address and country. Off by default.",
   "exitIpLabel": "IP {ip}",
   "@exitIpLabel": {
     "placeholders": {
       "ip": {
+        "type": "String"
+      }
+    }
+  },
+  "connectedTo": "Connected to {place}",
+  "@connectedTo": {
+    "placeholders": {
+      "place": {
         "type": "String"
       }
     }

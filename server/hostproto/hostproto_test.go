@@ -478,3 +478,25 @@ func TestConfigureTUN(t *testing.T) {
 		t.Fatal("a failed `ip link set up` was ignored")
 	}
 }
+
+func TestIKEMeterCountsLiveTunnelsPerUser(t *testing.T) {
+	m := &ikeMeter{last: map[string][2]uint64{}, total: map[string][2]uint64{}}
+	m.add(map[string][2]uint64{"alice\x0010.10.10.2": {10, 20}, "alice\x0010.10.10.3": {1, 2}, "bob\x0010.10.10.4": {5, 5}})
+	out := m.add(map[string][2]uint64{"alice\x0010.10.10.2": {30, 50}, "bob\x0010.10.10.4": {5, 5}})
+	got := map[string]Usage{}
+	for _, u := range out {
+		got[u.User] = u
+	}
+	if a := got["alice"]; a.Sessions != 1 || a.Up != 31 || a.Down != 52 {
+		t.Fatalf("alice: %+v", a)
+	}
+	if b := got["bob"]; b.Sessions != 1 {
+		t.Fatalf("bob: %+v", b)
+	}
+	// Both left: the totals stay, nobody is live.
+	for _, u := range m.add(map[string][2]uint64{}) {
+		if u.Sessions != 0 {
+			t.Fatalf("%s still has %d session(s)", u.User, u.Sessions)
+		}
+	}
+}

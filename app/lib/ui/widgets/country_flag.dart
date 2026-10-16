@@ -65,7 +65,7 @@ class LatencyDot extends StatelessWidget {
       null => scheme.outlineVariant,
       < 0 => scheme.error,
       < 150 => connectedGreen,
-      < 400 => const Color(0xFFE0A100),
+      < 400 => connectingAmber,
       _ => const Color(0xFFE5732F),
     };
     return Tooltip(

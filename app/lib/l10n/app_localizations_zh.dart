@@ -124,7 +124,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get automatic => '自动';
 
   @override
-  String get automaticHint => '最快的服务器，出现故障时自动切换';
+  String get automaticHint => '最快的服务器，故障时自动切换';
 
   @override
   String get anyServerInCountry => '该国家的任意服务器';
@@ -136,7 +136,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get emptyTitle => '还没有配置';
 
   @override
-  String get emptyHint => '导入配置文件、链接或订阅即可开始。';
+  String get emptyHint => '导入配置、链接或订阅。';
 
   @override
   String get importConfig => '导入配置';
@@ -297,7 +297,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get addServerTitle => '添加服务器';
 
   @override
-  String get addServerIntro => '选择服务器的协议。分享链接或二维码更快：请使用“导入”。';
+  String get addServerIntro => '选择协议。链接或二维码更快：请用导入。';
 
   @override
   String newServerTitle(String label) {
@@ -368,7 +368,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get shareScanHint => '在另一台设备上用 Omnitun 扫描，或复制链接。';
+  String get shareScanHint => '用 Omnitun 扫描，或复制链接。';
 
   @override
   String get shareCopy => '复制链接';
@@ -377,7 +377,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get shareCopied => '链接已复制';
 
   @override
-  String get shareWarning => '链接包含此服务器的密码或密钥：只分享给有权使用该服务器的人。';
+  String get shareWarning => '包含服务器密码或密钥，请谨慎分享。';
 
   @override
   String shareFailed(String reason) {
@@ -391,26 +391,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get obTitle1 => '私密而简单';
 
   @override
-  String get obText1 => 'Omnitun 在一个安静的界面里通过 VPN、代理和 Tor 协议为你连接。选择位置，点击“连接”。';
+  String get obText1 => 'VPN、代理和 Tor，一个简洁界面。选择位置，点按连接。';
 
   @override
   String get obTitle2 => '添加你的服务器';
 
   @override
-  String get obText2 => '导入分享链接、二维码、配置文件或服务商的订阅。你也可以手动添加服务器。';
+  String get obText2 => '导入链接、二维码、配置文件或订阅，也可手动添加服务器。';
 
   @override
   String get obTitle3Android => 'Android 只会询问一次';
 
   @override
-  String get obText3Android =>
-      '第一次连接时，Android 会请求允许 VPN 连接。只有你同意后，Omnitun 才能保护你的流量。连接期间，通知会显示速度和“断开连接”按钮。';
+  String get obText3Android => 'Android 会请求允许 VPN 连接，请接受以获得保护。';
 
   @override
   String get obTitle3Desktop => '随时可用';
 
   @override
-  String get obText3Desktop => 'Omnitun 以代理模式启动，无需特殊权限。在设置中开启 VPN 模式即可接管所有流量。';
+  String get obText3Desktop => '以代理模式启动，无需特殊权限。在设置中开启 VPN 模式可接管全部流量。';
 
   @override
   String get obAddFirst => '添加第一台服务器';
@@ -446,7 +445,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get bypassIntro =>
-      '不应走 VPN 的网站和地址，例如银行或本地服务。每行一条：example.com（含其子域名）、full:www.example.com、keyword:bank、regexp:…、203.0.113.7 或 10.0.0.0/8。以 # 开头的行会被忽略。';
+      '不走 VPN 的网站和地址。每行一条：example.com、full:www.example.com、keyword:bank、regexp:…、203.0.113.7 或 10.0.0.0/8。以 # 开头的行会被忽略。';
 
   @override
   String get bypassNoLists => '还没有列表。';
@@ -465,25 +464,25 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get bypassOnlyTitle => '仅列表中的目标使用 VPN';
+  String get bypassOnlyTitle => '仅列表内走 VPN';
 
   @override
-  String get bypassOnlyOn => '其余流量直连，不经过 VPN。';
+  String get bypassOnlyOn => '其余直连。';
 
   @override
-  String get bypassOnlyOff => '关闭：列表中的目标直连，其余流量使用 VPN。';
+  String get bypassOnlyOff => '列表内直连，其余走 VPN。';
 
   @override
-  String get bypassNothing => '开启列表之前，不会绕过任何内容。';
+  String get bypassNothing => '未启用任何列表。';
 
   @override
   String bypassInUse(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count 条',
+      other: '使用中 $count 条',
     );
-    return '正在使用 $_temp0。更改将在下次连接时生效。';
+    return '$_temp0。下次连接时生效。';
   }
 
   @override
@@ -574,7 +573,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get manageServers => '管理服务器';
 
   @override
-  String get manageServersHint => '导入、订阅、排序和删除';
+  String get manageServersHint => '服务器和订阅';
 
   @override
   String get settingsConnection => '连接';
@@ -583,25 +582,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get vpnMode => 'VPN 模式（所有流量）';
 
   @override
-  String get vpnModeHint => '关闭 = 仅代理：本地 SOCKS/HTTP 端口，无需 VPN 权限';
+  String get vpnModeHint => '关闭：仅代理，无需 VPN 权限';
 
   @override
   String get systemProxy => '设置系统代理';
 
   @override
-  String get systemProxyHint => '代理模式：连接期间将系统代理设置指向 Omnitun';
+  String get systemProxyHint => '连接时设置系统代理';
 
   @override
   String get autoSwitch => '故障时自动切换';
 
   @override
-  String get autoSwitchHint => '某个配置失效时，尝试组内的下一个配置';
+  String get autoSwitchHint => '服务器失效时尝试下一个';
 
   @override
   String get bypassLan => '绕过本地网络';
 
   @override
-  String get bypassLanHint => '局域网设备和本地地址（192.168.x.x、10.x.x.x 等）直接访问，不经过 VPN';
+  String get bypassLanHint => '直接访问本地设备（192.168.x.x、10.x.x.x）';
 
   @override
   String get bypassListsHint => '不走 VPN 的网站和地址';
@@ -621,11 +620,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get alwaysOnHint =>
-      'Android 可在开机时自动重连，并在 VPN 断开期间阻止所有流量。在 VPN 设置中点击 Omnitun 旁的齿轮，开启“始终开启的 VPN”和“阻止没有 VPN 的连接”。请先在本应用中连接一次。';
+      '开机重连，VPN 断开时阻止流量。请在 Android VPN 设置中开启（Omnitun 旁的齿轮）。';
 
   @override
-  String get openVpnSettingsFallback =>
-      '打开 Android 设置 → 网络 → VPN，然后点击 Omnitun 旁的齿轮';
+  String get openVpnSettingsFallback => '设置 → 网络 → VPN → Omnitun 旁的齿轮';
 
   @override
   String get splitTunneling => '分应用隧道';
@@ -658,7 +656,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get remoteDnsHelp =>
-      '通过隧道使用的解析器。例如：https://1.1.1.1/dns-query、tls://1.1.1.1、tcp://8.8.8.8、9.9.9.9';
+      '隧道内使用的 DNS，例如 https://1.1.1.1/dns-query 或 tls://1.1.1.1';
 
   @override
   String get settingsApp => '应用';
@@ -702,17 +700,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get splitBypassSelected => '所选绕过';
 
   @override
-  String get splitHelpOffMode => '所有应用都使用 VPN。选择一种模式来挑选应用。';
+  String get splitHelpOffMode => '所有应用都走 VPN。';
 
   @override
-  String get splitHelpOnlyNone => '还没有选择应用——在你选择之前，所有应用都使用 VPN。';
+  String get splitHelpOnlyNone => '未选应用：全部走 VPN。';
 
   @override
   String splitHelpOnly(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '仅所选的 $count 个应用使用 VPN。',
+      other: '仅 $count 个应用走 VPN。',
     );
     return '$_temp0';
   }
@@ -722,7 +720,7 @@ class AppLocalizationsZh extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '所选的 $count 个应用直接连接，不使用 VPN。',
+      other: '$count 个应用直连。',
     );
     return '$_temp0';
   }
@@ -782,7 +780,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get profilesEmptyHint => '没有配置。点击“导入”添加。';
 
   @override
-  String get profilesDragHint => '长按并拖动可调整顺序。开启自动切换后，组内其余配置会按此顺序依次尝试。';
+  String get profilesDragHint => '长按拖动排序。故障切换按此顺序。';
 
   @override
   String get myProfiles => '我的配置';
@@ -861,8 +859,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get importTitle => '导入配置';
 
   @override
-  String get importDescription =>
-      '粘贴分享链接（vless://、trojan://、ss://、hy2://、anytls://、ssh://、sstp://、ikev2:// 等）、Clash 或 sing-box 配置、订阅、WireGuard .conf、OpenVPN .ovpn 或 Tor 网桥行——也可以打开文件或扫描二维码。';
+  String get importDescription => '粘贴链接、配置或订阅，或打开文件、扫描二维码。';
 
   @override
   String get importScanQr => '扫描二维码';
@@ -975,13 +972,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get subDownloadLabel => '下载方式';
 
   @override
-  String get subDownloadHelp => '有些服务商在你所在的地区被屏蔽；VPN 仍然可以访问它们';
+  String get subDownloadHelp => '提供商被屏蔽？VPN 仍可获取';
 
   @override
   String get subViaDirect => '直接下载';
 
   @override
-  String get subViaAuto => '直接下载，服务商被屏蔽时通过 VPN';
+  String get subViaAuto => '直连，被屏蔽时走 VPN';
 
   @override
   String get subViaTunnel => '始终通过 VPN（需先连接）';
@@ -1249,10 +1246,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get exitTitle => '显示出口地址和国家';
 
   @override
-  String get exitHint => '连接后，通过 VPN 向 api.country.is 询问它看到的地址和国家。默认关闭。';
+  String get exitHint => '向 api.country.is 查询出口地址和国家。默认关闭。';
 
   @override
   String exitIpLabel(String ip) {
     return 'IP $ip';
+  }
+
+  @override
+  String connectedTo(String place) {
+    return '已连接到 $place';
   }
 }

@@ -429,6 +429,19 @@ func (s *Server) Traffic() []UserTraffic {
 	return out
 }
 
+// Sessions reports how many clients are connected now, by user name.
+func (s *Server) Sessions() map[string]int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[string]int{}
+	for _, c := range s.clients {
+		if c.username != "" {
+			out[c.username]++
+		}
+	}
+	return out
+}
+
 // SendPPP frames a PPP payload in an SSTP data packet and writes it to the client.
 func (c *sstpClient) SendPPP(frame []byte) error {
 	pkt, err := wire.EncodeData(frame)

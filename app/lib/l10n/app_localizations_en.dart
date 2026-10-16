@@ -124,7 +124,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get automatic => 'Automatic';
 
   @override
-  String get automaticHint => 'Fastest server, switches if one stops working';
+  String get automaticHint => 'Fastest server, switches on failure';
 
   @override
   String get anyServerInCountry => 'Any server in this country';
@@ -136,8 +136,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get emptyTitle => 'No profiles yet';
 
   @override
-  String get emptyHint =>
-      'Import a config file, link or subscription to get started.';
+  String get emptyHint => 'Import a config, link or subscription.';
 
   @override
   String get importConfig => 'Import config';
@@ -301,7 +300,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addServerIntro =>
-      'Choose the protocol of your server. A share link or QR code is quicker: use Import.';
+      'Pick a protocol. A link or QR is quicker: use Import.';
 
   @override
   String newServerTitle(String label) {
@@ -373,8 +372,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get shareScanHint =>
-      'Scan it with Omnitun on another device, or copy the link.';
+  String get shareScanHint => 'Scan with Omnitun, or copy the link.';
 
   @override
   String get shareCopy => 'Copy link';
@@ -384,7 +382,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get shareWarning =>
-      'The link contains this server\'s password or key: only share it with people who may use the server.';
+      'Contains the server\'s password or key. Share with care.';
 
   @override
   String shareFailed(String reason) {
@@ -399,28 +397,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get obText1 =>
-      'Omnitun connects you through VPN, proxy and Tor protocols from one calm screen. Pick a place, press Connect.';
+      'One calm screen for VPN, proxy and Tor. Pick a place, press Connect.';
 
   @override
   String get obTitle2 => 'Add your servers';
 
   @override
   String get obText2 =>
-      'Import a share link, a QR code, a config file or a subscription from your provider. You can also add a server by hand.';
+      'Import a link, QR code, config file or subscription. Or add a server by hand.';
 
   @override
   String get obTitle3Android => 'Android will ask once';
 
   @override
   String get obText3Android =>
-      'The first time you connect, Android asks to allow a VPN connection. Omnitun can only protect your traffic after you accept. While connected, a notification shows the speed and a Disconnect button.';
+      'Android will ask to allow a VPN connection. Accept it to be protected.';
 
   @override
   String get obTitle3Desktop => 'Ready when you are';
 
   @override
   String get obText3Desktop =>
-      'Omnitun starts in proxy mode, which needs no special rights. Turn on VPN mode in Settings to capture all traffic.';
+      'Starts in proxy mode, no special rights. Turn on VPN mode in Settings to capture all traffic.';
 
   @override
   String get obAddFirst => 'Add my first server';
@@ -456,7 +454,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bypassIntro =>
-      'Websites and addresses that should not use the VPN, for example your bank or local services. One entry per line: example.com (and its subdomains), full:www.example.com, keyword:bank, regexp:…, 203.0.113.7 or 10.0.0.0/8. Lines starting with # are ignored.';
+      'Sites and addresses that skip the VPN. One per line: example.com, full:www.example.com, keyword:bank, regexp:…, 203.0.113.7 or 10.0.0.0/8. Lines starting with # are ignored.';
 
   @override
   String get bypassNoLists => 'No lists yet.';
@@ -476,27 +474,26 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get bypassOnlyTitle => 'Only the listed destinations use the VPN';
+  String get bypassOnlyTitle => 'Only listed use the VPN';
 
   @override
-  String get bypassOnlyOn => 'Everything else goes direct, outside the VPN.';
+  String get bypassOnlyOn => 'Everything else goes direct.';
 
   @override
-  String get bypassOnlyOff =>
-      'Off: the listed destinations go direct and everything else uses the VPN.';
+  String get bypassOnlyOff => 'Listed go direct; the rest uses the VPN.';
 
   @override
-  String get bypassNothing => 'Nothing is bypassed until a list is on.';
+  String get bypassNothing => 'No list is on.';
 
   @override
   String bypassInUse(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count entries are in use',
-      one: '1 entry is in use',
+      other: '$count entries in use',
+      one: '1 entry in use',
     );
-    return '$_temp0. Changes apply the next time you connect.';
+    return '$_temp0. Applies on next connect.';
   }
 
   @override
@@ -590,7 +587,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get manageServers => 'Manage servers';
 
   @override
-  String get manageServersHint => 'Import, subscriptions, order and removal';
+  String get manageServersHint => 'Servers and subscriptions';
 
   @override
   String get settingsConnection => 'Connection';
@@ -599,29 +596,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vpnMode => 'VPN mode (all traffic)';
 
   @override
-  String get vpnModeHint =>
-      'Off = proxy only: local SOCKS/HTTP port, no VPN permission needed';
+  String get vpnModeHint => 'Off: proxy only, no VPN permission';
 
   @override
   String get systemProxy => 'Set system proxy';
 
   @override
-  String get systemProxyHint =>
-      'Proxy mode: point the OS proxy settings at Omnitun while connected';
+  String get systemProxyHint => 'Set the system proxy while connected';
 
   @override
   String get autoSwitch => 'Auto-switch on failure';
 
   @override
-  String get autoSwitchHint =>
-      'Try the next profile in the group when one stops working';
+  String get autoSwitchHint => 'Try the next server if one fails';
 
   @override
   String get bypassLan => 'Bypass local network';
 
   @override
   String get bypassLanHint =>
-      'LAN devices and local addresses (192.168.x.x, 10.x.x.x, …) are reached directly, not through the VPN';
+      'Reach local devices directly (192.168.x.x, 10.x.x.x)';
 
   @override
   String get bypassListsHint => 'Websites and addresses that skip the VPN';
@@ -642,11 +636,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get alwaysOnHint =>
-      'Android reconnects at boot and can block all traffic while the VPN is down. In the VPN settings tap the gear next to Omnitun and turn on \"Always-on VPN\" and \"Block connections without VPN\". Connect once from this app first.';
+      'Reconnect at boot and block traffic if the VPN drops. Set it in Android\'s VPN settings (gear next to Omnitun).';
 
   @override
   String get openVpnSettingsFallback =>
-      'Open Android Settings → Network → VPN, then the gear next to Omnitun';
+      'Settings → Network → VPN → gear next to Omnitun';
 
   @override
   String get splitTunneling => 'Split tunneling';
@@ -681,7 +675,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get remoteDnsHelp =>
-      'Resolver used through the tunnel. Examples: https://1.1.1.1/dns-query, tls://1.1.1.1, tcp://8.8.8.8, 9.9.9.9';
+      'DNS used through the tunnel, e.g. https://1.1.1.1/dns-query or tls://1.1.1.1';
 
   @override
   String get settingsApp => 'App';
@@ -725,20 +719,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get splitBypassSelected => 'Bypass selected';
 
   @override
-  String get splitHelpOffMode =>
-      'Every app uses the VPN. Choose a mode to pick apps.';
+  String get splitHelpOffMode => 'Every app uses the VPN.';
 
   @override
-  String get splitHelpOnlyNone =>
-      'No apps selected yet — until you pick some, all apps use the VPN.';
+  String get splitHelpOnlyNone => 'No apps picked: all use the VPN.';
 
   @override
   String splitHelpOnly(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Only the $count selected apps use the VPN.',
-      one: 'Only the selected app uses the VPN.',
+      other: 'Only $count apps use the VPN.',
+      one: 'Only 1 app uses the VPN.',
     );
     return '$_temp0';
   }
@@ -748,8 +740,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'The $count selected apps connect directly, without the VPN.',
-      one: 'The selected app connects directly, without the VPN.',
+      other: '$count apps go direct.',
+      one: '1 app goes direct.',
     );
     return '$_temp0';
   }
@@ -810,7 +802,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profilesDragHint =>
-      'Long-press and drag to reorder. With auto-switch on, the rest of the group is tried next, in this order.';
+      'Hold and drag to reorder. Failover follows this order.';
 
   @override
   String get myProfiles => 'My profiles';
@@ -892,7 +884,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importDescription =>
-      'Paste share links (vless://, trojan://, ss://, hy2://, anytls://, ssh://, sstp://, ikev2://, …), a Clash or sing-box config, a subscription, a WireGuard .conf, an OpenVPN .ovpn or Tor bridge lines — or open a file or scan a QR code.';
+      'Paste a link, config or subscription — or open a file or scan a QR code.';
 
   @override
   String get importScanQr => 'Scan QR';
@@ -1008,15 +1000,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get subDownloadLabel => 'Download';
 
   @override
-  String get subDownloadHelp =>
-      'Some providers are blocked where you are; the VPN can still reach them';
+  String get subDownloadHelp => 'Provider blocked? The VPN can still fetch it';
 
   @override
   String get subViaDirect => 'Directly';
 
   @override
-  String get subViaAuto =>
-      'Directly, or through the VPN if the provider is blocked';
+  String get subViaAuto => 'Direct, or via the VPN if blocked';
 
   @override
   String get subViaTunnel => 'Always through the VPN (connect first)';
@@ -1296,10 +1286,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exitHint =>
-      'After connecting, asks api.country.is, through the VPN, which address and country it sees. Off by default.';
+      'Ask api.country.is for your exit address and country. Off by default.';
 
   @override
   String exitIpLabel(String ip) {
     return 'IP $ip';
+  }
+
+  @override
+  String connectedTo(String place) {
+    return 'Connected to $place';
   }
 }

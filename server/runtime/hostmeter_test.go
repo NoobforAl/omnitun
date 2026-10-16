@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"testing"
+	"time"
 
 	"github.com/NoobforAl/omnitun/server/hostproto"
 	"github.com/NoobforAl/omnitun/server/stats"
@@ -52,5 +53,48 @@ func TestHostMetersCountChangesPerUserAndProtocol(t *testing.T) {
 	h.collect(tr)
 	if got := tr.MonthTotal("alice"); got != 620 {
 		t.Fatalf("alice after a restart: %d", got)
+	}
+}
+
+func TestHostMetersLiveConnectionsAndSpeed(t *testing.T) {
+	tr := stats.NewTracker(tempDir(t))
+	defer tr.Stop()
+	clock := time.Unix(1000, 0)
+	h := hostMeters{now: func() time.Time { return clock }}
+	sstp, awg := &fakeMeter{}, &fakeMeter{}
+	h.add("sstp", sstp)
+	h.add("amneziawg", awg)
+
+	sstp.usage = []hostproto.Usage{{User: "alice", Up: 0, Down: 0, Sessions: 2}}
+	awg.usage = []hostproto.Usage{{User: "alice", Sessions: 1}, {User: "bob", Sessions: 0}}
+	h.collect(tr)
+
+	clock = clock.Add(2 * time.Second)
+	sstp.usage = []hostproto.Usage{{User: "alice", Up: 2000, Down: 6000, Sessions: 2}}
+	awg.usage = []hostproto.Usage{{User: "alice", Up: 400, Down: 200, Sessions: 1}, {User: "bob"}}
+	h.collect(tr)
+
+	users, protocols := h.live()
+	got := users["alice"]
+	if got.Connections != 3 || got.UpBps != 1200 || got.DownBps != 3100 {
+		t.Fatalf("alice live: %+v", got)
+	}
+	if _, ok := users["bob"]; ok {
+		t.Fatalf("bob has no connection but is listed: %+v", users["bob"])
+	}
+	if protocols["sstp"] != 2 || protocols["amneziawg"] != 1 {
+		t.Fatalf("protocols: %v", protocols)
+	}
+
+	// Everyone leaves: nothing is live any more, though the totals stay.
+	clock = clock.Add(2 * time.Second)
+	sstp.usage = []hostproto.Usage{{User: "alice", Up: 2000, Down: 6000}}
+	awg.usage = []hostproto.Usage{{User: "alice", Up: 400, Down: 200}}
+	h.collect(tr)
+	if users, protocols := h.live(); len(users) != 0 || len(protocols) != 0 {
+		t.Fatalf("still live: %v %v", users, protocols)
+	}
+	if got := tr.MonthTotal("alice"); got != 8600 {
+		t.Fatalf("alice total %d", got)
 	}
 }

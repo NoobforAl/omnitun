@@ -56,6 +56,8 @@ type Server interface {
 type Usage struct {
 	User     string
 	Up, Down uint64
+	// Sessions is how many connections the user has right now.
+	Sessions int
 }
 
 // Meter is implemented by the host servers that count traffic per user.
@@ -114,8 +116,9 @@ func (sstpServer) Pool() string   { return protocols.SSTPPool }
 
 func (x sstpServer) Usage() []Usage {
 	var out []Usage
+	live := x.s.Sessions()
 	for _, t := range x.s.Traffic() {
-		out = append(out, Usage{User: t.User, Up: t.Up, Down: t.Down})
+		out = append(out, Usage{User: t.User, Up: t.Up, Down: t.Down, Sessions: live[t.User]})
 	}
 	return out
 }
@@ -189,9 +192,13 @@ func (m *ikeMeter) add(cur map[string][2]uint64) []Usage {
 		m.total[user] = [2]uint64{t[0] + d[0], t[1] + d[1]}
 	}
 	m.last = cur
+	sessions := map[string]int{} // live tunnels by user
+	for k := range cur {
+		sessions[k[:strings.IndexByte(k, 0)]]++
+	}
 	out := make([]Usage, 0, len(m.total))
 	for user, t := range m.total {
-		out = append(out, Usage{User: user, Up: t[0], Down: t[1]})
+		out = append(out, Usage{User: user, Up: t[0], Down: t[1], Sessions: sessions[user]})
 	}
 	return out
 }

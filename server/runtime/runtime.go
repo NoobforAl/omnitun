@@ -54,6 +54,7 @@ type Server struct {
 
 	wgMu    sync.RWMutex
 	wgUsers map[netip.Addr]string // WireGuard tunnel address -> user name
+	ovpn    ovpnUsers             // OpenVPN tunnel address -> user name
 }
 
 // setWireGuardUsers remembers which user owns which tunnel address.
@@ -69,10 +70,16 @@ func (s *Server) setWireGuardUsers(st *store.State) {
 	s.wgMu.Unlock()
 }
 
-func (s *Server) userByWireGuardIP(a netip.Addr) string {
+// userByTunnelIP names the user behind a WireGuard or OpenVPN tunnel address.
+func (s *Server) userByTunnelIP(a netip.Addr) string {
+	a = a.Unmap()
 	s.wgMu.RLock()
-	defer s.wgMu.RUnlock()
-	return s.wgUsers[a.Unmap()]
+	u := s.wgUsers[a]
+	s.wgMu.RUnlock()
+	if u != "" {
+		return u
+	}
+	return s.ovpn.user(a)
 }
 
 // New prepares a server for the store.
@@ -101,6 +108,7 @@ func (s *Server) Start() error {
 	}
 	s.tracker = stats.NewTracker(s.store.Dir)
 	s.setWireGuardUsers(st)
+	s.watchOpenVPN()
 	accCtx, accCancel := context.WithCancel(context.Background())
 	s.accStop = accCancel
 	go s.accountingLoop(accCtx)
@@ -158,7 +166,7 @@ func (s *Server) startBoxLocked(st *store.State) error {
 				s.instance, s.cancel = instance, cancel
 				if tm := service.PtrFromContext[trafficcontrol.Manager](ctx); tm != nil {
 					s.accMu.Lock()
-					s.coll = newCollector(tm, s.tracker, s.userByWireGuardIP)
+					s.coll = newCollector(tm, s.tracker, s.userByTunnelIP)
 					s.accMu.Unlock()
 				}
 				s.logf("serving %d protocol(s) for %d user(s)", len(inbounds)+len(endpoints), len(st.ActiveUsers(time.Now())))
@@ -176,7 +184,7 @@ func (s *Server) stopBoxLocked() {
 	s.accMu.Lock()
 	coll := s.coll
 	if coll != nil {
-		coll.tick()
+		_, _ = coll.tick() // the last numbers of this run; the next tick publishes without it
 		s.coll = nil
 	}
 	s.accMu.Unlock()
@@ -263,6 +271,7 @@ func (s *Server) Close() error {
 	defer s.mu.Unlock()
 	s.stopBoxLocked()
 	s.stopHostLocked()
+	s.stopWatchingOpenVPN()
 	defer s.file.Close()
 	if s.accStop != nil {
 		s.accStop()

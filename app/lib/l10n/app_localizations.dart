@@ -335,7 +335,7 @@ abstract class AppLocalizations {
   /// No description provided for @automaticHint.
   ///
   /// In en, this message translates to:
-  /// **'Fastest server, switches if one stops working'**
+  /// **'Fastest server, switches on failure'**
   String get automaticHint;
 
   /// No description provided for @anyServerInCountry.
@@ -359,7 +359,7 @@ abstract class AppLocalizations {
   /// No description provided for @emptyHint.
   ///
   /// In en, this message translates to:
-  /// **'Import a config file, link or subscription to get started.'**
+  /// **'Import a config, link or subscription.'**
   String get emptyHint;
 
   /// No description provided for @importConfig.
@@ -647,7 +647,7 @@ abstract class AppLocalizations {
   /// No description provided for @addServerIntro.
   ///
   /// In en, this message translates to:
-  /// **'Choose the protocol of your server. A share link or QR code is quicker: use Import.'**
+  /// **'Pick a protocol. A link or QR is quicker: use Import.'**
   String get addServerIntro;
 
   /// No description provided for @newServerTitle.
@@ -773,7 +773,7 @@ abstract class AppLocalizations {
   /// No description provided for @shareScanHint.
   ///
   /// In en, this message translates to:
-  /// **'Scan it with Omnitun on another device, or copy the link.'**
+  /// **'Scan with Omnitun, or copy the link.'**
   String get shareScanHint;
 
   /// No description provided for @shareCopy.
@@ -791,7 +791,7 @@ abstract class AppLocalizations {
   /// No description provided for @shareWarning.
   ///
   /// In en, this message translates to:
-  /// **'The link contains this server\'s password or key: only share it with people who may use the server.'**
+  /// **'Contains the server\'s password or key. Share with care.'**
   String get shareWarning;
 
   /// No description provided for @shareFailed.
@@ -815,7 +815,7 @@ abstract class AppLocalizations {
   /// No description provided for @obText1.
   ///
   /// In en, this message translates to:
-  /// **'Omnitun connects you through VPN, proxy and Tor protocols from one calm screen. Pick a place, press Connect.'**
+  /// **'One calm screen for VPN, proxy and Tor. Pick a place, press Connect.'**
   String get obText1;
 
   /// No description provided for @obTitle2.
@@ -827,7 +827,7 @@ abstract class AppLocalizations {
   /// No description provided for @obText2.
   ///
   /// In en, this message translates to:
-  /// **'Import a share link, a QR code, a config file or a subscription from your provider. You can also add a server by hand.'**
+  /// **'Import a link, QR code, config file or subscription. Or add a server by hand.'**
   String get obText2;
 
   /// No description provided for @obTitle3Android.
@@ -839,7 +839,7 @@ abstract class AppLocalizations {
   /// No description provided for @obText3Android.
   ///
   /// In en, this message translates to:
-  /// **'The first time you connect, Android asks to allow a VPN connection. Omnitun can only protect your traffic after you accept. While connected, a notification shows the speed and a Disconnect button.'**
+  /// **'Android will ask to allow a VPN connection. Accept it to be protected.'**
   String get obText3Android;
 
   /// No description provided for @obTitle3Desktop.
@@ -851,7 +851,7 @@ abstract class AppLocalizations {
   /// No description provided for @obText3Desktop.
   ///
   /// In en, this message translates to:
-  /// **'Omnitun starts in proxy mode, which needs no special rights. Turn on VPN mode in Settings to capture all traffic.'**
+  /// **'Starts in proxy mode, no special rights. Turn on VPN mode in Settings to capture all traffic.'**
   String get obText3Desktop;
 
   /// No description provided for @obAddFirst.
@@ -917,7 +917,7 @@ abstract class AppLocalizations {
   /// No description provided for @bypassIntro.
   ///
   /// In en, this message translates to:
-  /// **'Websites and addresses that should not use the VPN, for example your bank or local services. One entry per line: example.com (and its subdomains), full:www.example.com, keyword:bank, regexp:…, 203.0.113.7 or 10.0.0.0/8. Lines starting with # are ignored.'**
+  /// **'Sites and addresses that skip the VPN. One per line: example.com, full:www.example.com, keyword:bank, regexp:…, 203.0.113.7 or 10.0.0.0/8. Lines starting with # are ignored.'**
   String get bypassIntro;
 
   /// No description provided for @bypassNoLists.
@@ -941,31 +941,31 @@ abstract class AppLocalizations {
   /// No description provided for @bypassOnlyTitle.
   ///
   /// In en, this message translates to:
-  /// **'Only the listed destinations use the VPN'**
+  /// **'Only listed use the VPN'**
   String get bypassOnlyTitle;
 
   /// No description provided for @bypassOnlyOn.
   ///
   /// In en, this message translates to:
-  /// **'Everything else goes direct, outside the VPN.'**
+  /// **'Everything else goes direct.'**
   String get bypassOnlyOn;
 
   /// No description provided for @bypassOnlyOff.
   ///
   /// In en, this message translates to:
-  /// **'Off: the listed destinations go direct and everything else uses the VPN.'**
+  /// **'Listed go direct; the rest uses the VPN.'**
   String get bypassOnlyOff;
 
   /// No description provided for @bypassNothing.
   ///
   /// In en, this message translates to:
-  /// **'Nothing is bypassed until a list is on.'**
+  /// **'No list is on.'**
   String get bypassNothing;
 
   /// No description provided for @bypassInUse.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 entry is in use} other{{count} entries are in use}}. Changes apply the next time you connect.'**
+  /// **'{count, plural, =1{1 entry in use} other{{count} entries in use}}. Applies on next connect.'**
   String bypassInUse(int count);
 
   /// No description provided for @bypassHttpLink.
@@ -1091,7 +1091,7 @@ abstract class AppLocalizations {
   /// No description provided for @manageServersHint.
   ///
   /// In en, this message translates to:
-  /// **'Import, subscriptions, order and removal'**
+  /// **'Servers and subscriptions'**
   String get manageServersHint;
 
   /// No description provided for @settingsConnection.
@@ -1109,7 +1109,7 @@ abstract class AppLocalizations {
   /// No description provided for @vpnModeHint.
   ///
   /// In en, this message translates to:
-  /// **'Off = proxy only: local SOCKS/HTTP port, no VPN permission needed'**
+  /// **'Off: proxy only, no VPN permission'**
   String get vpnModeHint;
 
   /// No description provided for @systemProxy.
@@ -1121,7 +1121,7 @@ abstract class AppLocalizations {
   /// No description provided for @systemProxyHint.
   ///
   /// In en, this message translates to:
-  /// **'Proxy mode: point the OS proxy settings at Omnitun while connected'**
+  /// **'Set the system proxy while connected'**
   String get systemProxyHint;
 
   /// No description provided for @autoSwitch.
@@ -1133,7 +1133,7 @@ abstract class AppLocalizations {
   /// No description provided for @autoSwitchHint.
   ///
   /// In en, this message translates to:
-  /// **'Try the next profile in the group when one stops working'**
+  /// **'Try the next server if one fails'**
   String get autoSwitchHint;
 
   /// No description provided for @bypassLan.
@@ -1145,7 +1145,7 @@ abstract class AppLocalizations {
   /// No description provided for @bypassLanHint.
   ///
   /// In en, this message translates to:
-  /// **'LAN devices and local addresses (192.168.x.x, 10.x.x.x, …) are reached directly, not through the VPN'**
+  /// **'Reach local devices directly (192.168.x.x, 10.x.x.x)'**
   String get bypassLanHint;
 
   /// No description provided for @bypassListsHint.
@@ -1169,13 +1169,13 @@ abstract class AppLocalizations {
   /// No description provided for @alwaysOnHint.
   ///
   /// In en, this message translates to:
-  /// **'Android reconnects at boot and can block all traffic while the VPN is down. In the VPN settings tap the gear next to Omnitun and turn on \"Always-on VPN\" and \"Block connections without VPN\". Connect once from this app first.'**
+  /// **'Reconnect at boot and block traffic if the VPN drops. Set it in Android\'s VPN settings (gear next to Omnitun).'**
   String get alwaysOnHint;
 
   /// No description provided for @openVpnSettingsFallback.
   ///
   /// In en, this message translates to:
-  /// **'Open Android Settings → Network → VPN, then the gear next to Omnitun'**
+  /// **'Settings → Network → VPN → gear next to Omnitun'**
   String get openVpnSettingsFallback;
 
   /// No description provided for @splitTunneling.
@@ -1211,7 +1211,7 @@ abstract class AppLocalizations {
   /// No description provided for @remoteDnsHelp.
   ///
   /// In en, this message translates to:
-  /// **'Resolver used through the tunnel. Examples: https://1.1.1.1/dns-query, tls://1.1.1.1, tcp://8.8.8.8, 9.9.9.9'**
+  /// **'DNS used through the tunnel, e.g. https://1.1.1.1/dns-query or tls://1.1.1.1'**
   String get remoteDnsHelp;
 
   /// No description provided for @settingsApp.
@@ -1295,25 +1295,25 @@ abstract class AppLocalizations {
   /// No description provided for @splitHelpOffMode.
   ///
   /// In en, this message translates to:
-  /// **'Every app uses the VPN. Choose a mode to pick apps.'**
+  /// **'Every app uses the VPN.'**
   String get splitHelpOffMode;
 
   /// No description provided for @splitHelpOnlyNone.
   ///
   /// In en, this message translates to:
-  /// **'No apps selected yet — until you pick some, all apps use the VPN.'**
+  /// **'No apps picked: all use the VPN.'**
   String get splitHelpOnlyNone;
 
   /// No description provided for @splitHelpOnly.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Only the selected app uses the VPN.} other{Only the {count} selected apps use the VPN.}}'**
+  /// **'{count, plural, =1{Only 1 app uses the VPN.} other{Only {count} apps use the VPN.}}'**
   String splitHelpOnly(int count);
 
   /// No description provided for @splitHelpBypass.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{The selected app connects directly, without the VPN.} other{The {count} selected apps connect directly, without the VPN.}}'**
+  /// **'{count, plural, =1{1 app goes direct.} other{{count} apps go direct.}}'**
   String splitHelpBypass(int count);
 
   /// No description provided for @searchApps.
@@ -1415,7 +1415,7 @@ abstract class AppLocalizations {
   /// No description provided for @profilesDragHint.
   ///
   /// In en, this message translates to:
-  /// **'Long-press and drag to reorder. With auto-switch on, the rest of the group is tried next, in this order.'**
+  /// **'Hold and drag to reorder. Failover follows this order.'**
   String get profilesDragHint;
 
   /// No description provided for @myProfiles.
@@ -1517,7 +1517,7 @@ abstract class AppLocalizations {
   /// No description provided for @importDescription.
   ///
   /// In en, this message translates to:
-  /// **'Paste share links (vless://, trojan://, ss://, hy2://, anytls://, ssh://, sstp://, ikev2://, …), a Clash or sing-box config, a subscription, a WireGuard .conf, an OpenVPN .ovpn or Tor bridge lines — or open a file or scan a QR code.'**
+  /// **'Paste a link, config or subscription — or open a file or scan a QR code.'**
   String get importDescription;
 
   /// No description provided for @importScanQr.
@@ -1709,7 +1709,7 @@ abstract class AppLocalizations {
   /// No description provided for @subDownloadHelp.
   ///
   /// In en, this message translates to:
-  /// **'Some providers are blocked where you are; the VPN can still reach them'**
+  /// **'Provider blocked? The VPN can still fetch it'**
   String get subDownloadHelp;
 
   /// No description provided for @subViaDirect.
@@ -1721,7 +1721,7 @@ abstract class AppLocalizations {
   /// No description provided for @subViaAuto.
   ///
   /// In en, this message translates to:
-  /// **'Directly, or through the VPN if the provider is blocked'**
+  /// **'Direct, or via the VPN if blocked'**
   String get subViaAuto;
 
   /// No description provided for @subViaTunnel.
@@ -2243,7 +2243,7 @@ abstract class AppLocalizations {
   /// No description provided for @exitHint.
   ///
   /// In en, this message translates to:
-  /// **'After connecting, asks api.country.is, through the VPN, which address and country it sees. Off by default.'**
+  /// **'Ask api.country.is for your exit address and country. Off by default.'**
   String get exitHint;
 
   /// No description provided for @exitIpLabel.
@@ -2251,6 +2251,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'IP {ip}'**
   String exitIpLabel(String ip);
+
+  /// No description provided for @connectedTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to {place}'**
+  String connectedTo(String place);
 }
 
 class _AppLocalizationsDelegate

@@ -124,7 +124,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get automatic => 'Автоматически';
 
   @override
-  String get automaticHint => 'Самый быстрый сервер, переключается при сбое';
+  String get automaticHint => 'Самый быстрый сервер, меняется при сбое';
 
   @override
   String get anyServerInCountry => 'Любой сервер в этой стране';
@@ -136,8 +136,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get emptyTitle => 'Профилей пока нет';
 
   @override
-  String get emptyHint =>
-      'Импортируйте файл конфигурации, ссылку или подписку, чтобы начать.';
+  String get emptyHint => 'Импортируйте конфигурацию, ссылку или подписку.';
 
   @override
   String get importConfig => 'Импорт конфигурации';
@@ -304,7 +303,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get addServerIntro =>
-      'Выберите протокол сервера. Ссылка или QR-код быстрее: используйте «Импорт».';
+      'Выберите протокол. Ссылка или QR быстрее: используйте «Импорт».';
 
   @override
   String newServerTitle(String label) {
@@ -376,8 +375,7 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get shareScanHint =>
-      'Отсканируйте его в Omnitun на другом устройстве или скопируйте ссылку.';
+  String get shareScanHint => 'Отсканируйте в Omnitun или скопируйте ссылку.';
 
   @override
   String get shareCopy => 'Копировать ссылку';
@@ -387,7 +385,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get shareWarning =>
-      'Ссылка содержит пароль или ключ этого сервера: делитесь ею только с теми, кто может им пользоваться.';
+      'Содержит пароль или ключ сервера. Делитесь осторожно.';
 
   @override
   String shareFailed(String reason) {
@@ -402,28 +400,28 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get obText1 =>
-      'Omnitun подключает вас через VPN, прокси и Tor с одного спокойного экрана. Выберите место и нажмите «Подключить».';
+      'Один спокойный экран для VPN, прокси и Tor. Выберите место и нажмите «Подключить».';
 
   @override
   String get obTitle2 => 'Добавьте серверы';
 
   @override
   String get obText2 =>
-      'Импортируйте ссылку, QR-код, файл конфигурации или подписку вашего провайдера. Сервер можно добавить и вручную.';
+      'Импортируйте ссылку, QR-код, файл конфигурации или подписку. Или добавьте сервер вручную.';
 
   @override
   String get obTitle3Android => 'Android спросит один раз';
 
   @override
   String get obText3Android =>
-      'При первом подключении Android попросит разрешить VPN-соединение. Omnitun сможет защищать ваш трафик только после этого. Во время работы уведомление показывает скорость и кнопку «Отключить».';
+      'Android попросит разрешить VPN-соединение. Разрешите, чтобы быть защищённым.';
 
   @override
   String get obTitle3Desktop => 'Всё готово';
 
   @override
   String get obText3Desktop =>
-      'Omnitun запускается в режиме прокси, который не требует особых прав. Включите режим VPN в настройках, чтобы перехватывать весь трафик.';
+      'Запускается в режиме прокси без особых прав. Включите режим VPN в настройках, чтобы перехватывать весь трафик.';
 
   @override
   String get obAddFirst => 'Добавить первый сервер';
@@ -459,7 +457,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get bypassIntro =>
-      'Сайты и адреса, которые не должны идти через VPN, например банк или локальные службы. Одна запись в строке: example.com (и его поддомены), full:www.example.com, keyword:bank, regexp:…, 203.0.113.7 или 10.0.0.0/8. Строки, начинающиеся с #, игнорируются.';
+      'Сайты и адреса мимо VPN. По одному в строке: example.com, full:www.example.com, keyword:bank, regexp:…, 203.0.113.7 или 10.0.0.0/8. Строки с # игнорируются.';
 
   @override
   String get bypassNoLists => 'Списков пока нет.';
@@ -481,29 +479,28 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get bypassOnlyTitle => 'Через VPN идут только адреса из списков';
+  String get bypassOnlyTitle => 'Через VPN только из списков';
 
   @override
-  String get bypassOnlyOn => 'Всё остальное идёт напрямую, мимо VPN.';
+  String get bypassOnlyOn => 'Остальное идёт напрямую.';
 
   @override
-  String get bypassOnlyOff =>
-      'Выключено: адреса из списков идут напрямую, всё остальное — через VPN.';
+  String get bypassOnlyOff => 'Из списков — напрямую, остальное — через VPN.';
 
   @override
-  String get bypassNothing => 'Пока ни один список не включён, исключений нет.';
+  String get bypassNothing => 'Ни один список не включён.';
 
   @override
   String bypassInUse(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Используются $count записи',
-      many: 'Используются $count записей',
-      few: 'Используются $count записи',
-      one: 'Используется $count запись',
+      other: '$count записи используются',
+      many: '$count записей используются',
+      few: '$count записи используются',
+      one: '$count запись используется',
     );
-    return '$_temp0. Изменения применятся при следующем подключении.';
+    return '$_temp0. Применится при следующем подключении.';
   }
 
   @override
@@ -604,7 +601,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get manageServers => 'Серверы и подписки';
 
   @override
-  String get manageServersHint => 'Импорт, подписки, порядок и удаление';
+  String get manageServersHint => 'Серверы и подписки';
 
   @override
   String get settingsConnection => 'Подключение';
@@ -613,29 +610,27 @@ class AppLocalizationsRu extends AppLocalizations {
   String get vpnMode => 'Режим VPN (весь трафик)';
 
   @override
-  String get vpnModeHint =>
-      'Выкл. = только прокси: локальный порт SOCKS/HTTP, разрешение VPN не нужно';
+  String get vpnModeHint => 'Выкл.: только прокси, без разрешения VPN';
 
   @override
   String get systemProxy => 'Задать системный прокси';
 
   @override
   String get systemProxyHint =>
-      'Режим прокси: на время подключения направить системные настройки прокси на Omnitun';
+      'Включить системный прокси на время подключения';
 
   @override
   String get autoSwitch => 'Автопереключение при сбое';
 
   @override
-  String get autoSwitchHint =>
-      'Если сервер перестал работать, пробовать следующий профиль группы';
+  String get autoSwitchHint => 'При сбое пробовать следующий сервер';
 
   @override
   String get bypassLan => 'Локальная сеть мимо VPN';
 
   @override
   String get bypassLanHint =>
-      'Устройства в локальной сети и локальные адреса (192.168.x.x, 10.x.x.x, …) доступны напрямую, без VPN';
+      'Локальные устройства напрямую (192.168.x.x, 10.x.x.x)';
 
   @override
   String get bypassListsHint => 'Сайты и адреса, которые идут мимо VPN';
@@ -658,11 +653,11 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get alwaysOnHint =>
-      'Android подключает VPN при загрузке и может блокировать весь трафик, пока VPN не работает. В настройках VPN нажмите на шестерёнку рядом с Omnitun и включите «Постоянная VPN» и «Блокировать соединения без VPN». Сначала подключитесь из этого приложения хотя бы раз.';
+      'Подключаться при загрузке и блокировать трафик, если VPN упал. Включите в настройках VPN Android (шестерёнка у Omnitun).';
 
   @override
   String get openVpnSettingsFallback =>
-      'Откройте Настройки Android → Сеть → VPN, затем шестерёнку рядом с Omnitun';
+      'Настройки → Сеть → VPN → шестерёнка у Omnitun';
 
   @override
   String get splitTunneling => 'Раздельное туннелирование';
@@ -701,7 +696,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get remoteDnsHelp =>
-      'Преобразователь имён, используемый через туннель. Примеры: https://1.1.1.1/dns-query, tls://1.1.1.1, tcp://8.8.8.8, 9.9.9.9';
+      'DNS через туннель, например https://1.1.1.1/dns-query или tls://1.1.1.1';
 
   @override
   String get settingsApp => 'Приложение';
@@ -745,22 +740,20 @@ class AppLocalizationsRu extends AppLocalizations {
   String get splitBypassSelected => 'Выбранные мимо VPN';
 
   @override
-  String get splitHelpOffMode =>
-      'Все приложения используют VPN. Выберите режим, чтобы выбрать приложения.';
+  String get splitHelpOffMode => 'Все приложения используют VPN.';
 
   @override
-  String get splitHelpOnlyNone =>
-      'Приложения не выбраны — пока вы их не выберете, все приложения используют VPN.';
+  String get splitHelpOnlyNone => 'Приложения не выбраны: все используют VPN.';
 
   @override
   String splitHelpOnly(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Через VPN работают только $count выбранных приложения.',
-      many: 'Через VPN работают только $count выбранных приложений.',
-      few: 'Через VPN работают только $count выбранных приложения.',
-      one: 'Через VPN работает только $count выбранное приложение.',
+      other: 'Через VPN только $count приложения.',
+      many: 'Через VPN только $count приложений.',
+      few: 'Через VPN только $count приложения.',
+      one: 'Через VPN только $count приложение.',
     );
     return '$_temp0';
   }
@@ -770,10 +763,10 @@ class AppLocalizationsRu extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count выбранных приложения подключаются напрямую, без VPN.',
-      many: '$count выбранных приложений подключаются напрямую, без VPN.',
-      few: '$count выбранных приложения подключаются напрямую, без VPN.',
-      one: '$count выбранное приложение подключается напрямую, без VPN.',
+      other: '$count приложения идут напрямую.',
+      many: '$count приложений идут напрямую.',
+      few: '$count приложения идут напрямую.',
+      one: '$count приложение идёт напрямую.',
     );
     return '$_temp0';
   }
@@ -835,7 +828,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profilesDragHint =>
-      'Нажмите и перетащите, чтобы изменить порядок. При включённом автопереключении остальные профили группы пробуются в этом порядке.';
+      'Удерживайте и перетащите, чтобы изменить порядок. Переключение идёт в этом порядке.';
 
   @override
   String get myProfiles => 'Мои профили';
@@ -921,7 +914,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get importDescription =>
-      'Вставьте ссылки (vless://, trojan://, ss://, hy2://, anytls://, ssh://, sstp://, ikev2://, …), конфигурацию Clash или sing-box, подписку, файл WireGuard .conf, OpenVPN .ovpn или строки мостов Tor — или откройте файл или отсканируйте QR-код.';
+      'Вставьте ссылку, конфигурацию или подписку — или откройте файл или отсканируйте QR-код.';
 
   @override
   String get importScanQr => 'Сканировать QR';
@@ -1039,14 +1032,13 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get subDownloadHelp =>
-      'Некоторые провайдеры заблокированы там, где вы находитесь; через VPN они всё равно доступны';
+      'Провайдер заблокирован? VPN всё равно загрузит';
 
   @override
   String get subViaDirect => 'Напрямую';
 
   @override
-  String get subViaAuto =>
-      'Напрямую или через VPN, если провайдер заблокирован';
+  String get subViaAuto => 'Напрямую или через VPN, если заблокировано';
 
   @override
   String get subViaTunnel => 'Всегда через VPN (сначала подключитесь)';
@@ -1327,10 +1319,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get exitHint =>
-      'После подключения запрашивает у api.country.is через VPN, какой адрес и какую страну он видит. По умолчанию выключено.';
+      'Спросить у api.country.is адрес и страну выхода. По умолчанию выкл.';
 
   @override
   String exitIpLabel(String ip) {
     return 'IP $ip';
+  }
+
+  @override
+  String connectedTo(String place) {
+    return 'Подключено: $place';
   }
 }

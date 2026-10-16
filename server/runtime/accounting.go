@@ -42,6 +42,12 @@ func protocolKey(inbound string) string {
 	return inbound
 }
 
+// tunnelProtocol is true for the protocols whose users are told apart by the
+// tunnel address their connections come from.
+func tunnelProtocol(key string) bool {
+	return key == "wireguard" || key == "openvpn-udp" || key == "openvpn-tcp"
+}
+
 // seenConn is what was already counted of one connection.
 type seenConn struct {
 	user     string
@@ -63,8 +69,8 @@ const countedFor = 5 * time.Minute
 type collector struct {
 	tm *trafficcontrol.Manager
 	tr *stats.Tracker
-	// userByIP names the user behind a WireGuard tunnel address: the
-	// endpoint does not report users, but every user has a fixed address.
+	// userByIP names the user behind a WireGuard or OpenVPN tunnel address:
+	// those endpoints do not report users with their connections.
 	userByIP func(netip.Addr) string
 	last     time.Time
 	started  time.Time
@@ -150,19 +156,21 @@ func (c *collector) countClosedLocked(md *trafficcontrol.TrackerMetadata) (user 
 }
 
 // userOf is the user a connection belongs to: the authenticated user the
-// inbound reported, or for WireGuard the owner of the source address.
+// inbound reported, or for WireGuard and OpenVPN the owner of the source address.
 func (c *collector) userOf(md *trafficcontrol.TrackerMetadata) string {
 	if u := md.Metadata.User; u != "" {
 		return u
 	}
-	if protocolKey(md.Metadata.Inbound) == "wireguard" && c.userByIP != nil && md.Metadata.Source.IsValid() {
+	if tunnelProtocol(protocolKey(md.Metadata.Inbound)) && c.userByIP != nil && md.Metadata.Source.IsValid() {
 		return c.userByIP(md.Metadata.Source.Addr)
 	}
 	return ""
 }
 
-// tick counts the traffic since the previous tick.
-func (c *collector) tick() {
+// tick counts the traffic since the previous tick. It returns what sing-box's
+// users are doing now (connections and speed per user, connections per
+// protocol); the caller publishes it together with the host servers' numbers.
+func (c *collector) tick() (map[string]stats.Live, map[string]int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	now := time.Now()
@@ -199,7 +207,6 @@ func (c *collector) tick() {
 		l.Connections++
 		live[user] = l
 	}
-	c.tr.SetProtocolConnections(liveProto)
 
 	// The fallback: closed connections still in sing-box's list that no event
 	// counted (an event can be dropped when a burst fills its queue).
@@ -223,7 +230,31 @@ func (c *collector) tick() {
 			delete(c.seen, id)
 		}
 	}
-	c.tr.SetLive(live)
+	return live, liveProto
+}
+
+// publishLive tells the tracker what everyone is doing now: sing-box's
+// connections, as the collector counted them, and those of the host servers.
+func (s *Server) publishLive(box map[string]stats.Live, boxProto map[string]int) {
+	hostLive, hostProto := s.meters.live()
+	users := map[string]stats.Live{}
+	for _, m := range []map[string]stats.Live{box, hostLive} {
+		for name, l := range m {
+			u := users[name]
+			u.Connections += l.Connections
+			u.UpBps += l.UpBps
+			u.DownBps += l.DownBps
+			users[name] = u
+		}
+	}
+	protocols := map[string]int{}
+	for _, m := range []map[string]int{boxProto, hostProto} {
+		for key, n := range m {
+			protocols[key] += n
+		}
+	}
+	s.tracker.SetLive(users)
+	s.tracker.SetProtocolConnections(protocols)
 }
 
 // accountingLoop runs for the server's whole life (not one sing-box run): it
@@ -242,12 +273,15 @@ func (s *Server) accountingLoop(ctx context.Context) {
 			return
 		case <-t.C:
 		}
+		var boxLive map[string]stats.Live
+		var boxProto map[string]int
 		s.accMu.Lock()
 		if s.coll != nil {
-			s.coll.tick()
+			boxLive, boxProto = s.coll.tick()
 		}
 		s.accMu.Unlock()
 		s.meters.collect(s.tracker)
+		s.publishLive(boxLive, boxProto)
 		if n%enforceEvery == 0 {
 			s.enforceQuotas()
 			if err := s.tracker.Save(); err != nil {

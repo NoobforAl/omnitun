@@ -28,3 +28,5 @@ Trimmed: docs, tests, CLI (`cmd/`), packaging and upstream agent files.
    and UDP-encapsulates. The server has no raw-IP ESP path; a client on a network
    without NAT (strongSwan in Docker) otherwise sent bare ESP the server never
    received. Found by `tools/dockertest`.
+7. `sstp/server.go` `Server.Sessions()`: connected clients by user name, for the
+   server's live connection counts.

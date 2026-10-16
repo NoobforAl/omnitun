@@ -13,13 +13,12 @@ import '../widgets/connection_ring.dart';
 import '../widgets/country_flag.dart';
 import '../widgets/credentials_dialog.dart';
 import 'location_screen.dart';
-import 'logs_screen.dart';
 import 'profiles_screen.dart';
 import 'settings_screen.dart';
 
 /// The one screen of the app: how safe you are, where you exit, one button.
-/// Locations, logs and settings open from here and close with Back; there is
-/// no navigation bar.
+/// Locations and settings open from here and close with Back; there is no
+/// navigation bar.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -42,26 +41,40 @@ class HomeScreen extends ConsumerWidget {
     });
 
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Center(
-          child: ConstrainedBox(
-            // On a wide window the same screen stays one narrow column.
-            constraints: const BoxConstraints(maxWidth: _columnWidth),
-            child: Column(
-              children: [
-                const _TopBar(),
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, box) => SingleChildScrollView(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(minHeight: box.maxHeight),
-                        child: Center(child: _Hero(state: conn)),
+      body: DecoratedBox(
+        // A wash of the status colour fading into the page: calm when off, green when safe.
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color.alphaBlend(statusColor(conn.status, scheme).withValues(alpha: 0.14), scheme.surface),
+              scheme.surface,
+            ],
+            stops: const [0, 0.7],
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Center(
+            child: ConstrainedBox(
+              // On a wide window the same screen stays one narrow column.
+              constraints: const BoxConstraints(maxWidth: _columnWidth),
+              child: Column(
+                children: [
+                  const _TopBar(),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, box) => SingleChildScrollView(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minHeight: box.maxHeight),
+                          child: Center(child: _Hero(state: conn)),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -83,32 +96,53 @@ class HomeScreen extends ConsumerWidget {
 
 const _columnWidth = 480.0;
 
+/// Connects, cancels or disconnects, asking for a password first when the
+/// server needs one. Shared by the power ring and the main button.
+Future<void> _toggle(BuildContext context, WidgetRef ref) async {
+  final ctrl = ref.read(connectionProvider.notifier);
+  if (ref.read(connectionPlanProvider) == null || ref.read(connectionProvider).status == ConnStatus.disconnecting) {
+    return;
+  }
+  final profile = ref.read(selectedProfileProvider);
+  if (!ctrl.isActive && profile != null && profile.needsCredentials && !profile.hasCredentials) {
+    if (!await askCredentials(context, ref, profile)) return;
+  }
+  ctrl.toggle();
+}
+
 class _TopBar extends StatelessWidget {
   const _TopBar();
 
-  void _open(BuildContext context, Widget page) =>
-      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
-
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+      padding: const EdgeInsets.fromLTRB(20, 10, 8, 0),
       child: Row(
         children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(9),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [brandIndigo, brandViolet],
+              ),
+            ),
+            child: const Icon(Icons.shield_rounded, size: 18, color: Colors.white),
+          ),
+          const SizedBox(width: 10),
           Text(
-            'OMNITUN',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: 2.4),
+            context.l10n.appName,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(color: scheme.onSurface),
           ),
           const Spacer(),
           IconButton(
-            tooltip: context.l10n.tooltipLogs,
-            onPressed: () => _open(context, const LogsScreen()),
-            icon: const Icon(Icons.receipt_long_outlined),
-          ),
-          IconButton(
             tooltip: context.l10n.tooltipSettings,
-            onPressed: () => _open(context, const SettingsScreen()),
-            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen())),
+            icon: const Icon(Icons.tune_rounded),
           ),
         ],
       ),
@@ -160,19 +194,22 @@ class _HeroState extends ConsumerState<_Hero> {
     final active = profiles.where((p) => p.id == s.activeProfileId).firstOrNull;
     final connected = s.status == ConnStatus.connected;
     final exit = ref.watch(exitProvider);
+    final tor = active?.protocol == 'tor';
     // The country the service saw is the truth; the guess is the fallback.
-    final code = active?.protocol == 'tor' ? null : exit?.country ?? (active == null ? null : countryOf(active));
+    final code = tor ? null : exit?.country ?? (active == null ? null : countryOf(active));
+    // Where you appear to be: the country, or Tor; null when it is not known.
+    final place = tor ? context.l10n.torNetwork : (code == null ? null : countryNames[code] ?? code);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ConnectionRing(status: s.status, progress: s.progress),
+          ConnectionRing(status: s.status, progress: s.progress, onTap: () => _toggle(context, ref)),
           const SizedBox(height: 28),
           Text(
-            statusLabel(context.l10n, s.status),
-            style: text.titleLarge?.copyWith(color: color, fontWeight: FontWeight.w700),
+            connected && place != null ? context.l10n.connectedTo(place) : statusLabel(context.l10n, s.status),
+            style: text.headlineSmall?.copyWith(color: color),
             textAlign: TextAlign.center,
           ),
           // While connecting, say which step is running (and for which profile).
@@ -190,54 +227,72 @@ class _HeroState extends ConsumerState<_Hero> {
               ),
             ),
           if (connected && active != null) ...[
-            const SizedBox(height: 14),
-            // Where you exit: the country, or Tor; nothing when the country is not known.
-            if (code != null || active.protocol == 'tor')
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CountryFlag(
-                    code,
-                    size: 28,
-                    icon: Icons.security,
-                    label: active.protocol == 'tor' ? context.l10n.torNetwork : null,
-                  ),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    child: Text(
-                      active.protocol == 'tor' ? context.l10n.torNetwork : countryNames[code] ?? code!,
-                      style: text.titleMedium,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            const SizedBox(height: 4),
-            if (exit != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Text(
-                  context.l10n.exitIpLabel(exit.ip),
-                  textDirection: TextDirection.ltr,
-                  style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-              ),
-            Text(
-              active.name,
-              style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
+            const SizedBox(height: 18),
+            _ExitChip(code: code, tor: tor, title: active.name, ip: exit?.ip),
           ],
           if (connected && s.connectedSince != null) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: 18),
             Text(
               _elapsed(s.connectedSince!),
-              style: text.bodyLarge?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+              style: text.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w500,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             _TrafficRow(up: s.upBps, down: s.downBps),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The flag of the exit country with the server's name and, when known, the exit address.
+class _ExitChip extends StatelessWidget {
+  const _ExitChip({required this.code, required this.tor, required this.title, this.ip});
+
+  final String? code;
+  final bool tor;
+  final String title;
+  final String? ip;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsetsDirectional.fromSTEB(8, 8, 18, 8),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(40),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CountryFlag(
+            code,
+            size: 40,
+            icon: tor ? Icons.security : Icons.public,
+            label: tor ? context.l10n.torNetwork : null,
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(title, style: text.titleMedium, overflow: TextOverflow.ellipsis),
+                if (ip != null)
+                  Text(
+                    context.l10n.exitIpLabel(ip!),
+                    textDirection: TextDirection.ltr,
+                    style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -258,17 +313,26 @@ class _TrafficRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodyMedium
-        ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant);
+    final scheme = Theme.of(context).colorScheme;
+    Widget pill(IconData icon, int bps) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(color: scheme.surfaceContainer, borderRadius: BorderRadius.circular(20)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: scheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            _fmt(bps),
+            textDirection: TextDirection.ltr,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Icon(Icons.arrow_downward, size: 16),
-        Text(' ${_fmt(down)}', style: style),
-        const SizedBox(width: 20),
-        const Icon(Icons.arrow_upward, size: 16),
-        Text(' ${_fmt(up)}', style: style),
-      ],
+      children: [pill(Icons.south_rounded, down), const SizedBox(width: 10), pill(Icons.north_rounded, up)],
     );
   }
 }
@@ -287,7 +351,6 @@ class _BottomPanel extends ConsumerWidget {
     final plan = ref.watch(connectionPlanProvider);
     final choice = ref.watch(selectedProfileIdProvider);
     final countryOf = ref.watch(profileCountryProvider);
-    final ctrl = ref.read(connectionProvider.notifier);
 
     final active = switch (state.status) {
       ConnStatus.connected || ConnStatus.connecting || ConnStatus.noInternet => true,
@@ -295,7 +358,6 @@ class _BottomPanel extends ConsumerWidget {
     };
     final connected = state.status == ConnStatus.connected || state.status == ConnStatus.noInternet;
     final busy = state.status == ConnStatus.disconnecting;
-    final buttonText = active && !connected ? scheme.onSecondaryContainer : Colors.white;
 
     // What the row says: the choice, not the server it ended up on.
     final code = countryOfChoice(choice);
@@ -307,12 +369,13 @@ class _BottomPanel extends ConsumerWidget {
         : code != null
         ? (code, countryNames[code] ?? code, context.l10n.anyServerInCountry)
         : (null, context.l10n.automatic, context.l10n.automaticHint);
-    final rowIcon = specific == null ? Icons.bolt : (specific.protocol == 'tor' ? Icons.security : Icons.public);
+    final rowIcon = specific == null ? Icons.bolt_rounded : (specific.protocol == 'tor' ? Icons.security : Icons.public);
 
     return Container(
       decoration: BoxDecoration(
         color: scheme.surfaceContainer,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       child: Column(
@@ -333,22 +396,25 @@ class _BottomPanel extends ConsumerWidget {
           else ...[
             Material(
               color: scheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(18),
               child: InkWell(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(18),
                 onTap: () =>
                     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const LocationScreen())),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   child: Row(
                     children: [
-                      CountryFlag(flagCode, size: 36, icon: rowIcon, label: title),
+                      CountryFlag(flagCode, size: 40, icon: rowIcon, label: title),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(context.l10n.locationLabel, style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                            Text(
+                              context.l10n.locationLabel,
+                              style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                            ),
                             Text(title, style: text.titleMedium, overflow: TextOverflow.ellipsis),
                             Text(
                               subtitle,
@@ -358,40 +424,74 @@ class _BottomPanel extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      const Icon(Icons.chevron_right),
+                      Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
                     ],
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 14),
-            SizedBox(
-              height: 56,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: connected ? disconnectRed : (active ? scheme.secondaryContainer : connectedGreen),
-                  foregroundColor: buttonText,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                onPressed: busy
-                    ? null
-                    : () async {
-                        final profile = ref.read(selectedProfileProvider);
-                        if (!ctrl.isActive && profile != null && profile.needsCredentials && !profile.hasCredentials) {
-                          if (!await askCredentials(context, ref, profile)) return;
-                        }
-                        ctrl.toggle();
-                      },
-                child: Text(
-                  connected
-                      ? context.l10n.buttonDisconnect
-                      : (active ? context.l10n.buttonCancel : context.l10n.buttonConnect),
-                  style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: buttonText),
-                ),
-              ),
+            _MainButton(
+              label: connected
+                  ? context.l10n.buttonDisconnect
+                  : (active ? context.l10n.buttonCancel : context.l10n.buttonConnect),
+              kind: connected ? _ButtonKind.stop : (active ? _ButtonKind.cancel : _ButtonKind.go),
+              onPressed: busy ? null : () => _toggle(context, ref),
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+enum _ButtonKind { go, stop, cancel }
+
+/// The one big button: a gradient to connect, a red tint to disconnect, a quiet one to cancel.
+class _MainButton extends StatelessWidget {
+  const _MainButton({required this.label, required this.kind, required this.onPressed});
+
+  final String label;
+  final _ButtonKind kind;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final (fill, fg) = switch (kind) {
+      _ButtonKind.go => (null, Colors.white),
+      _ButtonKind.stop => (disconnectRed.withValues(alpha: 0.16), disconnectRed),
+      _ButtonKind.cancel => (scheme.surfaceContainerHighest, scheme.onSurface),
+    };
+    return Opacity(
+      opacity: onPressed == null ? 0.5 : 1,
+      child: Material(
+        color: fill ?? Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: fill == null
+                ? const LinearGradient(
+                    colors: [brandIndigo, brandViolet],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  )
+                : null,
+          ),
+          child: InkWell(
+            onTap: onPressed,
+            child: SizedBox(
+              height: 58,
+              child: Center(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(color: fg, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

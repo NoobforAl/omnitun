@@ -291,3 +291,5 @@ tool (
 )
 
 replace github.com/xen0bit/veepin => ./third_party/veepin
+
+replace github.com/sagernet/sing-openvpn => ./third_party/sing-openvpn

@@ -102,12 +102,21 @@ def user_info():
     return sub, password, d
 
 
-def usage():
-    r = dx("e2e-server", "omnitun-server --data /data proto list --json", check=False)
+def cli_json(*args):
+    r = dx("e2e-server", "omnitun-server --data /data --json " + " ".join(args), check=False)
     try:
         return json.loads(r.stdout)
     except ValueError:
-        return r.stdout
+        return None
+
+
+def alice():
+    users = cli_json("user", "list") or []
+    return next((u for u in users if u["name"] == "alice"), None)
+
+
+def proto(key):
+    return next((p for p in (cli_json("proto", "list") or []) if p["key"] == key), None)
 
 
 def start_client():
@@ -221,6 +230,31 @@ def through_tunnel():
     return r.stdout.strip()
 
 
+MB = 2  # one download; they are repeated for 24 s so that the server's 10-second stats file always sees traffic
+
+
+def watch_live(name):
+    """Slow downloads; while they run, the server must show the user's connection and speed."""
+    sh("docker", "exec", "-d", "e2e-client", "sh", "-c",
+       "timeout 24 sh -c 'while true; do curl -s -o /dev/null --limit-rate 300k http://%s:8080/big?mb=%d; done'" % (WEB_B, MB))
+    best = {"connections": 0, "speed": 0}
+    for _ in range(8):
+        time.sleep(3)
+        u = alice()
+        if u:
+            us = u["usage"]
+            best["connections"] = max(best["connections"], us["connections"])
+            best["speed"] = max(best["speed"], us["up_bps"] + us["down_bps"])
+    return best
+
+
+def wait_download_done():
+    for _ in range(40):
+        if dx("e2e-client", "pgrep -x curl", check=False).returncode != 0:
+            return
+        time.sleep(1)
+
+
 def diagnostics(name):
     print("--- diagnostics for", name, "---")
     print(dx("e2e-client", "ip -br addr; ip route; tail -n 25 /tmp/*.log 2>/dev/null", check=False).stdout[-2500:])
@@ -232,6 +266,7 @@ def main():
     ap.add_argument("protocols", nargs="*", default=PROTOCOLS)
     ap.add_argument("--keep", action="store_true", help="leave the containers running")
     ap.add_argument("--no-build", action="store_true")
+    ap.add_argument("--quick", action="store_true", help="only check the tunnel, not the server's live numbers and accounting")
     args = ap.parse_args()
     if shutil.which("docker") is None or sh("docker", "info", check=False).returncode != 0:
         sys.exit("Docker is not running")
@@ -239,34 +274,49 @@ def main():
         build()
     start_world()
     sub, pw, _ = user_info()
-    results = {}
+    rows = []
     for name in args.protocols:
         print("\n=== %s ===" % name)
         start_client()
-        ok = False
+        tunnel = live_ok = counted_ok = False
+        live, attributed, proto_bytes = {"connections": 0, "speed": 0}, 0, 0
         try:
-            ok = CLIENTS[name](sub, pw, None)
-            answer = through_tunnel() if ok else ""
-            ok = ok and answer == "client=%s" % SERVER_B
+            before_user = (alice() or {"usage": {"month_bytes": 0}})["usage"]["month_bytes"]
+            before_proto = (proto(PROTO_KEY[name]) or {}).get("month_bytes", 0)
+            tunnel = CLIENTS[name](sub, pw, None)
+            answer = through_tunnel() if tunnel else ""
+            tunnel = tunnel and answer == "client=%s" % SERVER_B
             print("  through the tunnel: %r (want client=%s)" % (answer, SERVER_B))
+            if tunnel and not args.quick:
+                live = watch_live(name)
+                wait_download_done()
+                sh("docker", "rm", "-f", "e2e-client", check=False)  # the client leaves
+                time.sleep(13)  # the server counts, then saves its stats file
+                attributed = alice()["usage"]["month_bytes"] - before_user
+                proto_bytes = (proto(PROTO_KEY[name]) or {}).get("month_bytes", 0) - before_proto
+                live_ok = live["connections"] >= 1 and live["speed"] > 0
+                counted_ok = attributed >= (MB << 20)
+                print("  live while downloading: %d connection(s), %.0f KB/s" % (live["connections"], live["speed"] / 1024))
+                print("  counted for alice: %.1f MB; for the protocol: %.1f MB (each download was %d MB)" % (
+                    attributed / 1048576, proto_bytes / 1048576, MB))
         except Exception as e:  # noqa: BLE001
             print("  error:", e)
-        results[name] = ok
-        if not ok:
+        if not tunnel:
             diagnostics(name)
         sh("docker", "rm", "-f", "e2e-client", check=False)
-    # Accounting needs the stats file written (every 10 s).
-    time.sleep(12)
-    print("\n=== accounting (what the server counted) ===")
-    u = dx("e2e-server", "omnitun-server --data /data user usage alice", check=False).stdout
-    print(u)
-    print(dx("e2e-server", "omnitun-server --data /data proto list", check=False).stdout)
+        rows.append((name, tunnel, live_ok, counted_ok))
     print("\n=== results ===")
-    for k, v in results.items():
-        print("  %-12s %s" % (k, "PASS" if v else "FAIL"))
+    print("  %-12s %-8s %-18s %s" % ("protocol", "tunnel", "live conn + speed", "counted for the user"))
+    ok = True
+    for name, tunnel, live_ok, counted_ok in rows:
+        if args.quick:
+            live_ok = counted_ok = None
+        print("  %-12s %-8s %-18s %s" % (name, "PASS" if tunnel else "FAIL", "-" if live_ok is None else ("PASS" if live_ok else "FAIL"),
+                                         "-" if counted_ok is None else ("PASS" if counted_ok else "FAIL")))
+        ok = ok and tunnel and live_ok is not False and counted_ok is not False
     if not args.keep:
         cleanup()
-    sys.exit(0 if all(results.values()) else 1)
+    sys.exit(0 if ok else 1)
 
 
 if __name__ == "__main__":

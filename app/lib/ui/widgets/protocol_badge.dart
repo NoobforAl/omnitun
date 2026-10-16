@@ -41,7 +41,7 @@ class LatencyText extends StatelessWidget {
       null => ('—', scheme.outline),
       -1 => (context.l10n.latencyTimeout, scheme.error),
       final v when v < 150 => (context.l10n.latencyMs(v), const Color(0xFF1FA67A)),
-      final v when v < 400 => (context.l10n.latencyMs(v), const Color(0xFFE0A100)),
+      final v when v < 400 => (context.l10n.latencyMs(v), connectingAmber),
       final v => (context.l10n.latencyMs(v), scheme.error),
     };
     return Text(text, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color));

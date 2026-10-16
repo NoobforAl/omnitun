@@ -124,8 +124,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get automatic => 'خودکار';
 
   @override
-  String get automaticHint =>
-      'سریع‌ترین سرور؛ اگر سروری از کار بیفتد عوض می‌شود';
+  String get automaticHint => 'سریع‌ترین سرور؛ در صورت خرابی عوض می‌شود';
 
   @override
   String get anyServerInCountry => 'هر سروری در این کشور';
@@ -137,8 +136,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get emptyTitle => 'هنوز پروفایلی نیست';
 
   @override
-  String get emptyHint =>
-      'برای شروع، یک فایل پیکربندی، لینک یا اشتراک وارد کنید.';
+  String get emptyHint => 'یک پیکربندی، لینک یا اشتراک وارد کنید.';
 
   @override
   String get importConfig => 'وارد کردن پیکربندی';
@@ -302,7 +300,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get addServerIntro =>
-      'پروتکل سرور خود را انتخاب کنید. لینک اشتراک یا کد QR سریع‌تر است: از «وارد کردن» استفاده کنید.';
+      'پروتکل را انتخاب کنید. لینک یا QR سریع‌تر است: از «وارد کردن» استفاده کنید.';
 
   @override
   String newServerTitle(String label) {
@@ -374,8 +372,7 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get shareScanHint =>
-      'آن را با Omnitun در دستگاه دیگر اسکن کنید یا لینک را کپی کنید.';
+  String get shareScanHint => 'با Omnitun اسکن کنید یا لینک را کپی کنید.';
 
   @override
   String get shareCopy => 'کپی لینک';
@@ -385,7 +382,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get shareWarning =>
-      'لینک شامل گذرواژه یا کلید این سرور است: فقط با کسانی به اشتراک بگذارید که مجاز به استفاده از سرور هستند.';
+      'شامل گذرواژه یا کلید سرور است. با احتیاط به اشتراک بگذارید.';
 
   @override
   String shareFailed(String reason) {
@@ -401,28 +398,28 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get obText1 =>
-      'Omnitun شما را از طریق پروتکل‌های VPN، پروکسی و Tor در یک صفحه آرام وصل می‌کند. مکانی انتخاب کنید و «اتصال» را بزنید.';
+      'یک صفحه آرام برای VPN، پروکسی و Tor. مکانی انتخاب کنید و «اتصال» را بزنید.';
 
   @override
   String get obTitle2 => 'سرورهایتان را اضافه کنید';
 
   @override
   String get obText2 =>
-      'لینک اشتراک‌گذاری، کد QR، فایل پیکربندی یا اشتراک ارائه‌دهنده را وارد کنید. می‌توانید سرور را دستی هم اضافه کنید.';
+      'لینک، کد QR، فایل پیکربندی یا اشتراک را وارد کنید. یا سرور را دستی اضافه کنید.';
 
   @override
   String get obTitle3Android => 'اندروید یک بار اجازه می‌پرسد';
 
   @override
   String get obText3Android =>
-      'بار اول که وصل می‌شوید، اندروید اجازه‌ی اتصال VPN را می‌پرسد. Omnitun فقط پس از پذیرفتن شما می‌تواند ترافیکتان را محافظت کند. هنگام اتصال، یک اعلان سرعت و دکمه‌ی قطع اتصال را نشان می‌دهد.';
+      'اندروید اجازه‌ی اتصال VPN را می‌پرسد. برای محافظت، آن را بپذیرید.';
 
   @override
   String get obTitle3Desktop => 'آماده‌ایم';
 
   @override
   String get obText3Desktop =>
-      'Omnitun در حالت پروکسی شروع می‌شود که به دسترسی ویژه نیاز ندارد. برای عبور همه ترافیک، حالت VPN را در تنظیمات روشن کنید.';
+      'در حالت پروکسی و بدون دسترسی ویژه شروع می‌شود. برای عبور همه ترافیک، حالت VPN را در تنظیمات روشن کنید.';
 
   @override
   String get obAddFirst => 'افزودن اولین سرور';
@@ -458,7 +455,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get bypassIntro =>
-      'وب‌سایت‌ها و نشانی‌هایی که نباید از ‎VPN‎ استفاده کنند، مثلاً بانک یا سرویس‌های محلی. در هر خط یک مورد: ‎example.com‎ (و زیردامنه‌هایش)، ‎full:www.example.com‎، ‎keyword:bank‎، ‎regexp‎:…، ‎203.0.113.7‎ یا ‎10.0.0.0/8‎. خط‌هایی که با # شروع شوند نادیده گرفته می‌شوند.';
+      'سایت‌ها و نشانی‌هایی که از VPN رد می‌شوند. هر خط یک مورد: ‎example.com‎، ‎full:www.example.com‎، ‎keyword:bank‎، ‎regexp:…‎، ‎203.0.113.7‎ یا ‎10.0.0.0/8‎. خط‌های شروع‌شونده با # نادیده گرفته می‌شوند.';
 
   @override
   String get bypassNoLists => 'هنوز فهرستی نیست.';
@@ -478,27 +475,26 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get bypassOnlyTitle => 'فقط مقصدهای فهرست از VPN استفاده کنند';
+  String get bypassOnlyTitle => 'فقط موارد فهرست از VPN استفاده کنند';
 
   @override
-  String get bypassOnlyOn => 'بقیه مستقیم و بیرون از VPN می‌روند.';
+  String get bypassOnlyOn => 'بقیه مستقیم می‌روند.';
 
   @override
-  String get bypassOnlyOff =>
-      'خاموش: مقصدهای فهرست مستقیم می‌روند و بقیه از VPN استفاده می‌کنند.';
+  String get bypassOnlyOff => 'موارد فهرست مستقیم؛ بقیه از VPN.';
 
   @override
-  String get bypassNothing => 'تا وقتی فهرستی روشن نباشد چیزی مستثنی نمی‌شود.';
+  String get bypassNothing => 'هیچ فهرستی روشن نیست.';
 
   @override
   String bypassInUse(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count مورد در حال استفاده است',
-      one: '1 مورد در حال استفاده است',
+      other: '$count مورد در استفاده',
+      one: '1 مورد در استفاده',
     );
-    return '$_temp0. تغییرات در اتصال بعدی اعمال می‌شود.';
+    return '$_temp0. در اتصال بعدی اعمال می‌شود.';
   }
 
   @override
@@ -592,7 +588,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get manageServers => 'مدیریت سرورها';
 
   @override
-  String get manageServersHint => 'وارد کردن، اشتراک‌ها، ترتیب و حذف';
+  String get manageServersHint => 'سرورها و اشتراک‌ها';
 
   @override
   String get settingsConnection => 'اتصال';
@@ -601,29 +597,26 @@ class AppLocalizationsFa extends AppLocalizations {
   String get vpnMode => 'حالت VPN (همه ترافیک)';
 
   @override
-  String get vpnModeHint =>
-      'خاموش = فقط پروکسی: پورت محلی SOCKS/HTTP، بدون نیاز به مجوز VPN';
+  String get vpnModeHint => 'خاموش: فقط پروکسی، بدون مجوز VPN';
 
   @override
   String get systemProxy => 'تنظیم پروکسی سیستم';
 
   @override
-  String get systemProxyHint =>
-      'حالت پروکسی: هنگام اتصال، تنظیمات پروکسی سیستم‌عامل به Omnitun اشاره می‌کند';
+  String get systemProxyHint => 'تنظیم پروکسی سیستم هنگام اتصال';
 
   @override
   String get autoSwitch => 'تغییر خودکار هنگام خرابی';
 
   @override
-  String get autoSwitchHint =>
-      'وقتی سروری از کار بیفتد، پروفایل بعدی گروه امتحان می‌شود';
+  String get autoSwitchHint => 'اگر سروری خراب شد، سرور بعدی امتحان شود';
 
   @override
   String get bypassLan => 'عبور مستقیم شبکه محلی';
 
   @override
   String get bypassLanHint =>
-      'دستگاه‌های شبکه محلی و نشانی‌های محلی (‎192.168.x.x‎، ‎10.x.x.x‎ و …) مستقیم، بدون ‎VPN‎ در دسترس‌اند';
+      'دستگاه‌های محلی مستقیم در دسترس‌اند (‎192.168.x.x‎، ‎10.x.x.x‎)';
 
   @override
   String get bypassListsHint =>
@@ -645,11 +638,11 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get alwaysOnHint =>
-      'اندروید هنگام راه‌اندازی دوباره وصل می‌شود و می‌تواند وقتی VPN قطع است همه ترافیک را مسدود کند. در تنظیمات VPN روی چرخ‌دنده کنار Omnitun بزنید و «VPN همیشه روشن» و «مسدود کردن اتصال‌های بدون VPN» را روشن کنید. ابتدا یک بار از همین برنامه وصل شوید.';
+      'اتصال دوباره هنگام راه‌اندازی و مسدود کردن ترافیک در صورت قطع VPN. در تنظیمات VPN اندروید (چرخ‌دنده کنار Omnitun) روشن کنید.';
 
   @override
   String get openVpnSettingsFallback =>
-      'تنظیمات اندروید ← شبکه ← VPN را باز کنید و سپس چرخ‌دنده کنار Omnitun را بزنید';
+      'تنظیمات ← شبکه ← VPN ← چرخ‌دنده کنار Omnitun';
 
   @override
   String get splitTunneling => 'تونل تفکیکی';
@@ -684,7 +677,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get remoteDnsHelp =>
-      'نام‌گشایی که از طریق تونل استفاده می‌شود. مثال: ‎https://1.1.1.1/dns-query‎، ‎tls://1.1.1.1‎، ‎tcp://8.8.8.8‎، ‎9.9.9.9‎';
+      'DNS مورد استفاده در تونل، مثلاً ‎https://1.1.1.1/dns-query‎ یا ‎tls://1.1.1.1‎';
 
   @override
   String get settingsApp => 'برنامه';
@@ -728,20 +721,19 @@ class AppLocalizationsFa extends AppLocalizations {
   String get splitBypassSelected => 'بدون VPN برای انتخاب‌شده‌ها';
 
   @override
-  String get splitHelpOffMode =>
-      'همه برنامه‌ها از VPN استفاده می‌کنند. برای انتخاب برنامه‌ها یک حالت را برگزینید.';
+  String get splitHelpOffMode => 'همه برنامه‌ها از VPN استفاده می‌کنند.';
 
   @override
   String get splitHelpOnlyNone =>
-      'هنوز برنامه‌ای انتخاب نشده — تا وقتی انتخاب نکنید، همه برنامه‌ها از VPN استفاده می‌کنند.';
+      'برنامه‌ای انتخاب نشده: همه از VPN استفاده می‌کنند.';
 
   @override
   String splitHelpOnly(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'فقط $count برنامه‌ی انتخاب‌شده از VPN استفاده می‌کنند.',
-      one: 'فقط برنامه‌ی انتخاب‌شده از VPN استفاده می‌کند.',
+      other: 'فقط $count برنامه از VPN استفاده می‌کنند.',
+      one: 'فقط 1 برنامه از VPN استفاده می‌کند.',
     );
     return '$_temp0';
   }
@@ -751,8 +743,8 @@ class AppLocalizationsFa extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count برنامه‌ی انتخاب‌شده مستقیم و بدون VPN وصل می‌شوند.',
-      one: 'برنامه‌ی انتخاب‌شده مستقیم و بدون VPN وصل می‌شود.',
+      other: '$count برنامه مستقیم وصل می‌شوند.',
+      one: '1 برنامه مستقیم وصل می‌شود.',
     );
     return '$_temp0';
   }
@@ -814,7 +806,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get profilesDragHint =>
-      'برای تغییر ترتیب، نگه دارید و بکشید. با روشن بودن تغییر خودکار، بقیه‌ی گروه به همین ترتیب امتحان می‌شوند.';
+      'برای تغییر ترتیب نگه دارید و بکشید. تعویض خودکار به همین ترتیب است.';
 
   @override
   String get myProfiles => 'پروفایل‌های من';
@@ -896,7 +888,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get importDescription =>
-      'لینک‌های اشتراک‌گذاری (vless://، trojan://، ss://، hy2://، anytls://، ssh://، sstp://، ikev2:// و …)، پیکربندی Clash یا sing-box، یک اشتراک، فایل conf. وایرگارد، فایل ovpn. اوپن‌وی‌پی‌ان یا خط‌های پل Tor را بچسبانید — یا فایلی باز کنید یا کد QR اسکن کنید.';
+      'لینک، پیکربندی یا اشتراک را بچسبانید — یا فایلی باز کنید یا کد QR اسکن کنید.';
 
   @override
   String get importScanQr => 'اسکن QR';
@@ -1011,14 +1003,13 @@ class AppLocalizationsFa extends AppLocalizations {
   String get subDownloadLabel => 'دانلود';
 
   @override
-  String get subDownloadHelp =>
-      'برخی ارائه‌دهندگان در محل شما مسدودند؛ VPN همچنان می‌تواند به آن‌ها برسد';
+  String get subDownloadHelp => 'ارائه‌دهنده مسدود است؟ VPN باز هم می‌رسد';
 
   @override
   String get subViaDirect => 'مستقیم';
 
   @override
-  String get subViaAuto => 'مستقیم، یا از طریق VPN اگر ارائه‌دهنده مسدود است';
+  String get subViaAuto => 'مستقیم، یا با VPN اگر مسدود بود';
 
   @override
   String get subViaTunnel => 'همیشه از طریق VPN (ابتدا وصل شوید)';
@@ -1297,10 +1288,15 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get exitHint =>
-      'پس از اتصال، از طریق VPN از api.country.is می‌پرسد چه نشانی و کشوری می‌بیند. به‌طور پیش‌فرض خاموش است.';
+      'نشانی و کشور خروجی را از api.country.is بپرس. پیش‌فرض: خاموش.';
 
   @override
   String exitIpLabel(String ip) {
     return 'IP‎ $ip';
+  }
+
+  @override
+  String connectedTo(String place) {
+    return 'متصل به $place';
   }
 }

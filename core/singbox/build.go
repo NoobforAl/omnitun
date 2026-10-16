@@ -207,15 +207,25 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 		}
 		// Local networks don't enter the VPN at all (unless ProxyPrivate), nor do
 		// the address ranges of the user's bypass list.
-		var excluded []netip.Prefix
+		var local []netip.Prefix
 		if !opts.ProxyPrivate {
-			excluded = BypassPrefixes(profileKeep(profiles))
+			local = BypassPrefixes(profileKeep(profiles))
 		}
-		if !opts.BypassOnly && opts.Bypass != nil {
-			excluded = append(excluded, opts.Bypass.CIDRs...)
-		}
-		if len(excluded) > 0 {
-			tun["route_exclude_address"] = prefixStrings(excluded)
+		switch {
+		case opts.BypassOnly && opts.Bypass.OnlyRanges():
+			// Only addresses are listed: nothing else has to enter the tunnel at
+			// all, so the rest of the device's traffic costs the VPN nothing. The
+			// tunnel's own subnet stays routed, because its DNS server lives there.
+			tun["route_address"] = prefixStrings(append(ParsePrefixes(tunAddresses), MergePrefixes(opts.Bypass.CIDRs)...))
+			if len(local) > 0 {
+				tun["route_exclude_address"] = prefixStrings(local)
+			}
+		case !opts.BypassOnly && !opts.Bypass.Empty():
+			// Listed ranges stay out of the VPN's routes, as many as fit the
+			// route budget; the rest is caught by the rules below.
+			tun["route_exclude_address"] = prefixStrings(FitExclusions(local, opts.Bypass.CIDRs, RouteBudget))
+		case len(local) > 0:
+			tun["route_exclude_address"] = prefixStrings(local)
 		}
 		// Per-app split tunneling (Android): include wins over exclude.
 		if len(opts.IncludePackages) > 0 {
@@ -235,10 +245,11 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 	remoteDNS["tag"] = "remote"
 	remoteDNS["detour"] = TagSelect
 
-	rules := []any{
-		obj{"action": "sniff"},
-		obj{"protocol": "dns", "action": "hijack-dns"},
-	}
+	// Rules run in order, cheapest first, so most connections are decided
+	// before anything costly happens: DNS by port, then address matches (no
+	// packet inspection), and only then sniffing for names — and only when a
+	// listed name needs it.
+	rules := []any{obj{"port": 53, "action": "hijack-dns"}}
 	if !opts.ProxyPrivate {
 		// Local addresses go direct (proxy mode, and anything that still
 		// reaches the TUN); ranges a profile routes on purpose stay proxied.
@@ -246,20 +257,39 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 	}
 	// The user's list: these go direct, or (BypassOnly) only these use the VPN.
 	routeFinal, dnsFinal, dnsRules := TagSelect, "remote", []any(nil)
-	if !opts.Bypass.Empty() {
+	if bypass := opts.Bypass.Optimized(); !bypass.Empty() {
 		listed, listedDNS := TagDirect, "local"
 		if opts.BypassOnly {
 			listed, listedDNS = TagSelect, "remote"
 			routeFinal, dnsFinal = TagDirect, "local"
 		}
-		for _, r := range opts.Bypass.rules() {
+		byAddress, byName := bypass.addressRules(), bypass.domainRules()
+		for _, r := range byAddress {
 			r["outbound"] = listed
 			rules = append(rules, obj(r))
 		}
-		// Names are looked up the same way as they are reached.
-		for _, r := range opts.Bypass.domainRules() {
-			r["server"] = listedDNS
-			dnsRules = append(dnsRules, obj(r))
+		if len(byName) > 0 {
+			// A connection arrives as an address; its name comes from the first
+			// packet. TLS, HTTP and QUIC cover the web; nothing else is read.
+			rules = append(rules,
+				obj{"action": "sniff", "sniffer": []string{"tls", "http", "quic"}},
+				obj{"protocol": "dns", "action": "hijack-dns"},
+			)
+			for _, r := range byName {
+				r["outbound"] = listed
+				rules = append(rules, obj(r))
+			}
+			// Names are looked up the same way as they are reached.
+			for _, r := range byName {
+				d := obj{}
+				for k, v := range r {
+					if k != "outbound" {
+						d[k] = v
+					}
+				}
+				d["server"] = listedDNS
+				dnsRules = append(dnsRules, d)
+			}
 		}
 	}
 
