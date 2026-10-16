@@ -425,7 +425,8 @@ Step 3 — more protocols and setup
 - [x] Easy setup: `omnitun-server init` is a wizard in a terminal (public address auto-detected, protocols from the registry, ports, imitated site, first user) and fully scriptable with `--host --protocols a,b --port p=N --first-user`; choices are validated before anything is written and port clashes (same port, overlapping TCP/UDP) are rejected on init and on every port or enable change
 - [x] `omnitun-server import xray <config.json> [--host H] [--adopt-reality]` and `POST /api/v1/import/xray`: moves an Xray/V2Ray server's users with their UUIDs and Trojan passwords, and (new server) the VLESS+Reality key, short ID, site and port, so users' existing links keep working
 - [ ] One-command install (`install` command, below)
-- [ ] Firewall/NAT setup (nftables), `install` command that writes and enables the systemd unit
+- [x] `omnitun-server install` / `uninstall` / `firewall` (Linux, root; `--dry-run` shows every step anywhere): system user, locked-down data directory, binary in `/usr/local/bin`, hardened systemd unit (also what `service` prints) started now and at boot, and the ports of the enabled protocols, the subscription endpoint, the ACME challenge and a public web API opened in **ufw or firewalld** (auto-detected; for plain nftables/iptables it prints the exact rules instead of guessing). The port list comes from the configuration (`FirewallPorts`), so changing protocols and running `firewall` again keeps the firewall right. The plan, commands and unit are unit-tested with a fake runner; **not run on a real Linux host yet**: try `install --dry-run` first, then on a fresh VPS
+- [ ] NAT/forwarding setup for the host-level servers (AmneziaWG, IKEv2, SSTP) once they exist
 
 ### Phase 9 — Polish & release
 - [ ] Translations (en, fa, ru, zh, ar) with right-to-left layout

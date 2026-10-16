@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/NoobforAl/omnitun/server/api"
+	"github.com/NoobforAl/omnitun/server/install"
 	"github.com/NoobforAl/omnitun/server/manager"
 	"github.com/NoobforAl/omnitun/server/runtime"
 	"github.com/NoobforAl/omnitun/server/serverconf"
@@ -198,9 +199,10 @@ func newAPICmd(o *options) *cobra.Command {
 }
 
 func newServiceCmd(o *options) *cobra.Command {
-	return &cobra.Command{
+	var user string
+	cmd := &cobra.Command{
 		Use:   "service",
-		Short: "Print a systemd unit for this server",
+		Short: "Print the systemd unit for this server (`install` writes the same one)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			exe, err := os.Executable()
@@ -208,24 +210,14 @@ func newServiceCmd(o *options) *cobra.Command {
 				return err
 			}
 			dir, _ := filepath.Abs(o.dataDir)
-			fmt.Printf(`# Save as /etc/systemd/system/omnitun-server.service, then:
-#   systemctl daemon-reload && systemctl enable --now omnitun-server
-[Unit]
-Description=Omnitun VPN server
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-ExecStart=%s --data %s run
-Restart=on-failure
-RestartSec=3
-LimitNOFILE=1048576
-AmbientCapabilities=CAP_NET_BIND_SERVICE
-
-[Install]
-WantedBy=multi-user.target
-`, exe, dir)
+			if user == "root" {
+				user = ""
+			}
+			fmt.Printf("# Save as %s, then:\n#   systemctl daemon-reload && systemctl enable --now %s\n", install.UnitPath, install.UnitName)
+			fmt.Print(install.Unit(filepath.ToSlash(exe), filepath.ToSlash(dir), user))
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&user, "user", "root", "user the service runs as")
+	return cmd
 }

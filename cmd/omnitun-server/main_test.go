@@ -263,3 +263,37 @@ func TestLogsCommand(t *testing.T) {
 		t.Fatalf("logs -n 0: code %d", exitCode(err))
 	}
 }
+
+func TestInstallDryRun(t *testing.T) {
+	dir := tempDir(t)
+	run(t, dir, "init", "--host", "203.0.113.7", "--protocols", "vless-reality,wireguard")
+	out, err := run(t, dir, "install", "--dry-run", "--user", "omnitun", "--firewall", "none")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"useradd --system", "install -m 0755", "ExecStart=/usr/local/bin/omnitun-server --data", "systemctl enable --now omnitun-server", "TCP: 443, 2096", "UDP: 51820"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("dry run lacks %q:\n%s", want, out)
+		}
+	}
+	root, _ := run(t, dir, "install", "--dry-run", "--user", "root", "--firewall", "none")
+	if strings.Contains(root, "useradd") || strings.Contains(root, "User=") {
+		t.Errorf("--user root still creates a user:\n%s", root)
+	}
+	if _, err := run(t, dir, "install", "--dry-run", "--firewall", "iptables"); exitCode(err) != 2 {
+		t.Fatalf("bad --firewall: code %d", exitCode(err))
+	}
+	if out, err := run(t, dir, "uninstall", "--dry-run", "--firewall", "none"); err != nil || !strings.Contains(out, "systemctl disable --now omnitun-server") {
+		t.Fatalf("uninstall: %v\n%s", err, out)
+	}
+	if out, err := run(t, dir, "firewall", "--dry-run", "--firewall", "none"); err != nil || !strings.Contains(out, "UDP: 51820") {
+		t.Fatalf("firewall: %v\n%s", err, out)
+	}
+	// Nothing was changed by any of it, and installing needs a server first.
+	if _, err := run(t, tempDir(t), "install", "--dry-run"); err == nil {
+		t.Fatal("install planned without a server")
+	}
+	if out, _ := run(t, dir, "service", "--user", "omnitun"); !strings.Contains(out, "User=omnitun") || !strings.Contains(out, "systemctl enable --now omnitun-server") {
+		t.Fatalf("service output:\n%s", out)
+	}
+}
