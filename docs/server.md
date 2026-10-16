@@ -2,7 +2,7 @@
 
 `omnitun-server` is one program that serves many VPN protocols to your own users, with one subscription link per user, quotas and traffic accounting, a terminal UI and a web API.
 
-**Honest status.** The sing-box protocols (the first ten below) are tested end to end against Omnitun's own client. SSTP, IKEv2/IPsec and AmneziaWG, the installer, the firewall helpers and ACME were written and unit-tested here on Windows with fake TUN devices and a fake command runner; **none of them has run on a real Linux host yet**. Try `install --dry-run` first, then a fresh VPS you can throw away.
+**Honest status.** The sing-box protocols (the first ten below) are tested end to end against Omnitun's own client. SSTP, IKEv2/IPsec and AmneziaWG have also run on Linux in Docker with real clients (`make docker-e2e`: `sstpc`, strongSwan, OpenVPN, `wg-quick` and an AmneziaWG client connect, reach a web server through the server's NAT, and are counted). The installer, the firewall helpers and ACME were written and unit-tested here on Windows with a fake command runner; **they have not run on a real Linux host yet**, and the Windows, iOS and Android IKEv2/SSTP clients have not been tried. Try `install --dry-run` first, then a fresh VPS you can throw away.
 
 ## Quick start (a VPS you own)
 
@@ -37,7 +37,7 @@ omnitun-server init --host vpn.example.com --protocols vless-reality,trojan,hyst
 | ShadowTLS v3 | 8446/tcp | with Shadowsocks inside |
 | NaiveProxy | 8447/tcp | needs a certificate clients trust (use ACME) |
 | WireGuard | 51820/udp | every user gets a key pair and a fixed address (10.30.0.0/16); standard `.conf` download |
-| OpenVPN UDP / TCP | 1194 | `.ovpn` download; per-protocol traffic only (the server cannot tell users apart) |
+| OpenVPN UDP / TCP | 1194 | `.ovpn` download |
 | SSTP | 8448/tcp | **Linux, root or `CAP_NET_ADMIN`**; off by default |
 | IKEv2/IPsec | 4500/udp (+ 500/udp, TCP 4500) | **Linux, root or `CAP_NET_ADMIN`**; off by default; the server proves itself with its certificate, users sign in with EAP-MSCHAPv2 |
 | AmneziaWG | 51821/udp | **Linux, root or `CAP_NET_ADMIN`**; off by default; random obfuscation parameters per server; AmneziaWG 1.x only |
@@ -65,7 +65,7 @@ omnitun-server link alice --ovpn udp       # the OpenVPN config file
 
 A user's subscription URL carries the usage, quota and expiry in the standard `Subscription-Userinfo` header, so apps like Omnitun show them. The monthly quota is counted per UTC calendar month and **blocks** the user (their connections are dropped) until the month rolls over or you raise it. `user usage <name> --reset` clears the count.
 
-Traffic is counted per user and per protocol for every protocol that can tell users apart. Not counted per user: OpenVPN. For SSTP, IKEv2 and AmneziaWG there is no live speed or connection count, and IKEv2 can miss the last two seconds before a client disconnects.
+Traffic, live connections and speed are counted per user and per protocol for every protocol. OpenVPN users are told apart by the tunnel address they were given (this needs the patched copy of the OpenVPN library in `third_party/sing-openvpn`). A WireGuard-style protocol (AmneziaWG) has no sessions, so a user counts as connected for three minutes after the last handshake. IKEv2 can miss the last two seconds before a client disconnects.
 
 ## Certificates
 
