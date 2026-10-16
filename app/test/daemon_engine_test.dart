@@ -149,4 +149,28 @@ void main() {
     expect(torProfile.protocol, 'tor');
     expect(await engine.exportLink(torProfile), 'tor://snowflake');
   }, skip: exe == null ? 'omnitun-svc not built' : false, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('a subscription can ask to go through the VPN; without one the core says so', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((req) {
+      req.response.write('trojan://pw@a.example.com:443#A');
+      req.response.close();
+    });
+    final dir = await Directory.systemTemp.createTemp('omnitun-test');
+    final engine = await DaemonEngine.launch(exe!, controlFile: '${dir.path}${Platform.pathSeparator}control.json');
+    addTearDown(() async {
+      engine.dispose();
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await dir.delete(recursive: true).catchError((_) => dir);
+    });
+    final url = 'http://127.0.0.1:${server.port}/sub';
+
+    final auto = await engine.fetchSubscription({'url': url, 'auth': {'type': 'none'}, 'via': 'auto'});
+    expect(auto.profiles.single.name, 'A');
+    await expectLater(
+      engine.fetchSubscription({'url': url, 'auth': {'type': 'none'}, 'via': 'tunnel'}),
+      throwsA(isA<EngineException>().having((e) => e.message, 'message', contains('VPN'))),
+    );
+  }, skip: exe == null ? 'omnitun-svc not built' : false, timeout: const Timeout(Duration(seconds: 60)));
 }

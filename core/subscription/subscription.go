@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -46,12 +47,24 @@ type Auth struct {
 	QueryKey string `json:"query_key,omitempty"`
 }
 
+// How a subscription is fetched (Request.Via).
+const (
+	ViaDirect = ""       // straight from this device
+	ViaAuto   = "auto"   // directly; through the VPN when that fails and the VPN is up
+	ViaTunnel = "tunnel" // always through the running VPN (for providers blocked here)
+)
+
 // Request is one subscription to fetch.
 type Request struct {
 	URL       string `json:"url"`
 	Auth      Auth   `json:"auth"`
 	UserAgent string `json:"user_agent,omitempty"`
+	// Via says whether to go through the VPN: ViaDirect, ViaAuto or ViaTunnel.
+	Via string `json:"via,omitempty"`
 }
+
+// Dialer opens a connection; Fetch's default is the system's.
+type Dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
 // Info is metadata from the provider's response headers.
 type Info struct {
@@ -78,9 +91,28 @@ var ErrAuth = errors.New("subscription authentication failed")
 // Fetch downloads and parses a subscription. rootCAs may be nil to use the
 // system pool (Android needs an explicit pool, see engine.Config.CertificateStore).
 func Fetch(ctx context.Context, req Request, rootCAs *x509.CertPool) (*Result, error) {
+	return FetchVia(ctx, req, rootCAs, nil)
+}
+
+// transportFor is the HTTP transport for a fetch; dial nil means the system's.
+func transportFor(rootCAs *x509.CertPool, dial Dialer) *http.Transport {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if rootCAs != nil {
+		transport.TLSClientConfig = &tls.Config{RootCAs: rootCAs}
+	}
+	if dial != nil {
+		transport.Proxy = nil
+		transport.DialContext = dial
+	}
+	return transport
+}
+
+// FetchVia is Fetch with connections opened by dial (for example through the
+// running VPN); nil dials directly.
+func FetchVia(ctx context.Context, req Request, rootCAs *x509.CertPool, dial Dialer) (*Result, error) {
 	u, err := url.Parse(strings.TrimSpace(req.URL))
 	if err == nil && u.Scheme == "nordvpn" {
-		return fetchNordVPN(ctx, u, req, rootCAs)
+		return fetchNordVPN(ctx, u, req, rootCAs, dial)
 	}
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return nil, fmt.Errorf("invalid subscription URL %q", req.URL)
@@ -118,11 +150,7 @@ func Fetch(ctx context.Context, req Request, rootCAs *x509.CertPool) (*Result, e
 		return nil, fmt.Errorf("unknown auth type %q", req.Auth.Type)
 	}
 
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	if rootCAs != nil {
-		transport.TLSClientConfig = &tls.Config{RootCAs: rootCAs}
-	}
-	client := &http.Client{Transport: transport, Timeout: 30 * time.Second}
+	client := &http.Client{Transport: transportFor(rootCAs, dial), Timeout: 30 * time.Second}
 	defer client.CloseIdleConnections()
 	resp, err := client.Do(httpReq)
 	if err != nil {
@@ -192,14 +220,10 @@ func parseInfo(h http.Header) Info {
 // fetchNordVPN handles nordvpn://<access token>?country=DE&limit=10: NordLynx
 // (WireGuard) profiles from NordVPN's API. The token may also be given as
 // bearer/basic auth instead of in the URL.
-func fetchNordVPN(ctx context.Context, u *url.URL, req Request, rootCAs *x509.CertPool) (*Result, error) {
+func fetchNordVPN(ctx context.Context, u *url.URL, req Request, rootCAs *x509.CertPool, dial Dialer) (*Result, error) {
 	token := firstNonEmptyStr(u.Host, u.User.Username(), req.Auth.Token, req.Auth.Password)
 	limit, _ := strconv.Atoi(u.Query().Get("limit"))
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	if rootCAs != nil {
-		transport.TLSClientConfig = &tls.Config{RootCAs: rootCAs}
-	}
-	client := &http.Client{Transport: transport, Timeout: 30 * time.Second}
+	client := &http.Client{Transport: transportFor(rootCAs, dial), Timeout: 30 * time.Second}
 	defer client.CloseIdleConnections()
 	profiles, err := nordlynx.Profiles(ctx, client, token, u.Query().Get("country"), limit)
 	if errors.Is(err, nordlynx.ErrAuth) {

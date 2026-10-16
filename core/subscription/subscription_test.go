@@ -1,8 +1,10 @@
 package subscription
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -92,5 +94,30 @@ func TestFetchRejectsBadInput(t *testing.T) {
 	// A Clash config whose only proxy has no usable type yields an error, not an empty group.
 	if _, err := Fetch(t.Context(), Request{URL: srv.URL}, nil); err == nil || !strings.Contains(err.Error(), "unsupported proxy type") {
 		t.Fatalf("err = %v, want unsupported proxy type", err)
+	}
+}
+
+// FetchVia opens its connections with the dialer it is given (the running VPN).
+func TestFetchViaUsesTheDialer(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Host != "provider.invalid" {
+			http.Error(w, "wrong host "+r.Host, http.StatusBadRequest)
+			return
+		}
+		w.Write([]byte("trojan://pw@a.example.com:443#A"))
+	}))
+	defer srv.Close()
+	var dialed []string
+	dial := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		dialed = append(dialed, addr)
+		var d net.Dialer
+		return d.DialContext(ctx, network, srv.Listener.Addr().String()) // the name only exists on the far side
+	}
+	res, err := FetchVia(t.Context(), Request{URL: "http://provider.invalid/sub"}, nil, dial)
+	if err != nil || len(res.Profiles) != 1 {
+		t.Fatalf("%v %+v", err, res)
+	}
+	if len(dialed) != 1 || dialed[0] != "provider.invalid:80" {
+		t.Fatalf("dialed %v", dialed)
 	}
 }

@@ -467,7 +467,7 @@ func (s *Server) dispatch(req Request) (any, error) {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 		defer cancel()
-		res, err := subscription.Fetch(ctx, p, s.rootPool())
+		res, err := s.fetchSubscription(ctx, p)
 		if err != nil {
 			code := CodeSubscriptionFailed
 			if errors.Is(err, subscription.ErrAuth) {
@@ -491,6 +491,37 @@ func (s *Server) dispatch(req Request) (any, error) {
 
 // rootPool returns the CA pool for HTTPS requests the server makes itself
 // (subscriptions): the configured sing-box store, or nil for the system pool.
+// fetchSubscription downloads a subscription directly or, as the request
+// says, through the running VPN (for providers that are blocked here).
+func (s *Server) fetchSubscription(ctx context.Context, req subscription.Request) (*subscription.Result, error) {
+	pool := s.rootPool()
+	switch req.Via {
+	case subscription.ViaDirect:
+		return subscription.Fetch(ctx, req, pool)
+	case subscription.ViaTunnel:
+		dial, err := s.engine.TunnelDialer()
+		if err != nil {
+			return nil, fmt.Errorf("this subscription is fetched through the VPN: %w", err)
+		}
+		return subscription.FetchVia(ctx, req, pool, dial)
+	case subscription.ViaAuto:
+		res, err := subscription.Fetch(ctx, req, pool)
+		if err == nil || errors.Is(err, subscription.ErrAuth) {
+			return res, err // a wrong password is not cured by another route
+		}
+		dial, derr := s.engine.TunnelDialer()
+		if derr != nil {
+			return nil, err
+		}
+		viaRes, viaErr := subscription.FetchVia(ctx, req, pool, dial)
+		if viaErr != nil {
+			return nil, fmt.Errorf("%w (through the VPN: %v)", err, viaErr)
+		}
+		return viaRes, nil
+	}
+	return nil, fmt.Errorf("unknown way to fetch a subscription: %q", req.Via)
+}
+
 func (s *Server) rootPool() *x509.CertPool {
 	if s.cfg.CertificateStore == "" || s.cfg.CertificateStore == "system" {
 		return nil

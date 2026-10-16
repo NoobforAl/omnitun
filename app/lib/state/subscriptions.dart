@@ -50,7 +50,11 @@ class Subscription {
     this.info = const SubscriptionInfo(),
     this.updatedAt,
     this.lastError,
+    this.via = defaultVia,
   });
+
+  /// Download directly, and through the VPN when that fails and the VPN is up.
+  static const defaultVia = 'auto';
 
   final String id;
   final String name;
@@ -60,13 +64,17 @@ class Subscription {
   final DateTime? updatedAt;
   final String? lastError;
 
+  /// How it is downloaded: 'direct', 'auto' (through the VPN when direct fails and the VPN is up)
+  /// or 'tunnel' (always through the VPN, for providers that are blocked).
+  final String via;
+
   /// The provider's interval, or once a day.
   Duration get refreshInterval =>
       Duration(hours: info.updateIntervalHours > 0 ? info.updateIntervalHours : 24);
 
   bool get isDue => updatedAt == null || DateTime.now().difference(updatedAt!) >= refreshInterval;
 
-  Map<String, dynamic> toRequest() => {'url': url, 'auth': auth.toJson()};
+  Map<String, dynamic> toRequest() => {'url': url, 'auth': auth.toJson(), if (via != 'direct') 'via': via};
 
   Subscription copyWith({
     String? name,
@@ -75,6 +83,7 @@ class Subscription {
     SubscriptionInfo? info,
     DateTime? updatedAt,
     String? lastError,
+    String? via,
     bool clearError = false,
   }) =>
       Subscription(
@@ -85,6 +94,7 @@ class Subscription {
         info: info ?? this.info,
         updatedAt: updatedAt ?? this.updatedAt,
         lastError: clearError ? null : lastError ?? this.lastError,
+        via: via ?? this.via,
       );
 
   Map<String, dynamic> toJson() => {
@@ -95,6 +105,7 @@ class Subscription {
         'info': info.toJson(),
         if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
         if (lastError != null) 'last_error': lastError,
+        'via': via,
       };
 
   factory Subscription.fromJson(Map<String, dynamic> j) => Subscription(
@@ -105,6 +116,7 @@ class Subscription {
         info: SubscriptionInfo.fromJson(Map<String, dynamic>.from(j['info'] as Map? ?? const {})),
         updatedAt: DateTime.tryParse(j['updated_at'] as String? ?? ''),
         lastError: j['last_error'] as String?,
+        via: j['via'] as String? ?? defaultVia,
       );
 }
 
@@ -133,9 +145,14 @@ class SubscriptionsController extends Notifier<List<Subscription>> {
 
   /// Fetches a new subscription and keeps it only if the fetch works.
   /// Returns the number of profiles; throws with a user-facing message.
-  Future<int> add({required String url, String name = '', SubscriptionAuth auth = const SubscriptionAuth()}) async {
+  Future<int> add({
+    required String url,
+    String name = '',
+    SubscriptionAuth auth = const SubscriptionAuth(),
+    String via = Subscription.defaultVia,
+  }) async {
     final id = 'sub-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
-    final draft = Subscription(id: id, name: name, url: url.trim(), auth: auth);
+    final draft = Subscription(id: id, name: name, url: url.trim(), auth: auth, via: via);
     final result = await ref.read(engineProvider).fetchSubscription(draft.toRequest());
     final sub = draft.copyWith(
       name: name.isNotEmpty ? name : (result.info.title.isNotEmpty ? result.info.title : Uri.parse(draft.url).host),

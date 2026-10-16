@@ -256,3 +256,38 @@ func TestCallRunsMethodsInProcess(t *testing.T) {
 		t.Fatalf("err = %v, want BAD_REQUEST", err)
 	}
 }
+
+// A subscription can be fetched through the VPN; without one that says so, and
+// "auto" falls back to a direct fetch that works (nothing is wrongly tunnelled).
+func TestSubscribeVia(t *testing.T) {
+	web := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("trojan://pw@a.example.com:443#A"))
+	}))
+	defer web.Close()
+	s, addr := newTestServer(t, ServerConfig{})
+	c, err := Dial(t.Context(), addr, s.Token())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	var res subscription.Result
+	if err := c.Call(t.Context(), "subscribe", subscription.Request{URL: web.URL, Via: subscription.ViaAuto}, &res); err != nil || len(res.Profiles) != 1 {
+		t.Fatalf("auto with a reachable provider: %v %+v", err, res)
+	}
+	var ce *Error
+	err = c.Call(t.Context(), "subscribe", subscription.Request{URL: web.URL, Via: subscription.ViaTunnel}, nil)
+	if !errors.As(err, &ce) || ce.Code != CodeSubscriptionFailed || !strings.Contains(ce.Message, "VPN") {
+		t.Fatalf("through the VPN without a VPN: %v", err)
+	}
+	err = c.Call(t.Context(), "subscribe", subscription.Request{URL: web.URL, Via: "carrier-pigeon"}, nil)
+	if !errors.As(err, &ce) || !strings.Contains(ce.Message, "unknown way") {
+		t.Fatalf("an unknown way: %v", err)
+	}
+	// Auto: the provider is down and no VPN is up: the direct error is the one reported.
+	web.Close()
+	err = c.Call(t.Context(), "subscribe", subscription.Request{URL: web.URL, Via: subscription.ViaAuto}, nil)
+	if !errors.As(err, &ce) || !strings.Contains(ce.Message, "download subscription") {
+		t.Fatalf("auto with the provider down: %v", err)
+	}
+}

@@ -15,6 +15,12 @@ class SubscriptionScreen extends ConsumerStatefulWidget {
 }
 
 class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
+  static const _viaChoices = {
+    'direct': 'Directly',
+    'auto': 'Directly, or through the VPN if the provider is blocked',
+    'tunnel': 'Always through the VPN (connect first)',
+  };
+
   static const _authTypes = {
     'none': 'None',
     'basic': 'Username & password (Basic)',
@@ -31,6 +37,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   late final _header = TextEditingController(text: widget.existing?.auth.header ?? '');
   late final _queryKey = TextEditingController(text: widget.existing?.auth.queryKey ?? 'token');
   late String _authType = widget.existing?.auth.type ?? 'none';
+  late String _via = widget.existing?.via ?? Subscription.defaultVia;
   bool _busy = false;
   bool _showSecret = false;
   String? _error;
@@ -80,9 +87,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
       final int count;
       final existing = widget.existing;
       if (existing == null) {
-        count = await ctrl.add(url: _url.text, name: _name.text.trim(), auth: _auth);
+        count = await ctrl.add(url: _url.text, name: _name.text.trim(), auth: _auth, via: _via);
       } else {
-        ctrl.update(existing.copyWith(name: _name.text.trim(), url: _url.text.trim(), auth: _auth));
+        ctrl.update(existing.copyWith(name: _name.text.trim(), url: _url.text.trim(), auth: _auth, via: _via));
         count = await ctrl.refresh(existing.id);
       }
       if (!mounted) return;
@@ -186,6 +193,21 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                 ),
               ),
             ),
+          const SizedBox(height: 20),
+          DropdownButtonFormField<String>(
+            initialValue: _via,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Download',
+              helperText: 'Some providers are blocked where you are; the VPN can still reach them',
+              helperMaxLines: 2,
+              border: OutlineInputBorder(),
+            ),
+            items: [
+              for (final e in _viaChoices.entries) DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis)),
+            ],
+            onChanged: _busy ? null : (v) => setState(() => _via = v ?? Subscription.defaultVia),
+          ),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(top: 16),

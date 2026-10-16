@@ -51,6 +51,7 @@ void main() {
     expect(engine.lastRequest, {
       'url': 'https://prov.example/sub',
       'auth': {'type': 'bearer', 'token': 't'},
+      'via': 'auto', // directly, or through the VPN when the provider is blocked
     });
     final sub = c.read(subscriptionsProvider).single;
     expect(sub.name, 'Prov'); // provider title when no name is given
@@ -155,5 +156,22 @@ void main() {
     c.dispose();
     c = make();
     expect(c.read(profilesProvider).single.hasCredentials, isTrue);
+  });
+
+  test('how a subscription is downloaded is sent, kept, and defaults to direct-then-VPN', () async {
+    engine.next = [_p('a')];
+    final subs = c.read(subscriptionsProvider.notifier);
+    await subs.add(url: 'https://blocked.example/sub', via: 'tunnel');
+    expect(engine.lastRequest!['via'], 'tunnel');
+    await subs.add(url: 'https://plain.example/sub', via: 'direct');
+    expect(engine.lastRequest!.containsKey('via'), isFalse); // direct is the core's default
+
+    final saved = [for (final s in c.read(subscriptionsProvider)) s.toJson()];
+    expect([for (final s in saved) s['via']], ['tunnel', 'direct']);
+    // Saved by an older version: no 'via'.
+    final old = Subscription.fromJson({'id': 'x', 'name': 'x', 'url': 'https://x.example/sub'});
+    expect(old.via, 'auto');
+    expect(old.copyWith(via: 'tunnel').via, 'tunnel');
+    await Future<void>.delayed(const Duration(milliseconds: 400)); // the store saves 300 ms after a change
   });
 }

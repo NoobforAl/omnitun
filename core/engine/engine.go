@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"path/filepath"
 	"regexp"
 	"sync"
@@ -19,6 +20,7 @@ import (
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing-box/option"
 	sjson "github.com/sagernet/sing/common/json"
+	M "github.com/sagernet/sing/common/metadata"
 	"github.com/sagernet/sing/service"
 
 	"github.com/NoobforAl/omnitun/core/netcheck"
@@ -591,6 +593,28 @@ func (e *Engine) TestLatency(ctx context.Context, profiles []*profile.Profile, t
 		e.logf("warn", "latency test skipped: %v", s)
 	}
 	return results, nil
+}
+
+// ErrNoTunnel is returned when no running tunnel can carry the app's own requests.
+var ErrNoTunnel = errors.New("the VPN is not connected, or this connection type cannot carry the app's own requests")
+
+// TunnelDialer opens connections through the running tunnel's selected
+// outbound, for requests that must not go around the VPN (a subscription whose
+// provider is blocked here). Only sing-box based tunnels can do this.
+func (e *Engine) TunnelDialer() (func(ctx context.Context, network, addr string) (net.Conn, error), error) {
+	e.mu.Lock()
+	instance, status := e.instance, e.state.Status
+	e.mu.Unlock()
+	if instance == nil || status != StatusRunning {
+		return nil, ErrNoTunnel
+	}
+	out, ok := lookupDialer(instance, singbox.TagSelect)
+	if !ok {
+		return nil, ErrNoTunnel
+	}
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return out.DialContext(ctx, network, M.ParseSocksaddr(addr))
+	}, nil
 }
 
 func lookupDialer(instance *box.Box, tag string) (adapter.Outbound, bool) {

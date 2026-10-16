@@ -343,7 +343,7 @@ omnitun/
 - [x] Plain-language errors on the Home screen (timeouts, refused connections, bad bridges, blocked Tor …); the log keeps the raw text
 - [ ] Typed, translatable error messages (`NO_NETWORK`, `AUTH_FAILED`, `TLS_ERROR`, `HANDSHAKE_TIMEOUT`, …)
 - [ ] More strategies: lowest latency, round-robin; per-group strategy setting
-- [ ] Fetch subscriptions through the tunnel when the provider is blocked
+- [x] Fetch subscriptions through the tunnel when the provider is blocked: a subscription has a "Download" choice: directly, **directly or through the VPN if the provider is blocked** (default; used only when the direct fetch fails and the VPN is up, never after a wrong password), or always through the VPN. The core dials through the running sing-box tunnel's selected outbound (`Engine.TunnelDialer`, `subscription.FetchVia`, request field `via`; NordLynx subscriptions too). Tested end to end (an in-process Shadowsocks server whose route maps a made-up provider name to a local web server: unreachable directly, fetched through the tunnel), in the control protocol and from Dart against the real daemon. **Not tried on the phone**; AmneziaWG, SSTP and IKEv2 tunnels cannot carry it (the core says so)
 - [ ] Secrets (subscription tokens) in the OS keystore instead of the app's JSON file
 - [x] Onboarding: on the first start with no servers, three skippable screens (what it does, how to add servers, what Android will ask) ending in the import sheet; not shown again, and not shown when servers exist. Widget-tested; **not seen on the phone** (it has servers, and clearing its data would delete them)
 - [x] Profile sharing (QR/link) from the app: see Phase 1
