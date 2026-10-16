@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'state/providers.dart';
 import 'state/store.dart';
 import 'state/subscriptions.dart';
-import 'ui/app_shell.dart';
+import 'ui/screens/home_screen.dart';
 import 'ui/theme.dart';
 
 Future<void> main() async {
@@ -35,13 +35,14 @@ class _OmnitunAppState extends ConsumerState<OmnitunApp> {
   Widget build(BuildContext context) {
     // Collect core logs from startup, not only once the Logs tab is opened.
     ref.listen(logsProvider, (_, _) {});
+    final theme = ref.watch(settingsProvider.select((s) => s.theme));
     return MaterialApp(
       title: 'Omnitun',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
-      themeMode: ThemeMode.system,
-      home: const AppShell(),
+      themeMode: themeModeOf(theme),
+      home: const HomeScreen(),
     );
   }
 }

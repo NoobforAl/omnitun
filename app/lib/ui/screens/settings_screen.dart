@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../state/providers.dart';
+import 'logs_screen.dart';
+import 'profiles_screen.dart';
 import 'split_tunnel_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -17,6 +19,14 @@ class SettingsScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
+          const _Header('Servers'),
+          ListTile(
+            leading: const Icon(Icons.dns_outlined),
+            title: const Text('Manage servers'),
+            subtitle: const Text('Import, subscriptions, order and removal'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ProfilesScreen())),
+          ),
           const _Header('Connection'),
           SwitchListTile(
             title: const Text('VPN mode (all traffic)'),
@@ -67,6 +77,26 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => _editDns(context, ref, s.remoteDns),
           ),
           const _Header('App'),
+          ListTile(
+            title: const Text('Appearance'),
+            subtitle: Text(switch (s.theme) { 'light' => 'Light', 'system' => 'Follow the system', _ => 'Dark' }),
+            trailing: SegmentedButton<String>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: 'dark', icon: Icon(Icons.dark_mode_outlined), tooltip: 'Dark'),
+                ButtonSegment(value: 'system', icon: Icon(Icons.brightness_auto_outlined), tooltip: 'Follow the system'),
+                ButtonSegment(value: 'light', icon: Icon(Icons.light_mode_outlined), tooltip: 'Light'),
+              ],
+              selected: {s.theme},
+              onSelectionChanged: (v) => ctrl.update((s) => s.copyWith(theme: v.first)),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.receipt_long_outlined),
+            title: const Text('Logs'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const LogsScreen())),
+          ),
           SwitchListTile(
             title: const Text('Stop VPN when app is closed'),
             value: s.stopOnClose,

@@ -1,0 +1,80 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+
+import '../../state/countries.dart';
+import '../theme.dart';
+
+/// A country's flag. Windows has no flag emoji, so there (and for an unknown
+/// country) a small round badge is drawn instead: the country code, or a globe.
+class CountryFlag extends StatelessWidget {
+  const CountryFlag(this.code, {super.key, this.size = 32, this.icon = Icons.public});
+
+  /// ISO code, or null when the country is unknown.
+  final String? code;
+  final double size;
+
+  /// Shown instead of a flag when [code] is null.
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final c = code;
+    final emoji = c != null && defaultTargetPlatform != TargetPlatform.windows;
+    return Semantics(
+      label: c == null ? 'Unknown country' : (countryNames[c] ?? c),
+      excludeSemantics: true,
+      child: Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: scheme.surfaceContainerHighest),
+        child: emoji
+            ? Text(flagEmoji(c), style: TextStyle(fontSize: size * 0.62, height: 1))
+            : c == null
+            ? Icon(icon, size: size * 0.6, color: scheme.onSurfaceVariant)
+            : Text(
+                c,
+                style: TextStyle(
+                  fontSize: size * 0.36,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onSurfaceVariant,
+                  height: 1,
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+/// Dot showing how fast a server answered: green, amber, red, or grey when untested.
+class LatencyDot extends StatelessWidget {
+  const LatencyDot(this.ms, {super.key, this.size = 10});
+
+  final int? ms;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final color = switch (ms) {
+      null => scheme.outlineVariant,
+      < 0 => scheme.error,
+      < 150 => connectedGreen,
+      < 400 => const Color(0xFFE0A100),
+      _ => const Color(0xFFE5732F),
+    };
+    return Tooltip(
+      message: switch (ms) {
+        null => 'Not tested',
+        < 0 => 'Unreachable',
+        final v => '$v ms',
+      },
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+    );
+  }
+}

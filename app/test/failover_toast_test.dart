@@ -65,7 +65,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.textContaining('Switched to PC-dev'), findsOneWidget);
-    expect(find.text('PC-dev'), findsOneWidget); // home card follows the active profile
+    // The home screen follows the active profile, and so does the choice.
+    expect(find.text('PC-dev'), findsNWidgets(2)); // the server shown, and the location row
+    final container = ProviderScope.containerOf(tester.element(find.byType(OmnitunApp)));
+    expect(container.read(selectedProfileIdProvider), 'live');
     await tester.pumpWidget(const SizedBox());
   });
 

@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../engine/core_engine.dart';
 import '../engine/engine.dart';
+import 'countries.dart';
+import 'location.dart';
 import 'store.dart';
 
 /// Overridden in main() with the store loaded from disk.
@@ -103,6 +105,8 @@ class ProfilesController extends Notifier<List<ProfileInfo>> {
 final profilesProvider =
     NotifierProvider<ProfilesController, List<ProfileInfo>>(ProfilesController.new);
 
+/// Where the user wants to connect: null = Auto, "country:DE" = a country,
+/// otherwise one profile's ID (see location.dart).
 class SelectedProfileController extends Notifier<String?> {
   static const _key = 'selected';
 
@@ -118,13 +122,45 @@ class SelectedProfileController extends Notifier<String?> {
 final selectedProfileIdProvider =
     NotifierProvider<SelectedProfileController, String?>(SelectedProfileController.new);
 
-/// The profile that Connect will use: the selection, or the first profile.
-final selectedProfileProvider = Provider<ProfileInfo?>((ref) {
-  final profiles = ref.watch(profilesProvider);
-  final id = ref.watch(selectedProfileIdProvider);
-  if (profiles.isEmpty) return null;
-  return profiles.firstWhere((p) => p.id == id, orElse: () => profiles.first);
+/// Countries the user set by hand, by profile ID (they win over the guess).
+class CountryOverrides extends Notifier<Map<String, String>> {
+  static const _key = 'countries';
+
+  @override
+  Map<String, String> build() {
+    final saved = ref.read(storeProvider).read<Map<String, dynamic>>(_key) ?? const {};
+    return {for (final e in saved.entries) e.key: e.value as String};
+  }
+
+  /// Sets the country of a profile; null goes back to the guess.
+  void set(String id, String? code) {
+    final next = {...state};
+    code == null ? next.remove(id) : next[id] = code;
+    state = next;
+    ref.read(storeProvider).write(_key, next);
+  }
+}
+
+final countryOverridesProvider = NotifierProvider<CountryOverrides, Map<String, String>>(CountryOverrides.new);
+
+/// The country of a profile: the user's choice, else a guess from its name and address.
+final profileCountryProvider = Provider<String? Function(ProfileInfo)>((ref) {
+  final overrides = ref.watch(countryOverridesProvider);
+  final guesses = <String, String?>{};
+  return (p) => overrides[p.id] ?? guesses.putIfAbsent(p.id, () => guessCountry(p));
 });
+
+/// The profile to start with and the ones to fall back to, for the current choice.
+final connectionPlanProvider = Provider<ConnectionPlan?>((ref) {
+  return planConnection(
+    ref.watch(profilesProvider),
+    ref.watch(selectedProfileIdProvider),
+    ref.watch(profileCountryProvider),
+  );
+});
+
+/// The profile that Connect will start with.
+final selectedProfileProvider = Provider<ProfileInfo?>((ref) => ref.watch(connectionPlanProvider)?.primary);
 
 class ConnectionController extends Notifier<EngineState> {
   @override
@@ -134,7 +170,10 @@ class ConnectionController extends Notifier<EngineState> {
       state = s;
       // Follow automatic switches so the UI shows the profile actually in use.
       final active = s.activeProfileId;
-      if (s.failover != null && active != null && active != ref.read(selectedProfileIdProvider)) {
+      // Auto and country choices stay as they are; they pick the profile themselves.
+      final choice = ref.read(selectedProfileIdProvider);
+      final specific = choice != null && countryOfChoice(choice) == null;
+      if (s.failover != null && active != null && specific && active != choice) {
         ref.read(selectedProfileIdProvider.notifier).select(active);
       }
     });
@@ -148,27 +187,27 @@ class ConnectionController extends Notifier<EngineState> {
       };
 
   Future<void> toggle() async {
-    final engine = ref.read(engineProvider);
     if (isActive) {
-      await engine.disconnect();
+      await ref.read(engineProvider).disconnect();
       return;
     }
-    final profile = ref.read(selectedProfileProvider);
-    if (profile == null) return;
-    // Fallbacks: the rest of the selected profile's group in list order,
-    // then all other profiles.
-    final all = ref.read(profilesProvider);
-    final group = all.where((p) => p.group == profile.group).toList();
-    final i = group.indexWhere((p) => p.id == profile.id);
-    final others = [
-      ...group.skip(i + 1),
-      ...group.take(i),
-      ...all.where((p) => p.group != profile.group),
-    ];
+    await _connect();
+  }
+
+  /// Switches to the location chosen now (disconnect, then connect).
+  Future<void> reconnect() async {
+    await ref.read(engineProvider).disconnect();
+    await _connect();
+  }
+
+  Future<void> _connect() async {
+    final engine = ref.read(engineProvider);
+    final plan = ref.read(connectionPlanProvider);
+    if (plan == null) return;
     final settings = ref.read(settingsProvider);
     await engine.connect(
-      profile,
-      fallbacks: others,
+      plan.primary,
+      fallbacks: plan.fallbacks,
       options: ConnectOptions(
         tunMode: settings.tunMode,
         systemProxy: settings.systemProxy,
@@ -214,6 +253,7 @@ class SettingsState {
     this.remoteDns = defaultRemoteDns,
     this.splitMode = 'off',
     this.splitApps = const [],
+    this.theme = 'dark',
   });
 
   static const defaultRemoteDns = 'https://1.1.1.1/dns-query';
@@ -238,6 +278,9 @@ class SettingsState {
   final String splitMode;
   final List<String> splitApps;
 
+  /// 'dark' (default), 'light' or 'system'.
+  final String theme;
+
   SettingsState copyWith({
     bool? tunMode,
     bool? systemProxy,
@@ -248,6 +291,7 @@ class SettingsState {
     String? remoteDns,
     String? splitMode,
     List<String>? splitApps,
+    String? theme,
   }) =>
       SettingsState(
         tunMode: tunMode ?? this.tunMode,
@@ -259,6 +303,7 @@ class SettingsState {
         remoteDns: remoteDns ?? this.remoteDns,
         splitMode: splitMode ?? this.splitMode,
         splitApps: splitApps ?? this.splitApps,
+        theme: theme ?? this.theme,
       );
 
   Map<String, dynamic> toJson() => {
@@ -271,6 +316,7 @@ class SettingsState {
         'remote_dns': remoteDns,
         'split_mode': splitMode,
         'split_apps': splitApps,
+        'theme': theme,
       };
 
   /// Missing keys keep the values from [defaults].
@@ -284,6 +330,7 @@ class SettingsState {
         remoteDns: j['remote_dns'] as String? ?? defaults.remoteDns,
         splitMode: j['split_mode'] as String? ?? defaults.splitMode,
         splitApps: [for (final a in (j['split_apps'] as List? ?? const [])) a as String],
+        theme: j['theme'] as String? ?? defaults.theme,
       );
 }
 

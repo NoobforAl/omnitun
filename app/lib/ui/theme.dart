@@ -4,21 +4,53 @@ import '../engine/engine.dart';
 
 const _seed = Color(0xFF0E7C86);
 
+/// Calm dark blue like a night sky; the light theme is plain.
+const _darkBackground = Color(0xFF10243A);
+const _darkPanel = Color(0xFF1A3452);
+
+/// Green of the "connected" state and of the Connect button.
+const connectedGreen = Color(0xFF3DB36B);
+
+/// Red of the Disconnect button.
+const disconnectRed = Color(0xFFD64550);
+
 ThemeData buildTheme(Brightness brightness) {
-  final scheme = ColorScheme.fromSeed(seedColor: _seed, brightness: brightness);
+  var scheme = ColorScheme.fromSeed(seedColor: _seed, brightness: brightness);
+  if (brightness == Brightness.dark) {
+    scheme = scheme.copyWith(
+      surface: _darkBackground,
+      surfaceContainerLowest: _darkBackground,
+      surfaceContainerLow: _darkPanel,
+      surfaceContainer: _darkPanel,
+      surfaceContainerHigh: const Color(0xFF22416A),
+      surfaceContainerHighest: const Color(0xFF2A4C78),
+    );
+  }
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
     visualDensity: VisualDensity.adaptivePlatformDensity,
+    scaffoldBackgroundColor: scheme.surface,
     cardTheme: const CardThemeData(margin: EdgeInsets.zero),
+    appBarTheme: AppBarTheme(
+      backgroundColor: scheme.surface,
+      surfaceTintColor: Colors.transparent,
+      scrolledUnderElevation: 0,
+    ),
   );
 }
+
+ThemeMode themeModeOf(String setting) => switch (setting) {
+  'light' => ThemeMode.light,
+  'system' => ThemeMode.system,
+  _ => ThemeMode.dark,
+};
 
 /// Semantic colour for each connection state. Never the only signal:
 /// screens always pair it with an icon and a label.
 Color statusColor(ConnStatus status, ColorScheme scheme) {
   return switch (status) {
-    ConnStatus.connected => const Color(0xFF1FA67A),
+    ConnStatus.connected => connectedGreen,
     ConnStatus.connecting || ConnStatus.disconnecting => const Color(0xFFE0A100),
     ConnStatus.error => scheme.error,
     ConnStatus.noInternet => scheme.outline,
@@ -28,11 +60,11 @@ Color statusColor(ConnStatus status, ColorScheme scheme) {
 
 IconData statusIcon(ConnStatus status) {
   return switch (status) {
-    ConnStatus.connected => Icons.verified_user,
+    ConnStatus.connected => Icons.lock,
     ConnStatus.connecting || ConnStatus.disconnecting => Icons.sync,
     ConnStatus.error => Icons.error_outline,
     ConnStatus.noInternet => Icons.wifi_off,
-    ConnStatus.disconnected => Icons.shield_outlined,
+    ConnStatus.disconnected => Icons.lock_open,
   };
 }
 

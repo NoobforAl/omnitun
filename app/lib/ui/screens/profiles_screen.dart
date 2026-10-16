@@ -7,6 +7,7 @@ import '../../engine/engine.dart';
 import '../../state/providers.dart';
 import '../../state/subscriptions.dart';
 import '../widgets/protocol_badge.dart';
+import 'location_screen.dart';
 import 'qr_scan_screen.dart';
 import 'subscription_screen.dart';
 import '../widgets/credentials_dialog.dart';
@@ -14,25 +15,16 @@ import '../widgets/credentials_dialog.dart';
 class ProfilesScreen extends ConsumerWidget {
   const ProfilesScreen({super.key});
 
-  Future<void> _testAll(WidgetRef ref) async {
-    final engine = ref.read(engineProvider);
-    final profiles = ref.read(profilesProvider);
-    await Future.wait(profiles.map((p) async {
-      final ms = await engine.testLatency(p);
-      ref.read(profilesProvider.notifier).setLatency(p.id, ms);
-    }));
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profiles = ref.watch(profilesProvider);
     final subs = ref.watch(subscriptionsProvider);
-    final selected = ref.watch(selectedProfileProvider);
+    final selected = ref.watch(selectedProfileIdProvider);
     final manual = profiles.where((p) => p.group == ProfileInfo.defaultGroup).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profiles'),
+        title: const Text('Manage servers'),
         actions: [
           IconButton(
             tooltip: 'Add subscription',
@@ -41,7 +33,7 @@ class ProfilesScreen extends ConsumerWidget {
           ),
           IconButton(
             tooltip: 'Test latency',
-            onPressed: profiles.isEmpty ? null : () => _testAll(ref),
+            onPressed: profiles.isEmpty ? null : () => testAllLatencies(ref),
             icon: const Icon(Icons.speed),
           ),
         ],
@@ -67,14 +59,14 @@ class ProfilesScreen extends ConsumerWidget {
                 ),
                 if (manual.isNotEmpty) ...[
                   const SliverToBoxAdapter(child: _GroupTitle('My profiles')),
-                  _GroupList(group: ProfileInfo.defaultGroup, profiles: manual, selectedId: selected?.id),
+                  _GroupList(group: ProfileInfo.defaultGroup, profiles: manual, selectedId: selected),
                 ],
                 for (final sub in subs) ...[
                   SliverToBoxAdapter(child: _SubscriptionHeader(sub)),
                   _GroupList(
                     group: sub.id,
                     profiles: profiles.where((p) => p.group == sub.id).toList(),
-                    selectedId: selected?.id,
+                    selectedId: selected,
                   ),
                 ],
                 const SliverToBoxAdapter(child: SizedBox(height: 96)),

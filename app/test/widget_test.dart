@@ -16,26 +16,27 @@ void main() {
     expect(find.text('Not connected'), findsOneWidget);
     expect(find.text('No profiles yet'), findsOneWidget);
 
+    // The home screen has no footer to switch pages with.
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byType(NavigationRail), findsNothing);
+
     await tester.tap(find.text('Import config'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Import').last);
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'trojan://pw@example.com:443#Test%20Server');
     await tester.tap(find.widgetWithText(FilledButton, 'Import'));
     await tester.pumpAndSettle();
-    expect(find.text('Test Server'), findsOneWidget);
-
-    await tester.tap(find.text('Home'));
-    await tester.pumpAndSettle();
+    expect(find.text('Automatic'), findsOneWidget); // the location row of the home screen
     final container = ProviderScope.containerOf(tester.element(find.byType(OmnitunApp)));
+    expect(container.read(profilesProvider).single.name, 'Test Server');
 
-    await tester.tap(find.text('CONNECT'));
+    await tester.tap(find.text('Connect'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 10));
     expect(container.read(connectionProvider).status, ConnStatus.connected);
     expect(find.text('Connected'), findsOneWidget);
+    expect(find.text('Test Server'), findsOneWidget); // where you exit
 
-    await tester.tap(find.text('DISCONNECT'));
+    await tester.tap(find.text('Disconnect'));
     await tester.pump(const Duration(milliseconds: 400));
     expect(container.read(connectionProvider).status, ConnStatus.disconnected);
     await tester.pumpWidget(const SizedBox());
