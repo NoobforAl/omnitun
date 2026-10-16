@@ -40,6 +40,12 @@ bash scripts/android-github-secrets.sh  # uploads them as repository secrets (ne
 `cd app && flutter build apk --release --split-per-abi --build-name=0.1.0 --build-number=100`; it signs with
 `app/android/key.properties`.
 
+## Build environment
+
+* The workflow installs **NDK 29** (`29.0.14206865`). The runner's own NDK 27 cannot link the Cronet library the core
+  uses for NaiveProxy. Change `ANDROID_NDK_HOME` there together with the NDK your local builds use.
+* Flutter is pinned to 3.47.7 in the workflow; Go comes from `go.mod`.
+
 ## Security notes
 
 * Third-party actions in the workflow are pinned to commit SHAs; Dependabot proposes updates.
