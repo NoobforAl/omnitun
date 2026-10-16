@@ -13,6 +13,8 @@ name: Android
 #   ANDROID_KEYSTORE_BASE64    the keystore file, base64 (base64 -w0 omnitun-release.jks)
 #   ANDROID_KEYSTORE_PASSWORD  its store password
 #   ANDROID_KEY_PASSWORD       the key password (alias: omnitun)
+# Third-party actions are pinned to full commit SHAs (a moved tag cannot run new code with the
+# signing secrets); Dependabot (.github/dependabot.yml) proposes updates.
 # Keep the keystore backed up: updates to an installed app must be signed with the same key.
 
 on:
@@ -62,19 +64,19 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable (2026-10-17)
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: tor
 
-      - uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with:
           tool: cargo-ndk
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: "3.47.7"
           channel: stable
