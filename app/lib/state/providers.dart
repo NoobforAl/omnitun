@@ -263,6 +263,21 @@ class LogsController extends Notifier<List<String>> {
 
 final logsProvider = NotifierProvider<LogsController, List<String>>(LogsController.new);
 
+/// Whether the first-start introduction has been seen.
+class OnboardedController extends Notifier<bool> {
+  static const _key = 'onboarded';
+
+  @override
+  bool build() => ref.read(storeProvider).read<bool>(_key) ?? false;
+
+  void done() {
+    state = true;
+    ref.read(storeProvider).write(_key, true);
+  }
+}
+
+final onboardedProvider = NotifierProvider<OnboardedController, bool>(OnboardedController.new);
+
 class SettingsState {
   const SettingsState({
     this.tunMode = false,

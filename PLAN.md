@@ -345,7 +345,9 @@ omnitun/
 - [ ] More strategies: lowest latency, round-robin; per-group strategy setting
 - [ ] Fetch subscriptions through the tunnel when the provider is blocked
 - [ ] Secrets (subscription tokens) in the OS keystore instead of the app's JSON file
-- [ ] Onboarding screens; profile sharing (QR/link) from the app
+- [x] Onboarding: on the first start with no servers, three skippable screens (what it does, how to add servers, what Android will ask) ending in the import sheet; not shown again, and not shown when servers exist. Widget-tested; **not seen on the phone** (it has servers, and clearing its data would delete them)
+- [x] Profile sharing (QR/link) from the app: see Phase 1
+- [x] Android backup is off (`allowBackup=false`): before, Auto Backup copied the app's data (every server's password and key) to the user's Google Drive. Verified on the device (`dumpsys package` no longer lists ALLOW_BACKUP)
 
 ### Phase 5 — More client protocols
 - [x] OpenVPN via sing-box's `openvpn-client` endpoint: `.ovpn` import (inline certs, tls-auth/tls-crypt/tls-crypt-v2, multiple remotes, comp-lzo/compress, verify-x509-name), username/password prompt in the app, sing-box JSON import; end-to-end tests (TCP cert + tls-crypt, UDP user/pass + tls-auth); verified on device through omnitun-server

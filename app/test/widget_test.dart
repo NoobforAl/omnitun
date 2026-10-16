@@ -13,6 +13,12 @@ void main() {
       child: const OmnitunApp(),
     ));
 
+    // The first start opens with a short introduction.
+    await tester.pumpAndSettle();
+    expect(find.text('Private and simple'), findsOneWidget);
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+
     expect(find.text('Not connected'), findsOneWidget);
     expect(find.text('No profiles yet'), findsOneWidget);
 
