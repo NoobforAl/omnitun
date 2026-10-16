@@ -1,6 +1,10 @@
 # Omnitun app
 
-One calm screen: a lock that shows whether you are protected, the country you exit from, and one button.
+One calm screen: a power ring that shows whether you are protected, the country you exit from, and one button.
+
+## Look
+
+A dark-fantasy look in cold, muted blues (a light "stone" theme is in Settings). Behind the home screen is a dotted Earth: when you connect it turns to the exit country and marks it with a glow; it moves only for that turn. Fonts are open (SIL OFL, texts in the app's assets): Cinzel for headings, Inter for text, Vazirmatn for Persian and Arabic. The land outlines are Natural Earth (public domain). `scripts/gen-icon.py`, `gen-fonts.py` and `gen-globe.py` rebuild the icon, the fonts and the globe data.
 
 ## First start
 
@@ -10,8 +14,9 @@ Three short screens say what the app does, how to add servers and what Android w
 
 * The ring fills while connecting (the real progress: network check, configuration, engine, tunnel, handshake). If something fails it stops red at the step that failed and says why, in your language.
 * "Connected" is only shown after a real test connection through the tunnel worked.
+* Once connected it says **Connected to <country>** with the flag, the server's name and (if you turned it on) the exit address. Tap the ring or the big button to connect and disconnect.
 * **Location** opens the list of places. **Connect / Cancel / Disconnect** is the only button.
-* Logs and Settings are the two icons at the top. Everything else opens from there and closes with Back; there is no footer.
+* Settings (the sliders icon) is at the top, and Logs are in Settings. Everything else opens from there and closes with Back; there is no footer.
 * A notification (Android) shows the speed and has a Disconnect button.
 
 ## Choosing where to connect
@@ -50,6 +55,8 @@ regexp:^ads?\..*       names matching an expression
 ```
 
 Add a list by typing, pasting, opening a `.txt` file or downloading a link. The app shows how many entries it understood and which lines it will ignore. Each list can be switched off. **Only the listed destinations use the VPN** turns it round: everything else goes direct. Changes apply the next time you connect.
+
+**Battery and speed.** The app tidies a list before using it: a name under another listed domain, a name containing a listed keyword, and nested or neighbouring address ranges are merged, so the matcher stays small. Traffic to listed addresses is decided first and never inspected; names are only recognised (from the first packet of a connection) when your list has names in it. Listed address ranges are kept out of the VPN's routes (the largest first, up to a limit of a few hundred routes; the rest are still bypassed, one step later). In "only the listed" mode with only addresses, nothing else enters the VPN at all.
 
 ## Settings worth knowing
 

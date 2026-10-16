@@ -70,6 +70,40 @@ flutter:
   # The licenses of everything inside the app: make notices
   assets:
     - assets/third_party_notices.md
+    - assets/logo.png
+    - assets/fonts/OFL-cinzel.txt
+    - assets/fonts/OFL-inter.txt
+    - assets/fonts/OFL-vazirmatn.txt
+
+  # Open fonts (SIL OFL 1.1, texts in assets/fonts/OFL-*.txt), cut to the scripts the app uses:
+  # Cinzel for headings, Inter for text (Latin, Cyrillic), Vazirmatn for Persian and Arabic.
+  fonts:
+    - family: Cinzel
+      fonts:
+        - asset: assets/fonts/Cinzel-500.ttf
+          weight: 500
+        - asset: assets/fonts/Cinzel-700.ttf
+          weight: 700
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-400.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-500.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-600.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-700.ttf
+          weight: 700
+    - family: Vazirmatn
+      fonts:
+        - asset: assets/fonts/Vazirmatn-400.ttf
+          weight: 400
+        - asset: assets/fonts/Vazirmatn-500.ttf
+          weight: 500
+        - asset: assets/fonts/Vazirmatn-600.ttf
+          weight: 600
+        - asset: assets/fonts/Vazirmatn-700.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   # assets:

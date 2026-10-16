@@ -108,6 +108,10 @@ class _ConnectionRingState extends State<ConnectionRing> with SingleTickerProvid
                   ),
                 ),
               ),
+              CustomPaint(
+                size: Size.square(widget.size),
+                painter: _RingPainter(color: color, full: connected, track: !_showRing),
+              ),
               if (_showRing)
                 TweenAnimationBuilder<double>(
                   tween: Tween(end: percent / 100),
@@ -124,11 +128,6 @@ class _ConnectionRingState extends State<ConnectionRing> with SingleTickerProvid
                       backgroundColor: color.withValues(alpha: 0.16),
                     ),
                   ),
-                )
-              else
-                CustomPaint(
-                  size: Size.square(widget.size),
-                  painter: _RingPainter(color: color, full: connected),
                 ),
               if (connecting && _showRing)
                 Text(
@@ -149,10 +148,13 @@ class _ConnectionRingState extends State<ConnectionRing> with SingleTickerProvid
 /// The ring at rest: a faint track, and once connected a full ring that blends
 /// from the status colour to the brand colour.
 class _RingPainter extends CustomPainter {
-  _RingPainter({required this.color, required this.full});
+  _RingPainter({required this.color, required this.full, this.track = true});
 
   final Color color;
   final bool full;
+
+  /// Draw the ring itself (off while the progress indicator draws it).
+  final bool track;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -170,9 +172,26 @@ class _RingPainter extends CustomPainter {
     } else {
       paint.color = color.withValues(alpha: 0.28);
     }
-    canvas.drawArc(arc, 0, math.pi * 2, false, paint);
+    if (track) canvas.drawArc(arc, 0, math.pi * 2, false, paint);
+
+    // Runes: tick marks around the disc, alternately long and short; they light up when connected.
+    final c = size.center(Offset.zero);
+    final tick = Paint()
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round
+      ..color = (full ? color : color.withValues(alpha: 0.5)).withValues(alpha: full ? 0.85 : 0.35);
+    final outer = size.width / 2 - 13;
+    for (var i = 0; i < 48; i++) {
+      final a = math.pi * 2 * i / 48;
+      final inner = outer - (i.isEven ? 7 : 3.5);
+      canvas.drawLine(
+        c + Offset(math.cos(a), math.sin(a)) * inner,
+        c + Offset(math.cos(a), math.sin(a)) * outer,
+        tick,
+      );
+    }
   }
 
   @override
-  bool shouldRepaint(_RingPainter old) => old.color != color || old.full != full;
+  bool shouldRepaint(_RingPainter old) => old.color != color || old.full != full || old.track != track;
 }

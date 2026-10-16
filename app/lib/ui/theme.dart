@@ -3,80 +3,104 @@ import 'package:flutter/material.dart';
 import '../engine/engine.dart';
 import '../l10n/app_localizations.dart';
 
-/// Brand colours: indigo for actions, mint for "protected", on an ink-blue base.
-const brandIndigo = Color(0xFF6C7BFF);
-const brandViolet = Color(0xFF9B6CFF);
+/// A dark-fantasy palette, all in cold, muted blues that are easy on the eyes: a night
+/// sky of slate, steel blue for actions, frost for "protected", worn gold for "working".
+const brandIndigo = Color(0xFF4A78B8);
+const brandViolet = Color(0xFF30578F);
 
-/// Green of the "connected" state and of the Connect button. Works on dark and light.
-const connectedGreen = Color(0xFF1FCB91);
+/// Frost-teal glow of the "connected" state. Works on dark and light.
+const connectedGreen = Color(0xFF63B8C6);
 
-/// Amber of the "connecting" state.
-const connectingAmber = Color(0xFFFFB547);
+/// Worn gold of the "connecting" state.
+const connectingAmber = Color(0xFFC9A55C);
 
-/// Red of the Disconnect button.
-const disconnectRed = Color(0xFFF2536B);
+/// Dried-blood red of the Disconnect button.
+const disconnectRed = Color(0xFFC4566B);
 
-const _ink = Color(0xFF0A0F1E);
-const _inkPanel = Color(0xFF131B31);
-const _inkHigh = Color(0xFF1B2644);
-const _inkHighest = Color(0xFF26345A);
+const _ink = Color(0xFF080C13);
+const _inkPanel = Color(0xFF0F1622);
+const _inkHigh = Color(0xFF16202F);
+const _inkHighest = Color(0xFF1F2D42);
+
+/// Engraved capitals (Cinzel, SIL OFL) for headings; Inter for text; Vazirmatn for
+/// Persian and Arabic, which the other two do not cover.
+const headingFont = 'Cinzel';
+const bodyFont = 'Inter';
+const fallbackFonts = ['Inter', 'Vazirmatn'];
 
 ThemeData buildTheme(Brightness brightness) {
   final dark = brightness == Brightness.dark;
   final scheme = dark
       ? const ColorScheme.dark(
-          primary: brandIndigo,
-          onPrimary: Colors.white,
-          primaryContainer: Color(0xFF2A3470),
-          onPrimaryContainer: Color(0xFFDDE1FF),
+          primary: Color(0xFF86A8D8),
+          onPrimary: Color(0xFF0A1424),
+          primaryContainer: Color(0xFF1E3555),
+          onPrimaryContainer: Color(0xFFD6E4F7),
           secondary: connectedGreen,
-          onSecondary: Color(0xFF00281B),
+          onSecondary: Color(0xFF06222A),
           secondaryContainer: _inkHighest,
-          onSecondaryContainer: Color(0xFFE3E8FF),
-          tertiary: brandViolet,
+          onSecondaryContainer: Color(0xFFDCE6F4),
+          tertiary: connectingAmber,
           error: disconnectRed,
           onError: Colors.white,
           surface: _ink,
-          onSurface: Color(0xFFEAEEFB),
-          onSurfaceVariant: Color(0xFF98A3C4),
+          onSurface: Color(0xFFDCE3EE),
+          onSurfaceVariant: Color(0xFF8D9AB0),
           surfaceContainerLowest: _ink,
           surfaceContainerLow: _inkPanel,
           surfaceContainer: _inkPanel,
           surfaceContainerHigh: _inkHigh,
           surfaceContainerHighest: _inkHighest,
-          outline: Color(0xFF55618A),
-          outlineVariant: Color(0xFF2B3759),
+          outline: Color(0xFF4B5B75),
+          outlineVariant: Color(0xFF223047),
         )
+      // Cold stone by day.
       : const ColorScheme.light(
-          primary: Color(0xFF4A57E0),
+          primary: Color(0xFF2D5287),
           onPrimary: Colors.white,
-          primaryContainer: Color(0xFFE1E4FF),
-          onPrimaryContainer: Color(0xFF14196B),
-          secondary: Color(0xFF0FA775),
+          primaryContainer: Color(0xFFD3E0F2),
+          onPrimaryContainer: Color(0xFF0E2340),
+          secondary: Color(0xFF2E8B98),
           onSecondary: Colors.white,
-          secondaryContainer: Color(0xFFE4E8F5),
-          onSecondaryContainer: Color(0xFF1B2447),
-          tertiary: Color(0xFF7A4FE0),
-          error: Color(0xFFD93A53),
+          secondaryContainer: Color(0xFFD0D9E6),
+          onSecondaryContainer: Color(0xFF16233A),
+          tertiary: Color(0xFF9A7B33),
+          error: Color(0xFFB03A52),
           onError: Colors.white,
-          surface: Color(0xFFF4F6FC),
-          onSurface: Color(0xFF111833),
-          onSurfaceVariant: Color(0xFF58628A),
-          surfaceContainerLowest: Colors.white,
-          surfaceContainerLow: Colors.white,
-          surfaceContainer: Colors.white,
-          surfaceContainerHigh: Color(0xFFEBEEF9),
-          surfaceContainerHighest: Color(0xFFE0E5F5),
-          outline: Color(0xFF8A94B8),
-          outlineVariant: Color(0xFFD5DAEC),
+          surface: Color(0xFFE6EAF0),
+          onSurface: Color(0xFF141B28),
+          onSurfaceVariant: Color(0xFF55637C),
+          surfaceContainerLowest: Color(0xFFF3F5F8),
+          surfaceContainerLow: Color(0xFFF3F5F8),
+          surfaceContainer: Color(0xFFF3F5F8),
+          surfaceContainerHigh: Color(0xFFDDE3EC),
+          surfaceContainerHighest: Color(0xFFD0D9E6),
+          outline: Color(0xFF8796AD),
+          outlineVariant: Color(0xFFCBD3DF),
         );
 
-  const radius = 16.0;
+  const radius = 18.0;
   final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius));
-  final base = ThemeData(brightness: brightness, useMaterial3: true, colorScheme: scheme);
+  final base = ThemeData(
+    brightness: brightness,
+    useMaterial3: true,
+    colorScheme: scheme,
+    fontFamily: bodyFont,
+    fontFamilyFallback: fallbackFonts,
+  );
   final text = base.textTheme.copyWith(
-    headlineSmall: base.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-    titleLarge: base.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.2),
+    headlineSmall: base.textTheme.headlineSmall?.copyWith(
+      fontFamily: headingFont,
+      fontFamilyFallback: fallbackFonts,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.4,
+    ),
+    titleLarge: base.textTheme.titleLarge?.copyWith(
+      fontFamily: headingFont,
+      fontFamilyFallback: fallbackFonts,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.6,
+    ),
     titleMedium: base.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
     titleSmall: base.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: 0.6),
   );
@@ -90,7 +114,10 @@ ThemeData buildTheme(Brightness brightness) {
       margin: EdgeInsets.zero,
       elevation: 0,
       color: scheme.surfaceContainer,
-      shape: shape,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(radius),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
     ),
     appBarTheme: AppBarTheme(
       backgroundColor: scheme.surface,
@@ -183,7 +210,7 @@ Color statusColor(ConnStatus status, ColorScheme scheme) {
 
 IconData statusIcon(ConnStatus status) {
   return switch (status) {
-    ConnStatus.connected => Icons.shield_rounded,
+    ConnStatus.connected => Icons.auto_awesome_rounded,
     ConnStatus.connecting || ConnStatus.disconnecting => Icons.sync_rounded,
     ConnStatus.error => Icons.priority_high_rounded,
     ConnStatus.noInternet => Icons.wifi_off_rounded,

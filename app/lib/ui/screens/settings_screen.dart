@@ -21,136 +21,166 @@ class SettingsScreen extends ConsumerWidget {
     final s = ref.watch(settingsProvider);
     final ctrl = ref.read(settingsProvider.notifier);
     final bypassEntries = ref.watch(bypassListsProvider).where((b) => b.enabled).fold<int>(0, (n, b) => n + b.entries);
+    void open(Widget page) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
     return Scaffold(
       appBar: AppBar(title: Text(l.settingsTitle)),
-      body: ListView(
-        children: [
-          _Header(l.settingsServers),
-          ListTile(
-            leading: const Icon(Icons.dns_outlined),
-            title: Text(l.manageServers),
-            subtitle: Text(l.manageServersHint),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ProfilesScreen())),
-          ),
-          _Header(l.settingsConnection),
-          SwitchListTile(
-            title: Text(l.vpnMode),
-            subtitle: Text(l.vpnModeHint),
-            value: s.tunMode,
-            onChanged: (v) => ctrl.update((s) => s.copyWith(tunMode: v)),
-          ),
-          SwitchListTile(
-            title: Text(l.systemProxy),
-            subtitle: Text(l.systemProxyHint),
-            value: s.systemProxy,
-            onChanged: s.tunMode ? null : (v) => ctrl.update((s) => s.copyWith(systemProxy: v)),
-          ),
-          SwitchListTile(
-            title: Text(l.autoSwitch),
-            subtitle: Text(l.autoSwitchHint),
-            value: s.autoFailover,
-            onChanged: (v) => ctrl.update((s) => s.copyWith(autoFailover: v)),
-          ),
-          SwitchListTile(
-            title: Text(l.exitTitle),
-            subtitle: Text(l.exitHint),
-            value: s.showExit,
-            onChanged: (v) => ctrl.update((s) => s.copyWith(showExit: v)),
-          ),
-          SwitchListTile(
-            title: Text(l.bypassLan),
-            subtitle: Text(l.bypassLanHint),
-            value: s.bypassLan,
-            onChanged: (v) => ctrl.update((s) => s.copyWith(bypassLan: v)),
-          ),
-          if (Platform.isAndroid)
-            ListTile(
-              title: Text(l.alwaysOnTitle),
-              subtitle: Text(l.alwaysOnHint),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: () => _openVpnSettings(context),
-            ),
-          ListTile(
-            title: Text(l.bypassTitle),
-            subtitle: Text(bypassEntries == 0 ? l.bypassListsHint : l.bypassListsInUse(bypassEntries)),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const BypassScreen())),
-          ),
-          if (Platform.isAndroid)
-            ListTile(
-              title: Text(l.splitTunneling),
-              subtitle: Text(switch (s.splitMode) {
-                'include' => l.splitSummaryOnly(s.splitApps.length),
-                'exclude' => l.splitSummaryBypass(s.splitApps.length),
-                _ => l.splitSummaryOff,
-              }),
-              trailing: const Icon(Icons.chevron_right),
-              enabled: s.tunMode,
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SplitTunnelScreen())),
-            ),
-          ListTile(
-            title: Text(l.remoteDns),
-            subtitle: Text(s.remoteDns),
-            trailing: const Icon(Icons.edit_outlined),
-            onTap: () => _editDns(context, ref, s.remoteDns),
-          ),
-          _Header(l.settingsApp),
-          ListTile(
-            title: Text(l.language),
-            subtitle: Text(
-              s.language.isEmpty
-                  ? l.languageSystem
-                  : supportedLanguages.where((e) => e.$1 == s.language).map((e) => e.$2).firstOrNull ?? s.language,
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _pickLanguage(context, ref, s.language),
-          ),
-          ListTile(
-            title: Text(l.appearance),
-            subtitle: Text(switch (s.theme) {
-              'light' => l.themeLight,
-              'system' => l.themeSystem,
-              _ => l.themeDark,
-            }),
-            trailing: SegmentedButton<String>(
-              showSelectedIcon: false,
-              segments: [
-                ButtonSegment(value: 'dark', icon: const Icon(Icons.dark_mode_outlined), tooltip: l.themeDark),
-                ButtonSegment(
-                  value: 'system',
-                  icon: const Icon(Icons.brightness_auto_outlined),
-                  tooltip: l.themeSystem,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 32),
+            children: [
+              _Header(l.settingsServers),
+              _Group([
+                ListTile(
+                  leading: const Icon(Icons.dns_outlined),
+                  title: Text(l.manageServers),
+                  subtitle: Text(l.manageServersHint),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => open(const ProfilesScreen()),
                 ),
-                ButtonSegment(value: 'light', icon: const Icon(Icons.light_mode_outlined), tooltip: l.themeLight),
-              ],
-              selected: {s.theme},
-              onSelectionChanged: (v) => ctrl.update((s) => s.copyWith(theme: v.first)),
-            ),
+              ]),
+              _Header(l.settingsConnection),
+              _Group([
+                SwitchListTile(
+                  secondary: const Icon(Icons.vpn_lock_rounded),
+                  title: Text(l.vpnMode),
+                  subtitle: Text(l.vpnModeHint),
+                  value: s.tunMode,
+                  onChanged: (v) => ctrl.update((s) => s.copyWith(tunMode: v)),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.lan_outlined),
+                  title: Text(l.systemProxy),
+                  subtitle: Text(l.systemProxyHint),
+                  value: s.systemProxy,
+                  onChanged: s.tunMode ? null : (v) => ctrl.update((s) => s.copyWith(systemProxy: v)),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.autorenew_rounded),
+                  title: Text(l.autoSwitch),
+                  subtitle: Text(l.autoSwitchHint),
+                  value: s.autoFailover,
+                  onChanged: (v) => ctrl.update((s) => s.copyWith(autoFailover: v)),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.travel_explore_rounded),
+                  title: Text(l.exitTitle),
+                  subtitle: Text(l.exitHint),
+                  value: s.showExit,
+                  onChanged: (v) => ctrl.update((s) => s.copyWith(showExit: v)),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.devices_other_rounded),
+                  title: Text(l.bypassLan),
+                  subtitle: Text(l.bypassLanHint),
+                  value: s.bypassLan,
+                  onChanged: (v) => ctrl.update((s) => s.copyWith(bypassLan: v)),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.alt_route_rounded),
+                  title: Text(l.bypassTitle),
+                  subtitle: Text(bypassEntries == 0 ? l.bypassListsHint : l.bypassListsInUse(bypassEntries)),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => open(const BypassScreen()),
+                ),
+                if (Platform.isAndroid)
+                  ListTile(
+                    leading: const Icon(Icons.call_split_rounded),
+                    title: Text(l.splitTunneling),
+                    subtitle: Text(switch (s.splitMode) {
+                      'include' => l.splitSummaryOnly(s.splitApps.length),
+                      'exclude' => l.splitSummaryBypass(s.splitApps.length),
+                      _ => l.splitSummaryOff,
+                    }),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    enabled: s.tunMode,
+                    onTap: () => open(const SplitTunnelScreen()),
+                  ),
+                if (Platform.isAndroid)
+                  ListTile(
+                    leading: const Icon(Icons.verified_user_outlined),
+                    title: Text(l.alwaysOnTitle),
+                    subtitle: Text(l.alwaysOnHint),
+                    trailing: const Icon(Icons.open_in_new_rounded),
+                    onTap: () => _openVpnSettings(context),
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.hub_outlined),
+                  title: Text(l.remoteDns),
+                  subtitle: Text(s.remoteDns, textDirection: TextDirection.ltr),
+                  trailing: const Icon(Icons.edit_outlined),
+                  onTap: () => _editDns(context, ref, s.remoteDns),
+                ),
+              ]),
+              _Header(l.settingsApp),
+              _Group([
+                ListTile(
+                  leading: const Icon(Icons.translate_rounded),
+                  title: Text(l.language),
+                  subtitle: Text(
+                    s.language.isEmpty
+                        ? l.languageSystem
+                        : supportedLanguages.where((e) => e.$1 == s.language).map((e) => e.$2).firstOrNull ??
+                              s.language,
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => _pickLanguage(context, ref, s.language),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.palette_outlined),
+                  title: Text(l.appearance),
+                  subtitle: Text(switch (s.theme) {
+                    'light' => l.themeLight,
+                    'system' => l.themeSystem,
+                    _ => l.themeDark,
+                  }),
+                  trailing: SegmentedButton<String>(
+                    showSelectedIcon: false,
+                    segments: [
+                      ButtonSegment(value: 'dark', icon: const Icon(Icons.dark_mode_outlined), tooltip: l.themeDark),
+                      ButtonSegment(
+                        value: 'system',
+                        icon: const Icon(Icons.brightness_auto_outlined),
+                        tooltip: l.themeSystem,
+                      ),
+                      ButtonSegment(
+                        value: 'light',
+                        icon: const Icon(Icons.light_mode_outlined),
+                        tooltip: l.themeLight,
+                      ),
+                    ],
+                    selected: {s.theme},
+                    onSelectionChanged: (v) => ctrl.update((s) => s.copyWith(theme: v.first)),
+                  ),
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.power_settings_new_rounded),
+                  title: Text(l.stopOnClose),
+                  value: s.stopOnClose,
+                  onChanged: (v) => ctrl.update((s) => s.copyWith(stopOnClose: v)),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.receipt_long_outlined),
+                  title: Text(l.tooltipLogs),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => open(const LogsScreen()),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.gavel_outlined),
+                  title: Text(l.noticesTitle),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => open(const NoticesScreen()),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.info_outline_rounded),
+                  title: Text(l.appName),
+                  subtitle: Text(l.aboutLine(ref.watch(engineProvider).name)),
+                ),
+              ]),
+            ],
           ),
-          ListTile(
-            leading: const Icon(Icons.receipt_long_outlined),
-            title: Text(l.tooltipLogs),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const LogsScreen())),
-          ),
-          SwitchListTile(
-            title: Text(l.stopOnClose),
-            value: s.stopOnClose,
-            onChanged: (v) => ctrl.update((s) => s.copyWith(stopOnClose: v)),
-          ),
-          ListTile(
-            leading: const Icon(Icons.gavel_outlined),
-            title: Text(l.noticesTitle),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NoticesScreen())),
-          ),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: Text(l.appName),
-            subtitle: Text(l.aboutLine(ref.watch(engineProvider).name)),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -245,6 +275,29 @@ class _DnsDialogState extends State<_DnsDialog> {
   }
 }
 
+/// A rounded card holding one section's rows.
+class _Group extends StatelessWidget {
+  const _Group(this.children);
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final divider = Divider(indent: 56, color: Theme.of(context).colorScheme.outlineVariant);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            for (var i = 0; i < children.length; i++) ...[if (i > 0) divider, children[i]],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _Header extends StatelessWidget {
   const _Header(this.text);
 
@@ -253,7 +306,7 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+      padding: const EdgeInsets.fromLTRB(32, 22, 32, 8),
       child: Text(
         text,
         style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.primary),

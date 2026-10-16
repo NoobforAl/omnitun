@@ -1,17 +1,21 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/engine.dart';
+import '../../l10n/errors.dart';
 import '../../l10n/l10n.dart';
-import '../../state/countries.dart';
 import '../../state/location.dart';
 import '../../state/providers.dart';
 import '../theme.dart';
 import '../widgets/connection_ring.dart';
 import '../widgets/country_flag.dart';
+import '../../state/geo_data.dart';
 import '../widgets/credentials_dialog.dart';
+import '../widgets/earth_globe.dart';
+import '../widgets/star_field.dart';
 import 'location_screen.dart';
 import 'profiles_screen.dart';
 import 'settings_screen.dart';
@@ -31,11 +35,14 @@ class HomeScreen extends ConsumerWidget {
     ref.listen(connectionProvider.select((s) => s.failover), (prev, next) {
       if (next == null || next.at == prev?.at) return;
       final profiles = ref.read(profilesProvider);
-      String name(String id) => profiles.where((p) => p.id == id).firstOrNull?.name ?? id;
+      String name(String id) =>
+          profiles.where((p) => p.id == id).firstOrNull?.name ?? id;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 6),
-          content: Text(context.l10n.failoverToast(name(next.to), name(next.from))),
+          content: Text(
+            context.l10n.failoverToast(name(next.to), name(next.from)),
+          ),
         ),
       );
     });
@@ -48,34 +55,47 @@ class HomeScreen extends ConsumerWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color.alphaBlend(statusColor(conn.status, scheme).withValues(alpha: 0.14), scheme.surface),
+              Color.alphaBlend(
+                statusColor(conn.status, scheme).withValues(alpha: 0.14),
+                scheme.surface,
+              ),
               scheme.surface,
             ],
             stops: const [0, 0.7],
           ),
         ),
-        child: SafeArea(
-          bottom: false,
-          child: Center(
-            child: ConstrainedBox(
-              // On a wide window the same screen stays one narrow column.
-              constraints: const BoxConstraints(maxWidth: _columnWidth),
-              child: Column(
-                children: [
-                  const _TopBar(),
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, box) => SingleChildScrollView(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(minHeight: box.maxHeight),
-                          child: Center(child: _Hero(state: conn)),
+        child: CustomPaint(
+          painter: const StarFieldPainter(),
+          child: Stack(
+            children: [
+              Positioned.fill(child: _Earth(state: conn)),
+              SafeArea(
+            bottom: false,
+            child: Center(
+              child: ConstrainedBox(
+                // On a wide window the same screen stays one narrow column.
+                constraints: const BoxConstraints(maxWidth: _columnWidth),
+                child: Column(
+                  children: [
+                    const _TopBar(),
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, box) => SingleChildScrollView(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: box.maxHeight,
+                            ),
+                            child: Center(child: _Hero(state: conn)),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
+          ),
+            ],
           ),
         ),
       ),
@@ -100,14 +120,57 @@ const _columnWidth = 480.0;
 /// server needs one. Shared by the power ring and the main button.
 Future<void> _toggle(BuildContext context, WidgetRef ref) async {
   final ctrl = ref.read(connectionProvider.notifier);
-  if (ref.read(connectionPlanProvider) == null || ref.read(connectionProvider).status == ConnStatus.disconnecting) {
+  if (ref.read(connectionPlanProvider) == null ||
+      ref.read(connectionProvider).status == ConnStatus.disconnecting) {
     return;
   }
   final profile = ref.read(selectedProfileProvider);
-  if (!ctrl.isActive && profile != null && profile.needsCredentials && !profile.hasCredentials) {
+  if (!ctrl.isActive &&
+      profile != null &&
+      profile.needsCredentials &&
+      !profile.hasCredentials) {
     if (!await askCredentials(context, ref, profile)) return;
   }
   ctrl.toggle();
+}
+
+/// The country the connection exits in: what the service saw, else the guess from
+/// the server's name; null for Tor, when not connected, or when unknown.
+String? _exitCode(WidgetRef ref, EngineState s) {
+  if (s.status != ConnStatus.connected) return null;
+  final active = ref.watch(profilesProvider).where((p) => p.id == s.activeProfileId).firstOrNull;
+  if (active == null || active.protocol == 'tor') return null;
+  return ref.watch(exitProvider)?.country ?? ref.watch(profileCountryProvider)(active);
+}
+
+/// The Earth behind everything, turned to the exit country while connected.
+class _Earth extends ConsumerWidget {
+  const _Earth({required this.state});
+
+  final EngineState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final code = _exitCode(ref, state);
+    final center = code == null ? null : countryCenters[code];
+    return LayoutBuilder(
+      builder: (context, box) {
+        final d = math.min(box.maxWidth * 0.98, 520.0);
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: (box.maxWidth - d) / 2,
+              top: box.maxHeight * 0.41 - d / 2,
+              width: d,
+              height: d,
+              child: EarthBackdrop(target: center, markerColor: statusColor(state.status, Theme.of(context).colorScheme)),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _TopBar extends StatelessWidget {
@@ -120,28 +183,27 @@ class _TopBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 10, 8, 0),
       child: Row(
         children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(9),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [brandIndigo, brandViolet],
-              ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(9),
+            child: Image.asset(
+              'assets/logo.png',
+              width: 32,
+              height: 32,
+              filterQuality: FilterQuality.medium,
             ),
-            child: const Icon(Icons.shield_rounded, size: 18, color: Colors.white),
           ),
           const SizedBox(width: 10),
           Text(
             context.l10n.appName,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(color: scheme.onSurface),
+            style: Theme.of(context).textTheme.titleLarge
+                ?.copyWith(color: scheme.onSurface),
           ),
           const Spacer(),
           IconButton(
             tooltip: context.l10n.tooltipSettings,
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen())),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+            ),
             icon: const Icon(Icons.tune_rounded),
           ),
         ],
@@ -196,19 +258,29 @@ class _HeroState extends ConsumerState<_Hero> {
     final exit = ref.watch(exitProvider);
     final tor = active?.protocol == 'tor';
     // The country the service saw is the truth; the guess is the fallback.
-    final code = tor ? null : exit?.country ?? (active == null ? null : countryOf(active));
+    final code = tor
+        ? null
+        : exit?.country ?? (active == null ? null : countryOf(active));
     // Where you appear to be: the country, or Tor; null when it is not known.
-    final place = tor ? context.l10n.torNetwork : (code == null ? null : countryNames[code] ?? code);
+    final place = tor
+        ? context.l10n.torNetwork
+        : (code == null ? null : context.countryName(code));
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ConnectionRing(status: s.status, progress: s.progress, onTap: () => _toggle(context, ref)),
+          ConnectionRing(
+            status: s.status,
+            progress: s.progress,
+            onTap: () => _toggle(context, ref),
+          ),
           const SizedBox(height: 28),
           Text(
-            connected && place != null ? context.l10n.connectedTo(place) : statusLabel(context.l10n, s.status),
+            connected && place != null
+                ? context.l10n.connectedTo(place)
+                : statusLabel(context.l10n, s.status),
             style: text.headlineSmall?.copyWith(color: color),
             textAlign: TextAlign.center,
           ),
@@ -219,9 +291,17 @@ class _HeroState extends ConsumerState<_Hero> {
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
                 child: Text(
-                  [s.progress!.detail ?? stageLabel(context.l10n, s.progress!.stage), ?s.progress!.profile].join(' · '),
-                  key: ValueKey('${s.progress!.stage}${s.progress!.profile}${s.progress!.detail}'),
-                  style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                  [
+                    progressDetail(context.l10n, s.progress!) ??
+                        stageLabel(context.l10n, s.progress!.stage),
+                    ?s.progress!.profile,
+                  ].join(' · '),
+                  key: ValueKey(
+                    '${s.progress!.stage}${s.progress!.profile}${s.progress!.detail}',
+                  ),
+                  style: text.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -250,7 +330,12 @@ class _HeroState extends ConsumerState<_Hero> {
 
 /// The flag of the exit country with the server's name and, when known, the exit address.
 class _ExitChip extends StatelessWidget {
-  const _ExitChip({required this.code, required this.tor, required this.title, this.ip});
+  const _ExitChip({
+    required this.code,
+    required this.tor,
+    required this.title,
+    this.ip,
+  });
 
   final String? code;
   final bool tor;
@@ -283,12 +368,18 @@ class _ExitChip extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(title, style: text.titleMedium, overflow: TextOverflow.ellipsis),
+                Text(
+                  title,
+                  style: text.titleMedium,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 if (ip != null)
                   Text(
                     context.l10n.exitIpLabel(ip!),
                     textDirection: TextDirection.ltr,
-                    style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                    style: text.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
               ],
             ),
@@ -316,7 +407,10 @@ class _TrafficRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     Widget pill(IconData icon, int bps) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(color: scheme.surfaceContainer, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -325,14 +419,19 @@ class _TrafficRow extends StatelessWidget {
           Text(
             _fmt(bps),
             textDirection: TextDirection.ltr,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+            style: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ],
       ),
     );
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: [pill(Icons.south_rounded, down), const SizedBox(width: 10), pill(Icons.north_rounded, up)],
+      children: [
+        pill(Icons.south_rounded, down),
+        const SizedBox(width: 10),
+        pill(Icons.north_rounded, up),
+      ],
     );
   }
 }
@@ -353,10 +452,14 @@ class _BottomPanel extends ConsumerWidget {
     final countryOf = ref.watch(profileCountryProvider);
 
     final active = switch (state.status) {
-      ConnStatus.connected || ConnStatus.connecting || ConnStatus.noInternet => true,
+      ConnStatus.connected ||
+      ConnStatus.connecting ||
+      ConnStatus.noInternet => true,
       _ => false,
     };
-    final connected = state.status == ConnStatus.connected || state.status == ConnStatus.noInternet;
+    final connected =
+        state.status == ConnStatus.connected ||
+        state.status == ConnStatus.noInternet;
     final busy = state.status == ConnStatus.disconnecting;
 
     // What the row says: the choice, not the server it ended up on.
@@ -365,11 +468,17 @@ class _BottomPanel extends ConsumerWidget {
     final (flagCode, title, subtitle) = plan == null
         ? (null, context.l10n.noServers, context.l10n.noServersHint)
         : specific != null
-        ? (countryOf(specific), specific.name, profileAddress(context, specific))
+        ? (
+            countryOf(specific),
+            specific.name,
+            profileAddress(context, specific),
+          )
         : code != null
-        ? (code, countryNames[code] ?? code, context.l10n.anyServerInCountry)
+        ? (code, context.countryName(code), context.l10n.anyServerInCountry)
         : (null, context.l10n.automatic, context.l10n.automaticHint);
-    final rowIcon = specific == null ? Icons.bolt_rounded : (specific.protocol == 'tor' ? Icons.security : Icons.public);
+    final rowIcon = specific == null
+        ? Icons.bolt_rounded
+        : (specific.protocol == 'tor' ? Icons.security : Icons.public);
 
     return Container(
       decoration: BoxDecoration(
@@ -399,13 +508,24 @@ class _BottomPanel extends ConsumerWidget {
               borderRadius: BorderRadius.circular(18),
               child: InkWell(
                 borderRadius: BorderRadius.circular(18),
-                onTap: () =>
-                    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const LocationScreen())),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const LocationScreen(),
+                  ),
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   child: Row(
                     children: [
-                      CountryFlag(flagCode, size: 40, icon: rowIcon, label: title),
+                      CountryFlag(
+                        flagCode,
+                        size: 40,
+                        icon: rowIcon,
+                        label: title,
+                      ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
@@ -413,18 +533,29 @@ class _BottomPanel extends ConsumerWidget {
                           children: [
                             Text(
                               context.l10n.locationLabel,
-                              style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                              style: text.labelSmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
                             ),
-                            Text(title, style: text.titleMedium, overflow: TextOverflow.ellipsis),
+                            Text(
+                              title,
+                              style: text.titleMedium,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             Text(
                               subtitle,
-                              style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                              style: text.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
-                      Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ],
                   ),
                 ),
@@ -434,8 +565,12 @@ class _BottomPanel extends ConsumerWidget {
             _MainButton(
               label: connected
                   ? context.l10n.buttonDisconnect
-                  : (active ? context.l10n.buttonCancel : context.l10n.buttonConnect),
-              kind: connected ? _ButtonKind.stop : (active ? _ButtonKind.cancel : _ButtonKind.go),
+                  : (active
+                        ? context.l10n.buttonCancel
+                        : context.l10n.buttonConnect),
+              kind: connected
+                  ? _ButtonKind.stop
+                  : (active ? _ButtonKind.cancel : _ButtonKind.go),
               onPressed: busy ? null : () => _toggle(context, ref),
             ),
           ],
@@ -449,7 +584,11 @@ enum _ButtonKind { go, stop, cancel }
 
 /// The one big button: a gradient to connect, a red tint to disconnect, a quiet one to cancel.
 class _MainButton extends StatelessWidget {
-  const _MainButton({required this.label, required this.kind, required this.onPressed});
+  const _MainButton({
+    required this.label,
+    required this.kind,
+    required this.onPressed,
+  });
 
   final String label;
   final _ButtonKind kind;
@@ -460,7 +599,10 @@ class _MainButton extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final (fill, fg) = switch (kind) {
       _ButtonKind.go => (null, Colors.white),
-      _ButtonKind.stop => (disconnectRed.withValues(alpha: 0.16), disconnectRed),
+      _ButtonKind.stop => (
+        disconnectRed.withValues(alpha: 0.16),
+        disconnectRed,
+      ),
       _ButtonKind.cancel => (scheme.surfaceContainerHighest, scheme.onSurface),
     };
     return Opacity(
@@ -486,7 +628,8 @@ class _MainButton extends StatelessWidget {
               child: Center(
                 child: Text(
                   label,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(color: fg, fontWeight: FontWeight.w700),
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(color: fg, fontWeight: FontWeight.w700),
                 ),
               ),
             ),
@@ -506,11 +649,18 @@ class _EmptyHint extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(context.l10n.emptyTitle, style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          context.l10n.emptyTitle,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 4),
         Text(context.l10n.emptyHint, textAlign: TextAlign.center),
         const SizedBox(height: 16),
-        FilledButton.icon(onPressed: onImport, icon: const Icon(Icons.add), label: Text(context.l10n.importConfig)),
+        FilledButton.icon(
+          onPressed: onImport,
+          icon: const Icon(Icons.add),
+          label: Text(context.l10n.importConfig),
+        ),
       ],
     );
   }
