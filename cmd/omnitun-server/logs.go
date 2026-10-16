@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"slices"
 	"syscall"
 	"time"
 
@@ -52,8 +53,8 @@ func newLogsCmd(o *options) *cobra.Command {
 					return err
 				}
 				start := 0
-				for i := len(cur) - 1; i >= 0; i-- {
-					if cur[i] == last {
+				for i, c := range slices.Backward(cur) {
+					if c == last {
 						start = i + 1
 						break
 					}

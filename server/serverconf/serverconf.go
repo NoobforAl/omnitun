@@ -38,6 +38,7 @@ func Env(st *store.State, s *store.Store) protocols.Env {
 			ServerKey: srv.OpenVPN.ServerKey, TLSCrypt: srv.OpenVPN.TLSCrypt,
 		},
 		WireGuard: wireGuardEnv(srv),
+		IKEv2PSK:  srv.IKEv2PSK,
 	}
 	if data, err := os.ReadFile(env.CertPath); err == nil {
 		env.CertPEM = string(data)
@@ -96,7 +97,8 @@ func wireGuardEnv(srv store.Server) protocols.WireGuard {
 	}
 }
 
-func accounts(users []*store.User) []protocols.Account {
+// Accounts maps users to the credentials the protocols use.
+func Accounts(users []*store.User) []protocols.Account {
 	out := make([]protocols.Account, len(users))
 	for i, u := range users {
 		out[i] = Account(u)
@@ -117,7 +119,7 @@ func Build(st *store.State, s *store.Store, now time.Time) obj {
 		if p == nil || !p.Enabled || len(users) == 0 || !ok {
 			continue
 		}
-		cfg := proto.Inbounds(env, p.Port, accounts(users))
+		cfg := proto.Inbounds(env, p.Port, Accounts(users))
 		for _, in := range cfg.Inbounds {
 			inbounds = append(inbounds, in)
 		}
@@ -220,6 +222,7 @@ func Links(st *store.State, u *store.User) []Link {
 		},
 		SSServerKey: st.Server.SSServerKey,
 		WireGuard:   wireGuardEnv(st.Server),
+		IKEv2PSK:    st.Server.IKEv2PSK,
 	}
 	var out []Link
 	for _, key := range store.AllProtocols {

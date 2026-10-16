@@ -19,6 +19,7 @@ import (
 
 	"github.com/NoobforAl/omnitun/core/protocols"
 	"github.com/NoobforAl/omnitun/server/manager"
+	"github.com/NoobforAl/omnitun/server/store"
 )
 
 func newInitCmd(o *options) *cobra.Command {
@@ -146,7 +147,7 @@ func runWizard(start manager.InitOptions) (*wizardResult, error) {
 	options := make([]huh.Option[string], 0, len(protocols.Specs()))
 	for _, s := range protocols.Specs() {
 		label := fmt.Sprintf("%-26s %-7s %s", s.Name, s.Transport, s.Description)
-		options = append(options, huh.NewOption(label, s.Key).Selected(len(start.Enabled) == 0 || contains(start.Enabled, s.Key)))
+		options = append(options, huh.NewOption(label, s.Key).Selected(store.EnabledAtInit(s.Key, start.Enabled)))
 	}
 
 	first := huh.NewForm(

@@ -83,6 +83,9 @@ func ImportSingBoxJSON(text string) (*Result, error) {
 	var doc struct {
 		Outbounds []json.RawMessage `json:"outbounds"`
 		Endpoints []json.RawMessage `json:"endpoints"`
+		// ExtraLinks carries what sing-box cannot express (SSTP, IKEv2): Omnitun
+		// servers list those profiles as share links next to the outbounds.
+		ExtraLinks []string `json:"extra_links"`
 	}
 	if err := json.Unmarshal([]byte(text), &doc); err != nil {
 		return nil, fmt.Errorf("sing-box JSON: %w", err)
@@ -148,6 +151,13 @@ func ImportSingBoxJSON(text string) (*Result, error) {
 		}
 		p.EnsureID()
 		res.Profiles = append(res.Profiles, p)
+	}
+	for _, link := range doc.ExtraLinks {
+		if p, err := ParseLink(link); err == nil {
+			res.Profiles = append(res.Profiles, p)
+		} else {
+			res.Errors = append(res.Errors, fmt.Sprintf("%s: %v", truncate(link, 40), err))
+		}
 	}
 	if len(res.Profiles) == 0 {
 		if len(res.Errors) > 0 {

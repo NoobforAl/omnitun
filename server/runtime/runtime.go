@@ -22,6 +22,7 @@ import (
 	sjson "github.com/sagernet/sing/common/json"
 	"github.com/sagernet/sing/service"
 
+	"github.com/NoobforAl/omnitun/server/hostproto"
 	"github.com/NoobforAl/omnitun/server/logs"
 	"github.com/NoobforAl/omnitun/server/serverconf"
 	"github.com/NoobforAl/omnitun/server/stats"
@@ -45,6 +46,10 @@ type Server struct {
 	accMu   sync.Mutex     // guards the collector's tick against the final flush
 	coll    *collector     // the running instance's collector (guarded by accMu)
 	accStop context.CancelFunc
+
+	hosts   map[string]hostproto.Server // running SSTP / IKEv2 servers
+	undoNAT func()
+	runner  hostproto.Runner // runs nft/iptables; tests replace it
 
 	wgMu    sync.RWMutex
 	wgUsers map[netip.Addr]string // WireGuard tunnel address -> user name
@@ -77,7 +82,7 @@ func New(s *store.Store, logf func(string, ...any)) *Server {
 	// Everything the server says also goes to server.log, where the CLI, the
 	// TUI and the API can read it.
 	file := logs.Open(s.Dir)
-	srv := &Server{store: s, file: file}
+	srv := &Server{store: s, file: file, runner: hostproto.ExecRunner{}}
 	srv.logf = func(format string, args ...any) {
 		logf(format, args...)
 		file.Write("info", fmt.Sprintf(format, args...))
@@ -106,6 +111,7 @@ func (s *Server) Start() error {
 	if err := s.startBoxLocked(st); err != nil {
 		return err
 	}
+	s.startHostLocked(st)
 	if sub := st.Server.Subscription; sub.Enabled {
 		ln, err := net.Listen("tcp", net.JoinHostPort(sub.Listen, strconv.Itoa(sub.Port)))
 		if err != nil {
@@ -189,7 +195,10 @@ func (s *Server) Reload() error {
 		return err
 	}
 	s.stopBoxLocked()
-	return s.startBoxLocked(st)
+	s.stopHostLocked()
+	err = s.startBoxLocked(st)
+	s.startHostLocked(st)
+	return err
 }
 
 // Watch reloads when the state file changes and once a minute (to apply
@@ -247,6 +256,7 @@ func (s *Server) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.stopBoxLocked()
+	s.stopHostLocked()
 	defer s.file.Close()
 	if s.accStop != nil {
 		s.accStop()

@@ -5,7 +5,6 @@ import (
 	"net"
 	"sort"
 
-	"github.com/NoobforAl/omnitun/core/protocols"
 	"github.com/NoobforAl/omnitun/server/store"
 )
 
@@ -31,18 +30,11 @@ func (m *Manager) FirewallPorts() ([]PortRule, error) {
 	}
 	for _, key := range store.AllProtocols {
 		p := st.Server.Protocols[key]
-		proto, ok := protocols.Get(key)
-		if p == nil || !p.Enabled || !ok {
+		if p == nil || !p.Enabled {
 			continue
 		}
-		switch proto.Spec().Transport {
-		case "tcp":
-			add(p.Port, "tcp", key)
-		case "udp":
-			add(p.Port, "udp", key)
-		default:
-			add(p.Port, "tcp", key)
-			add(p.Port, "udp", key)
+		for _, u := range portUses(key, p.Port) {
+			add(u.Port, u.Proto, key)
 		}
 	}
 	if sub := st.Server.Subscription; sub.Enabled {

@@ -212,13 +212,11 @@ func (w *platformWrapper) NetworkInterfaces() ([]adapter.NetworkInterface, error
 		}
 		isDefault := ni.Index == defaultIndex
 		out = append(out, adapter.NetworkInterface{
-			Interface: control.Interface{
-				Index:     ni.Index,
-				MTU:       ni.MTU,
-				Name:      ni.Name,
-				Addresses: addrs,
-				Flags:     linkFlags(ni.Flags),
-			},
+			Index:       ni.Index,
+			MTU:         ni.MTU,
+			Name:        ni.Name,
+			Addresses:   addrs,
+			Flags:       linkFlags(ni.Flags),
 			Type:        typ,
 			DNSServers:  ni.DNS,
 			Expensive:   ni.Metered || isDefault && expensive,

@@ -123,6 +123,9 @@ func (st *State) migrate() (bool, error) {
 			changed = true
 		}
 	}
+	if st.Server.IKEv2PSK == "" {
+		st.Server.IKEv2PSK, changed = RandomHex(16), true
+	}
 	if st.Server.API.Token == "" {
 		st.Server.API = API{Listen: "127.0.0.1", Port: DefaultAPIPort, Token: RandomHex(24)}
 		changed = true

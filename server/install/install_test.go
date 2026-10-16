@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -42,12 +43,7 @@ func commands(p Plan) []string {
 }
 
 func contains(list []string, s string) bool {
-	for _, v := range list {
-		if v == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(list, s)
 }
 
 func TestDetectFirewall(t *testing.T) {
@@ -216,5 +212,40 @@ func TestExecuteWritesFilesAndDescribeShowsThem(t *testing.T) {
 	Describe(plan, &b)
 	if !strings.Contains(b.String(), "#   write "+target) || !strings.Contains(b.String(), "#   | Description=x") || !strings.Contains(b.String(), "note: hello") {
 		t.Errorf("describe:\n%s", b.String())
+	}
+}
+
+func TestHostServersNeedCapabilitiesAndForwarding(t *testing.T) {
+	plan, err := BuildPlan(Options{Binary: "/opt/ots", DataDir: "/srv/ots", User: "omnitun", HostServers: true}, "none")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var unit, sysctl *Step
+	for i := range plan.Steps {
+		switch plan.Steps[i].File {
+		case UnitPath:
+			unit = &plan.Steps[i]
+		case SysctlPath:
+			sysctl = &plan.Steps[i]
+		}
+	}
+	if unit == nil || !strings.Contains(unit.Content, "AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN") ||
+		!strings.Contains(unit.Content, "CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN") {
+		t.Fatalf("unit lacks CAP_NET_ADMIN:\n%v", unit)
+	}
+	if sysctl == nil || sysctl.Content != "net.ipv4.ip_forward=1\n" || !contains(commands(plan), "sysctl --system") {
+		t.Fatalf("forwarding not enabled: %+v / %v", sysctl, commands(plan))
+	}
+
+	// Without SSTP/IKEv2 the service keeps the smaller capability set and
+	// does not touch the host's forwarding.
+	plain, _ := BuildPlan(Options{Binary: "/opt/ots", DataDir: "/srv/ots", User: "omnitun"}, "none")
+	for _, s := range plain.Steps {
+		if s.File == SysctlPath || strings.Contains(s.Content, "CAP_NET_ADMIN") {
+			t.Fatalf("host-server setup without host servers: %+v", s)
+		}
+	}
+	if contains(commands(plain), "sysctl --system") {
+		t.Fatal("sysctl applied without host servers")
 	}
 }

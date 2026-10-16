@@ -149,7 +149,7 @@ func TestGeneratedProfilesConnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(res.Profiles) != len(store.AllProtocols) {
+	if len(res.Profiles) != len(store.DefaultEnabled()) {
 		t.Fatalf("got %d profiles, errors %v", len(res.Profiles), res.Errors)
 	}
 	for _, p := range res.Profiles {
@@ -209,7 +209,7 @@ func TestSubscriptionEndpoint(t *testing.T) {
 	}
 	// Share links exist for everything except OpenVPN.
 	res, err := importer.Import(string(decoded))
-	if err != nil || len(res.Profiles) != len(store.AllProtocols)-2 {
+	if err != nil || len(res.Profiles) != len(store.DefaultEnabled())-2 {
 		t.Fatalf("import: %v, %d profiles", err, len(res.Profiles))
 	}
 
@@ -223,7 +223,7 @@ func TestSubscriptionEndpoint(t *testing.T) {
 	body, _ = io.ReadAll(resp.Body)
 	resp.Body.Close()
 	res, err = importer.Import(string(body))
-	if err != nil || len(res.Profiles) != len(store.AllProtocols) {
+	if err != nil || len(res.Profiles) != len(store.DefaultEnabled()) {
 		t.Fatalf("sing-box import: %v, %d profiles %v", err, len(res.Profiles), res.Errors)
 	}
 	ovpns := 0

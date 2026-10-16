@@ -20,7 +20,7 @@ func TestWireGuardKeysAndAddresses(t *testing.T) {
 	}
 
 	seen := map[string]bool{}
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		u, err := AddUser(st, string(rune('a'+i))+"user")
 		if err != nil {
 			t.Fatal(err)

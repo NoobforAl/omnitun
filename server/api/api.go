@@ -261,7 +261,7 @@ func New(o Options) http.Handler {
 	}, func(ctx context.Context, in *struct {
 		Body struct {
 			Config  string                    `json:"config" doc:"The server config.json as text" minLength:"2"`
-			Options manager.ImportXrayOptions `json:"options,omitempty"`
+			Options manager.ImportXrayOptions `json:"options,omitempty" required:"false" doc:"host, name and adopt_reality; optional"`
 		}
 	}) (*body[*manager.ImportXrayResult], error) {
 		res, err := m.ImportXray(in.Body.Config, in.Body.Options)

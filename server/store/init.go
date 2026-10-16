@@ -32,6 +32,29 @@ type InitOptions struct {
 	Enabled []string
 }
 
+// EnabledAtInit decides whether a protocol starts enabled: those asked for,
+// or by default every protocol that needs nothing special from the host.
+func EnabledAtInit(key string, asked []string) bool {
+	if len(asked) > 0 {
+		return slices.Contains(asked, key)
+	}
+	if p, ok := protocols.Get(key); ok && p.Spec().DefaultOff {
+		return false
+	}
+	return true
+}
+
+// DefaultEnabled lists the protocols a new server enables when none are asked for.
+func DefaultEnabled() []string {
+	var out []string
+	for _, k := range AllProtocols {
+		if EnabledAtInit(k, nil) {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
 // DefaultPorts per protocol, from the protocol registry. TCP and UDP
 // protocols may share a number.
 var DefaultPorts = protocols.DefaultPorts()
@@ -79,6 +102,7 @@ func Init(s *Store, opts InitOptions) (*State, error) {
 		return nil, err
 	}
 	st.Server.WireGuard = WireGuard{PrivateKey: wgPriv, PublicKey: wgPub}
+	st.Server.IKEv2PSK = RandomHex(16)
 	if st.Server.OpenVPN, err = NewOpenVPN(opts.Name); err != nil {
 		return nil, err
 	}
@@ -87,7 +111,7 @@ func Init(s *Store, opts InitOptions) (*State, error) {
 		if v, ok := opts.Ports[p]; ok {
 			port = v
 		}
-		st.Server.Protocols[p] = &Proto{Enabled: len(opts.Enabled) == 0 || slices.Contains(opts.Enabled, p), Port: port}
+		st.Server.Protocols[p] = &Proto{Enabled: EnabledAtInit(p, opts.Enabled), Port: port}
 	}
 	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
 		return nil, err

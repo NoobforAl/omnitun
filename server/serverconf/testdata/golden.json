@@ -299,6 +299,14 @@
       "url": "naive+https://alice:alicepassword@203.0.113.7:8447/#Lab%20Naive"
     },
     {
+      "protocol": "sstp",
+      "url": "sstp://alice:alicepassword@203.0.113.7:8448#Lab%20SSTP"
+    },
+    {
+      "protocol": "ikev2",
+      "url": "ikev2://alice:alicepassword@203.0.113.7:4500?auth=eap\u0026psk=ike-psk-secret\u0026remote_id=203.0.113.7\u0026tcp=1#Lab%20IKEv2"
+    },
+    {
       "protocol": "wireguard",
       "url": "wireguard://YWxpY2UtcHJpdmF0ZQ==@203.0.113.7:51820?publickey=c2VydmVyLXB1YmxpYw%3D%3D\u0026address=10.30.0.2%2F32\u0026allowedips=0.0.0.0%2F0%2C%3A%3A%2F0\u0026dns=1.1.1.1%2C8.8.8.8\u0026mtu=1380\u0026keepalive=25#Lab%20WireGuard"
     }
@@ -379,6 +387,10 @@
         "type": "openvpn-client",
         "username": "alice"
       }
+    ],
+    "extra_links": [
+      "sstp://alice:alicepassword@203.0.113.7:8448#Lab%20SSTP",
+      "ikev2://alice:alicepassword@203.0.113.7:4500?auth=eap\u0026psk=ike-psk-secret\u0026remote_id=203.0.113.7\u0026tcp=1#Lab%20IKEv2"
     ],
     "outbounds": [
       {

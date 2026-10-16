@@ -209,7 +209,7 @@ func fetchNordVPN(ctx context.Context, u *url.URL, req Request, rootCAs *x509.Ce
 		return nil, err
 	}
 	return &Result{
-		Result:    importer.Result{Profiles: profiles},
+		Profiles:  profiles,
 		Info:      Info{Title: "NordVPN", UpdateIntervalHours: 24},
 		FetchedAt: time.Now(),
 	}, nil

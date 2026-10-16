@@ -328,7 +328,7 @@ func TestLiveSSTP(t *testing.T) {
 		time.Sleep(d)
 	}
 	dst := net.IPv4(1, 1, 1, 1)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		dev.in <- echoRequest(got.IPv4, dst, uint16(i))
 		deadline := time.After(3 * time.Second)
 	wait:

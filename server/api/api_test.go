@@ -177,7 +177,7 @@ func TestProtocolsAndServer(t *testing.T) {
 	}
 	var info manager.ServerInfo
 	json.Unmarshal(c.ok("GET", "/api/v1/server", nil, 200), &info)
-	if info.PublicHost != "203.0.113.7" || info.Protocols != len(store.AllProtocols)-1 {
+	if info.PublicHost != "203.0.113.7" || info.Protocols != len(store.DefaultEnabled())-1 {
 		t.Fatalf("server = %+v", info)
 	}
 }
@@ -265,7 +265,7 @@ func TestLogsEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 	lg := logs.Open(m.Store.Dir)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		lg.Write("info", "line "+string(rune('a'+i)))
 	}
 	lg.Close()

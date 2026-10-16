@@ -39,6 +39,9 @@ type Options struct {
 	// Firewall is "auto", "ufw", "firewalld" or "none".
 	Firewall string
 	Ports    []Port
+	// HostServers is true when SSTP or IKEv2 is enabled: the service then
+	// needs CAP_NET_ADMIN (TUN device, NAT rules) and IP forwarding.
+	HostServers bool
 }
 
 // Step is one thing the installer does: write a file or run a command.
@@ -64,6 +67,9 @@ type Plan struct {
 // UnitName is the systemd service name.
 const UnitName = "omnitun-server"
 
+// SysctlPath enables IP forwarding for the host-level protocols.
+const SysctlPath = "/etc/sysctl.d/99-omnitun.conf"
+
 // UnitPath is where the unit is installed.
 const UnitPath = "/etc/systemd/system/" + UnitName + ".service"
 
@@ -78,7 +84,7 @@ func (o *Options) defaults() {
 
 // Unit returns the systemd unit for the server. It is also what
 // `omnitun-server service` prints.
-func Unit(binary, dataDir, user string) string {
+func Unit(binary, dataDir, user string, hostServers bool) string {
 	var b strings.Builder
 	b.WriteString("[Unit]\nDescription=Omnitun VPN server\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\n")
 	fmt.Fprintf(&b, "ExecStart=%s --data %s run\n", binary, dataDir)
@@ -87,7 +93,11 @@ func Unit(binary, dataDir, user string) string {
 	}
 	b.WriteString("Restart=on-failure\nRestartSec=3\nLimitNOFILE=1048576\n")
 	// Binding ports below 1024 (443) without being root.
-	b.WriteString("AmbientCapabilities=CAP_NET_BIND_SERVICE\nCapabilityBoundingSet=CAP_NET_BIND_SERVICE\nNoNewPrivileges=true\n")
+	caps := "CAP_NET_BIND_SERVICE"
+	if hostServers {
+		caps += " CAP_NET_ADMIN" // the TUN device and the NAT rules of SSTP/IKEv2
+	}
+	fmt.Fprintf(&b, "AmbientCapabilities=%s\nCapabilityBoundingSet=%s\nNoNewPrivileges=true\n", caps, caps)
 	b.WriteString("ProtectSystem=full\nProtectHome=true\nPrivateTmp=true\n")
 	fmt.Fprintf(&b, "ReadWritePaths=%s\n", dataDir)
 	b.WriteString("\n[Install]\nWantedBy=multi-user.target\n")
@@ -182,8 +192,15 @@ func BuildPlan(o Options, fw string) (Plan, error) {
 	step("install the binary", false, "install", "-m", "0755", filepath.ToSlash(o.Binary), target)
 	plan.Steps = append(plan.Steps, Step{
 		Description: "write the systemd unit", File: UnitPath, FileMode: 0o644,
-		Content: Unit(target, filepath.ToSlash(o.DataDir), o.User),
+		Content: Unit(target, filepath.ToSlash(o.DataDir), o.User, o.HostServers),
 	})
+	if o.HostServers {
+		plan.Steps = append(plan.Steps, Step{
+			Description: "enable IP forwarding (SSTP and IKEv2 clients are routed through this host)",
+			File:        SysctlPath, FileMode: 0o644, Content: "net.ipv4.ip_forward=1\n",
+		})
+		step("apply the sysctl settings", false, "sysctl", "--system")
+	}
 	step("reload systemd", false, "systemctl", "daemon-reload")
 
 	kind := o.Firewall
@@ -307,7 +324,7 @@ func Describe(p Plan, w io.Writer) {
 	for _, s := range p.Steps {
 		if s.Command == nil {
 			fmt.Fprintf(w, "# %s\n#   write %s\n", s.Description, s.File)
-			for _, line := range strings.Split(strings.TrimRight(s.Content, "\n"), "\n") {
+			for line := range strings.SplitSeq(strings.TrimRight(s.Content, "\n"), "\n") {
 				fmt.Fprintf(w, "#   | %s\n", line)
 			}
 			continue

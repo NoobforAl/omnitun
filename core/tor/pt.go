@@ -62,9 +62,7 @@ func StartTransports(stateDir string, names []string, dial DialFunc) (*Transport
 		}
 		t.listeners = append(t.listeners, ln)
 		t.Addrs[name] = ln.Addr().String()
-		t.wg.Add(1)
-		go func() {
-			defer t.wg.Done()
+		t.wg.Go(func() {
 			for {
 				conn, err := ln.Accept()
 				if err != nil {
@@ -72,7 +70,7 @@ func StartTransports(stateDir string, names []string, dial DialFunc) (*Transport
 				}
 				go handle(factory, conn, dial)
 			}
-		}()
+		})
 	}
 	return t, nil
 }

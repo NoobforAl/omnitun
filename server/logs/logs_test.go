@@ -53,7 +53,7 @@ func TestRotationKeepsTheNewestLines(t *testing.T) {
 	l := Open(dir)
 	defer l.Close()
 	chunk := strings.Repeat("x", 1000)
-	for i := 0; i < 5000; i++ { // ~5 MB: rotates once
+	for i := range 5000 { // ~5 MB: rotates once
 		l.Write("info", fmt.Sprintf("%05d %s", i, chunk))
 	}
 	if _, err := os.Stat(l.path() + ".1"); err != nil {

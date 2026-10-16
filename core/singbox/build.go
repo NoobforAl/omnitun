@@ -2,6 +2,7 @@
 package singbox
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -12,6 +13,10 @@ import (
 
 	"github.com/NoobforAl/omnitun/core/profile"
 )
+
+// ErrOtherEngine marks profiles that another engine of the core runs (SSTP,
+// IKEv2, AmneziaWG): they have no sing-box form.
+var ErrOtherEngine = errors.New("not run by sing-box")
 
 // Tags of the built-in outbounds.
 const (
@@ -417,9 +422,9 @@ func convertProfile(p *profile.Profile, tag string) (out obj, isEndpoint bool, e
 		ep, err := openvpnEndpoint(p)
 		return ep, true, nil, err
 	case profile.AmneziaWG:
-		return nil, false, nil, fmt.Errorf("amneziawg runs on the dedicated AWG engine (not sing-box)")
+		return nil, false, nil, fmt.Errorf("%w: amneziawg runs on the dedicated AWG engine (not sing-box)", ErrOtherEngine)
 	case profile.IKEv2, profile.SSTP:
-		return nil, false, nil, fmt.Errorf("%s runs on the built-in classic VPN engine (not sing-box)", p.Protocol)
+		return nil, false, nil, fmt.Errorf("%w: %s runs on the built-in classic VPN engine (not sing-box)", ErrOtherEngine, p.Protocol)
 	default:
 		return nil, false, nil, fmt.Errorf("protocol %q is not supported by the sing-box engine", p.Protocol)
 	}

@@ -18,6 +18,7 @@ func testEnv() Env {
 		SSServerKey: "c2VydmVyLWtleS0xMjM0NQ==",
 		OpenVPN:     OpenVPN{CA: "CA\n", ServerCert: "CERT", ServerKey: "KEY", TLSCrypt: "CRYPT\n"},
 		WireGuard:   WireGuard{PrivateKey: "c2VydmVyLXByaXZhdGU=", PublicKey: "c2VydmVyLXB1YmxpYw==", Address: "10.30.0.1/16"},
+		IKEv2PSK:    "ike-psk-secret",
 	}
 }
 
@@ -59,13 +60,23 @@ func TestEveryProtocolIsCoherent(t *testing.T) {
 		s := proto.Spec()
 		t.Run(s.Key, func(t *testing.T) {
 			cfg := proto.Inbounds(env, s.DefaultPort, []Account{alice})
-			if len(cfg.Inbounds)+len(cfg.Endpoints) == 0 {
-				t.Fatal("no inbound")
-			}
-			raw, err := json.Marshal(cfg)
-			// Users appear by name, or (WireGuard peers) by public key.
-			if err != nil || !(strings.Contains(string(raw), "alice") || strings.Contains(string(raw), alice.WGPublicKey)) {
-				t.Fatalf("config has no user: %v %s", err, raw)
+			if s.Host {
+				// Served by a process-level server, not by sing-box.
+				if len(cfg.Inbounds)+len(cfg.Endpoints) != 0 {
+					t.Fatalf("a host protocol put %+v into the sing-box config", cfg)
+				}
+				if !s.DefaultOff {
+					t.Error("a host protocol should be off by default")
+				}
+			} else {
+				if len(cfg.Inbounds)+len(cfg.Endpoints) == 0 {
+					t.Fatal("no inbound")
+				}
+				raw, err := json.Marshal(cfg)
+				// Users appear by name, or (WireGuard peers) by public key.
+				if err != nil || !(strings.Contains(string(raw), "alice") || strings.Contains(string(raw), alice.WGPublicKey)) {
+					t.Fatalf("config has no user: %v %s", err, raw)
+				}
 			}
 
 			p, err := proto.Profile(env, s.DefaultPort, alice)
@@ -75,7 +86,8 @@ func TestEveryProtocolIsCoherent(t *testing.T) {
 			if p.Protocol != s.Profile || p.Server != env.Host || !strings.HasPrefix(p.Name, env.Name) {
 				t.Fatalf("profile = %+v", p)
 			}
-			if _, _, _, err := singbox.Outbound(p, "t"); err != nil {
+			// SSTP, IKEv2 and AmneziaWG run on the core's own engines, not sing-box.
+			if _, _, _, err := singbox.Outbound(p, "t"); err != nil && !strings.Contains(err.Error(), "built-in") && !strings.Contains(err.Error(), "AmneziaWG") {
 				t.Fatalf("not usable as a sing-box outbound: %v", err)
 			}
 

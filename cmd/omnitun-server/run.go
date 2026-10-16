@@ -40,18 +40,15 @@ func newRunCmd(o *options) *cobra.Command {
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() { defer wg.Done(); srv.Watch(ctx) }()
+			wg.Go(func() { ; srv.Watch(ctx) })
 
 			if a, err := m.API(); err == nil && a.Enabled {
 				handler := api.New(api.Options{Manager: m, Token: liveToken(m), Reload: srv.Reload})
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					if err := api.Serve(ctx, a.Listen, a.Port, handler, apiTLS(m, a), logger.Printf); err != nil {
 						logger.Printf("web API stopped: %v", err)
 					}
-				}()
+				})
 			}
 			logger.Printf("running with data in %s; Ctrl+C to stop", m.Store.Dir)
 			<-ctx.Done()
@@ -214,7 +211,7 @@ func newServiceCmd(o *options) *cobra.Command {
 				user = ""
 			}
 			fmt.Printf("# Save as %s, then:\n#   systemctl daemon-reload && systemctl enable --now %s\n", install.UnitPath, install.UnitName)
-			fmt.Print(install.Unit(filepath.ToSlash(exe), filepath.ToSlash(dir), user))
+			fmt.Print(install.Unit(filepath.ToSlash(exe), filepath.ToSlash(dir), user, hostServers(o)))
 			return nil
 		},
 	}

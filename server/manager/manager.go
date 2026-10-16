@@ -88,6 +88,9 @@ type ProtocolInfo struct {
 	NeedsCertificate bool `json:"needs_certificate"`
 	// ShareLink is false for protocols that travel as a config file (OpenVPN).
 	ShareLink bool `json:"share_link"`
+	// Host marks protocols served outside sing-box (SSTP, IKEv2): they need
+	// Linux and CAP_NET_ADMIN.
+	Host bool `json:"host,omitempty"`
 	// Traffic through this protocol's inbound, all users together. Live
 	// connections are 0 while the server is stopped.
 	MonthBytes  int64 `json:"month_bytes"`
@@ -154,7 +157,7 @@ func (m *Manager) Init(o InitOptions) (*ServerInfo, error) {
 			}
 			port = v
 		}
-		probe.Server.Protocols[key] = &store.Proto{Enabled: len(o.Enabled) == 0 || slices.Contains(o.Enabled, key), Port: port}
+		probe.Server.Protocols[key] = &store.Proto{Enabled: store.EnabledAtInit(key, o.Enabled), Port: port}
 	}
 	if err := portConflict(probe); err != nil {
 		return nil, err
@@ -219,7 +222,7 @@ func protocolInfo(st *store.State, key string, snap stats.Snapshot, running bool
 	if proto, ok := protocols.Get(key); ok {
 		s := proto.Spec()
 		info.Name, info.Description, info.DefaultPort = s.Name, s.Description, s.DefaultPort
-		info.Transport, info.NeedsCertificate, info.ShareLink = s.Transport, s.NeedsCertificate, s.ShareLink
+		info.Transport, info.NeedsCertificate, info.ShareLink, info.Host = s.Transport, s.NeedsCertificate, s.ShareLink, s.Host
 	}
 	if t := snap.Protocols[key]; t != nil {
 		info.MonthBytes, info.TotalBytes = t.MonthTotal(), t.Up+t.Down
@@ -250,39 +253,46 @@ type ProtocolPatch struct {
 	Port    *int  `json:"port,omitempty" minimum:"1" maximum:"65535"`
 }
 
-// portConflict returns an error when two enabled protocols would listen on
-// the same port with overlapping transports (TCP+UDP counts as both).
-func portConflict(st *store.State) error {
-	type use struct {
-		key      string
-		tcp, udp bool
+// portUses lists every (port, transport) a protocol listens on.
+func portUses(key string, port int) []protocols.PortUse {
+	p, ok := protocols.Get(key)
+	if !ok {
+		return []protocols.PortUse{{Port: port, Proto: "tcp"}}
 	}
-	byPort := map[int][]use{}
+	if pp, ok := p.(protocols.PortProtocol); ok {
+		return pp.Listens(port)
+	}
+	switch p.Spec().Transport {
+	case "udp":
+		return []protocols.PortUse{{Port: port, Proto: "udp"}}
+	case "tcp+udp":
+		return []protocols.PortUse{{Port: port, Proto: "tcp"}, {Port: port, Proto: "udp"}}
+	}
+	return []protocols.PortUse{{Port: port, Proto: "tcp"}}
+}
+
+// portConflict returns an error when two enabled protocols would listen on
+// the same port with the same transport (TCP+UDP counts as both).
+func portConflict(st *store.State) error {
+	type bind struct {
+		port  int
+		proto string
+	}
+	owner := map[bind]string{}
 	for _, key := range store.AllProtocols {
 		p := st.Server.Protocols[key]
 		if p == nil || !p.Enabled {
 			continue
 		}
-		t := transportOf(key)
-		byPort[p.Port] = append(byPort[p.Port], use{key, strings.Contains(t, "tcp"), strings.Contains(t, "udp")})
-	}
-	for port, uses := range byPort {
-		for i := range uses {
-			for j := i + 1; j < len(uses); j++ {
-				if (uses[i].tcp && uses[j].tcp) || (uses[i].udp && uses[j].udp) {
-					return fmt.Errorf("%w: %s and %s would both listen on port %d", ErrConflict, uses[i].key, uses[j].key, port)
-				}
+		for _, u := range portUses(key, p.Port) {
+			b := bind{u.Port, u.Proto}
+			if other, taken := owner[b]; taken && other != key {
+				return fmt.Errorf("%w: %s and %s would both listen on %s port %d", ErrConflict, other, key, strings.ToUpper(u.Proto), u.Port)
 			}
+			owner[b] = key
 		}
 	}
 	return nil
-}
-
-func transportOf(key string) string {
-	if p, ok := protocols.Get(key); ok {
-		return p.Spec().Transport
-	}
-	return "tcp"
 }
 
 // SetProtocol applies a patch to one protocol.

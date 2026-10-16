@@ -27,6 +27,7 @@ func goldenState(t *testing.T) (*store.State, *store.Store) {
 			Subscription: store.Subscription{Enabled: true, Listen: "0.0.0.0", Port: 2096, Path: "subpath"},
 			OpenVPN:      store.OpenVPN{CA: "CA-PEM\n", ServerCert: "SERVER-CERT", ServerKey: "SERVER-KEY", TLSCrypt: "TLS-CRYPT\n"},
 			WireGuard:    store.WireGuard{PrivateKey: "c2VydmVyLXByaXZhdGU=", PublicKey: "c2VydmVyLXB1YmxpYw=="},
+			IKEv2PSK:     "ike-psk-secret",
 		},
 		Users: []*store.User{{
 			Name: "alice", UUID: "b831381d-6324-4d53-ad4f-8cda48b30811", Password: "alicepassword",

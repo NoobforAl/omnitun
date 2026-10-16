@@ -3,12 +3,14 @@ package serverconf
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/NoobforAl/omnitun/core/links"
 	"github.com/NoobforAl/omnitun/core/protocols"
 	"github.com/NoobforAl/omnitun/core/singbox"
 	"github.com/NoobforAl/omnitun/server/stats"
@@ -34,8 +36,17 @@ func SingBoxSubscription(st *store.State, s *store.Store, u *store.User) ([]byte
 		return nil, err
 	}
 	outbounds, endpoints := []any{}, []any{}
+	extraLinks := []string{} // profiles another engine of the client runs (SSTP, IKEv2)
 	for _, p := range profiles {
 		out, isEndpoint, extras, err := singbox.Outbound(p, p.Name)
+		if errors.Is(err, singbox.ErrOtherEngine) {
+			link, lerr := links.Export(p)
+			if lerr != nil {
+				return nil, fmt.Errorf("%s: %w", p.Name, lerr)
+			}
+			extraLinks = append(extraLinks, link)
+			continue
+		}
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", p.Name, err)
 		}
@@ -48,7 +59,11 @@ func SingBoxSubscription(st *store.State, s *store.Store, u *store.User) ([]byte
 			outbounds = append(outbounds, x)
 		}
 	}
-	return json.MarshalIndent(map[string]any{"outbounds": outbounds, "endpoints": endpoints}, "", "  ")
+	doc := map[string]any{"outbounds": outbounds, "endpoints": endpoints}
+	if len(extraLinks) > 0 {
+		doc["extra_links"] = extraLinks // read by Omnitun's importer
+	}
+	return json.MarshalIndent(doc, "", "  ")
 }
 
 // SubscriptionHandler serves GET /<path>/<token> with the user's links,

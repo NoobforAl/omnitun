@@ -30,6 +30,7 @@ type loadedCert struct {
 	leaf     *x509.Certificate
 	acme     bool
 	certPath string
+	keyPath  string
 	modTime  time.Time
 	checked  time.Time
 }
@@ -114,7 +115,7 @@ func (s *Source) current() (*loadedCert, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.loaded = loadedCert{cert: &cert, leaf: leaf, acme: isACME, certPath: certPath, modTime: fi.ModTime(), checked: time.Now()}
+	s.loaded = loadedCert{cert: &cert, leaf: leaf, acme: isACME, certPath: certPath, keyPath: keyPath, modTime: fi.ModTime(), checked: time.Now()}
 	return &s.loaded, nil
 }
 
@@ -125,6 +126,23 @@ func (s *Source) GetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) 
 		return nil, err
 	}
 	return l.cert, nil
+}
+
+// PEM returns the certificate chain and private key currently served, for
+// servers that take PEM bytes (SSTP). They are read when called, so a renewed
+// certificate is used the next time such a server is started.
+func (s *Source) PEM() (cert, key []byte, err error) {
+	l, err := s.current()
+	if err != nil {
+		return nil, nil, err
+	}
+	if cert, err = os.ReadFile(l.certPath); err != nil {
+		return nil, nil, err
+	}
+	if key, err = os.ReadFile(l.keyPath); err != nil {
+		return nil, nil, err
+	}
+	return cert, key, nil
 }
 
 // TLSConfig returns a server TLS configuration using the source.

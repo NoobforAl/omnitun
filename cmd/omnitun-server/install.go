@@ -40,6 +40,7 @@ func (f *installFlags) options(o *options, needServer bool) (install.Options, er
 		return opts, err
 	}
 	opts.Binary = exe
+	opts.HostServers = hostServers(o)
 	rules, err := o.manager().FirewallPorts()
 	if err != nil {
 		if needServer {
@@ -144,4 +145,18 @@ func newFirewallCmd(o *options) *cobra.Command {
 	cmd.Flags().Lookup("user").Hidden = true
 	cmd.Flags().Lookup("bin-dir").Hidden = true
 	return cmd
+}
+
+// hostServers reports whether SSTP or IKEv2 is enabled on this server.
+func hostServers(o *options) bool {
+	protos, err := o.manager().Protocols()
+	if err != nil {
+		return false
+	}
+	for _, p := range protos {
+		if p.Enabled && p.Host {
+			return true
+		}
+	}
+	return false
 }

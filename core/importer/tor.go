@@ -2,6 +2,7 @@ package importer
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/NoobforAl/omnitun/core/profile"
@@ -24,10 +25,8 @@ func bridgeLine(line string) (string, bool) {
 	if len(f) < 2 {
 		return "", false
 	}
-	for _, t := range torTransports {
-		if f[0] == t {
-			return line, true
-		}
+	if slices.Contains(torTransports, f[0]) {
+		return line, true
 	}
 	if strings.Contains(f[0], ":") && len(f[1]) == 40 && !strings.Contains(f[0], "/") {
 		return line, true

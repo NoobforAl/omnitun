@@ -73,7 +73,7 @@ func TestProtocols(t *testing.T) {
 	if _, err := m.SetProtocol(store.Trojan, ProtocolPatch{Port: &bad}); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("bad port: %v", err)
 	}
-	if info, _ := m.Server(); info.Protocols != len(store.AllProtocols)-1 {
+	if info, _ := m.Server(); info.Protocols != len(store.DefaultEnabled())-1 {
 		t.Fatalf("enabled protocols = %d", info.Protocols)
 	}
 }

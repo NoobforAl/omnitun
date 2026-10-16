@@ -37,6 +37,8 @@ const (
 	OpenVPNUDP   = "openvpn-udp"
 	OpenVPNTCP   = "openvpn-tcp"
 	WireGuardKey = "wireguard"
+	SSTP         = "sstp"
+	IKEv2        = "ikev2"
 )
 
 // AllProtocols in display order (the order of the protocol registry).
@@ -120,8 +122,10 @@ type Server struct {
 	Subscription Subscription `json:"subscription"`
 	OpenVPN      OpenVPN      `json:"openvpn"`
 	WireGuard    WireGuard    `json:"wireguard"`
-	API          API          `json:"api"`
-	ACME         ACME         `json:"acme"`
+	// IKEv2PSK is the pre-shared key that authenticates the IKEv2 server.
+	IKEv2PSK string `json:"ikev2_psk,omitempty"`
+	API      API    `json:"api"`
+	ACME     ACME   `json:"acme"`
 }
 
 // ACMEActive reports whether certificates come from an ACME provider.

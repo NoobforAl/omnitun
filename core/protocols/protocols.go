@@ -14,6 +14,7 @@ package protocols
 
 import (
 	"fmt"
+	"maps"
 	"net"
 	"strconv"
 
@@ -49,8 +50,14 @@ type Spec struct {
 	ShareLink bool `json:"share_link"`
 	// FileExt is the extension of the config file users can download (".ovpn",
 	// ".conf"); empty when the protocol has none.
-	FileExt string   `json:"file_ext,omitempty"`
-	Options []Option `json:"options,omitempty"`
+	FileExt string `json:"file_ext,omitempty"`
+	// Host marks protocols served by a process-level server (a TUN device and
+	// NAT on the host, Linux, CAP_NET_ADMIN) instead of by sing-box.
+	Host bool `json:"host,omitempty"`
+	// DefaultOff keeps the protocol disabled on a new server unless asked for
+	// (it needs more of the host than the others).
+	DefaultOff bool     `json:"default_off,omitempty"`
+	Options    []Option `json:"options,omitempty"`
 }
 
 // Reality is the VLESS+Reality key material and the site it impersonates.
@@ -84,6 +91,8 @@ type Env struct {
 	SSServerKey string
 	OpenVPN     OpenVPN
 	WireGuard   WireGuard
+	// IKEv2PSK is the server's IKEv2 pre-shared key.
+	IKEv2PSK string
 }
 
 // Account is one user's credentials; every protocol uses the ones it needs.
@@ -208,9 +217,7 @@ func tlsBlock(env Env, extra map[string]any) map[string]any {
 		t["certificate_path"] = env.CertPath
 		t["key_path"] = env.KeyPath
 	}
-	for k, v := range extra {
-		t[k] = v
-	}
+	maps.Copy(t, extra)
 	return t
 }
 
