@@ -85,6 +85,10 @@ func (e *Engine) startTorLocked(p *profile.Profile, profiles []*profile.Profile,
 	if err != nil {
 		return e.failLocked(StagePrepare, err)
 	}
+	// Fail closed: a Tor profile never silently falls back to a non-Tor one
+	// (that would drop the anonymity the user chose); the user picks another
+	// profile themselves.
+	opts.Failover = false
 	// Tor and its bridge transports run as this app: in VPN mode keep the app
 	// itself out of the VPN so they reach the network directly.
 	if opts.Mode == singbox.ModeTUN && len(opts.IncludePackages) == 0 {
@@ -232,21 +236,6 @@ func (e *Engine) torFailedLocked(run *torRun, cause error) {
 	run.stop()
 	bridges, _ := torBridges(run.profile)
 	reason := torErrorText(cause, len(bridges) > 0)
-	if run.opts.Failover && len(run.profiles) > 1 {
-		next := rotateAfter(profileOrder(run.profiles), run.profile.ID)[0]
-		e.logf("warn", "failover: %s: %v, trying %s", e.name(run.profile.ID), cause, e.name(next))
-		e.carryFailover = &FailoverEvent{From: run.profile.ID, To: next, Reason: reason, At: time.Now()}
-		opts := run.opts
-		opts.Selected = next
-		rest := make([]*profile.Profile, 0, len(run.profiles)-1)
-		for _, p := range run.profiles {
-			if p.ID != run.profile.ID {
-				rest = append(rest, p)
-			}
-		}
-		e.startLocked(rest, opts)
-		return
-	}
 	e.logf("error", "%s failed: %v", stageLabel[StageEngineStart], cause)
 	msg := fmt.Sprintf("%s failed: %s", stageLabel[StageEngineStart], reason)
 	e.setState(State{Status: StatusError, Error: msg, Selected: run.profile.ID, Progress: progress(StageEngineStart, e.name(run.profile.ID))})

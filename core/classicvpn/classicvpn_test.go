@@ -139,6 +139,42 @@ func freeTCP(t *testing.T) int {
 	return l.Addr().(*net.TCPAddr).Port
 }
 
+// waitTCP waits until something accepts connections on the local port, so a
+// test doesn't dial before its server goroutine has started listening.
+func waitTCP(t *testing.T, port int) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if c, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)), 200*time.Millisecond); err == nil {
+			c.Close()
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("server did not start listening on port %d", port)
+}
+
+// freeBoth returns a port that is free for both TCP and UDP. On Windows a
+// port that is free for one can sit inside a reserved range for the other.
+func freeBoth(t *testing.T) int {
+	t.Helper()
+	for range 50 {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		port := l.Addr().(*net.TCPAddr).Port
+		c, err := net.ListenPacket("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+		l.Close()
+		if err == nil {
+			c.Close()
+			return port
+		}
+	}
+	t.Fatal("no port free for both TCP and UDP")
+	return 0
+}
+
 func freeUDP(t *testing.T) int {
 	c, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
@@ -173,7 +209,15 @@ func pingThrough(t *testing.T, p *profile.Profile, server net.IP) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("no ping reply through the tunnel")
 	}
-	if rx, tx := tun.Traffic(); rx == 0 || tx == 0 {
+	// The counter is bumped just after the device write returns, which can be
+	// after the reply is already visible to the test.
+	var rx, tx int64
+	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		if rx, tx = tun.Traffic(); rx > 0 && tx > 0 {
+			break
+		}
+	}
+	if rx == 0 || tx == 0 {
 		t.Fatalf("traffic rx=%d tx=%d", rx, tx)
 	}
 }
@@ -198,6 +242,7 @@ func TestSSTP(t *testing.T) {
 	}
 	go srv.ListenAndServe()
 	t.Cleanup(func() { srv.Close() })
+	waitTCP(t, port)
 
 	p := &profile.Profile{Protocol: profile.SSTP, Server: "127.0.0.1", Port: port, Username: "alice", Password: "secret",
 		TLS: &profile.TLS{Enabled: true, Insecure: true}}
@@ -213,7 +258,7 @@ func TestSSTP(t *testing.T) {
 
 func TestIKEv2PSKOverTCP(t *testing.T) {
 	useServerDevice(t)
-	port500, port4500 := freeUDP(t), freeUDP(t)
+	port500, port4500 := freeBoth(t), freeBoth(t)
 	srv, err := ikev2.NewServer(ikev2.ServerConfig{
 		ListenIP: "127.0.0.1", Port500: port500, Port4500: port4500,
 		PSK: "psk-secret", LocalID: "server.test", Pool: "10.21.0.0/24", TCP: true,
@@ -223,6 +268,7 @@ func TestIKEv2PSKOverTCP(t *testing.T) {
 	}
 	go srv.ListenAndServe()
 	t.Cleanup(func() { srv.Close() })
+	waitTCP(t, port4500)
 
 	p := &profile.Profile{Protocol: profile.IKEv2, Server: "127.0.0.1", Port: port4500,
 		IKEv2: &profile.IKEv2Opts{Auth: "psk", PSK: "psk-secret", RemoteID: "server.test", TCP: true}}
@@ -235,7 +281,7 @@ func TestIKEv2EAPOverTCP(t *testing.T) {
 	if err := os.WriteFile(users, []byte("bob:eap-secret\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	port500, port4500 := freeUDP(t), freeUDP(t)
+	port500, port4500 := freeBoth(t), freeBoth(t)
 	srv, err := ikev2.NewServer(ikev2.ServerConfig{
 		ListenIP: "127.0.0.1", Port500: port500, Port4500: port4500,
 		PSK: "psk-secret", LocalID: "server.test", Pool: "10.22.0.0/24", TCP: true, EAPUsers: users,
@@ -245,6 +291,7 @@ func TestIKEv2EAPOverTCP(t *testing.T) {
 	}
 	go srv.ListenAndServe()
 	t.Cleanup(func() { srv.Close() })
+	waitTCP(t, port4500)
 
 	p := &profile.Profile{Protocol: profile.IKEv2, Server: "127.0.0.1", Port: port4500, Username: "bob", Password: "eap-secret",
 		IKEv2: &profile.IKEv2Opts{Auth: "eap", PSK: "psk-secret", TCP: true}}

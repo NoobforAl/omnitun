@@ -58,7 +58,8 @@ async fn serve(client: Arc<TorClient<PreferredRuntime>>, mut conn: TcpStream) {
             let _ = tokio::io::copy_bidirectional(&mut conn, &mut stream).await;
         }
         Err(e) => {
-            eprintln!("connect to {}:{} failed: {e}", target.host, target.port);
+            // Never log the destination: the app log can be shown or exported.
+            eprintln!("connect failed: {:?}", e.kind());
             let code = match e.kind() {
                 arti_client::ErrorKind::RemoteHostNotFound | arti_client::ErrorKind::RemoteNetworkFailed => {
                     socks::reply::HOST_UNREACHABLE

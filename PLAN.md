@@ -33,7 +33,7 @@ The UI is a thin layer: **all networking lives in the Go/Rust core**, so the UI 
 
 ### 1.2 Engine and dependencies
 
-Decision (2026-10-15): dependencies are chosen on technical merit; license compatibility is not a constraint. The **main proxy engine is sing-box** (embedded as a Go library, pinned `v1.14.2`). It already provides VLESS/Reality, VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard, the TUN inbound (gVisor/system stack), DNS, routing and urltest/selector groups, which removes most of the protocol work.
+Decision (2026-10-15): dependencies are chosen on technical merit; license compatibility is not a constraint. The **main proxy engine is sing-box** (embedded as a Go library, pinned `v1.14.3`). It already provides VLESS/Reality, VMess, Trojan, Shadowsocks, Hysteria2, TUIC, WireGuard, the TUN inbound (gVisor/system stack), DNS, routing and urltest/selector groups, which removes most of the protocol work.
 
 | Component | Role |
 |---|---|
@@ -338,6 +338,7 @@ omnitun/
 - [x] `omnitun-tor` binary (Rust, `tor/`): Arti 0.47 (rustls + ring, static sqlite) behind a minimal local SOCKS5 port; JSON progress lines on stdout (`listening`, `bootstrap` %, `ready`, `error`); exits when stdin closes; bridge lines and unmanaged transports as arguments; unit tests (args, SOCKS)
 - [x] `core/tor`: bridge pluggable transports in Go (lyrebird 0.8.1: obfs4, WebTunnel, Snowflake, meek), each on a local PT-SOCKS port for Arti; process manager (start, progress, ready, stop); Tor Browser's built-in bridges embedded (obfs4, Snowflake, meek); bridge-line parsing; opt-in live test (`OMNITUN_LIVE_TOR=obfs4|snowflake|meek|direct`, `OMNITUN_TOR_BIN`)
 - [x] Engine: `tor` profile (`tor://`, `tor://snowflake`, `tor://obfs4`, pasted bridge lines): Tor starts first and its bootstrap fills the progress ring ("Connecting to Tor NN%", then "Building a Tor circuit"); the tunnel only opens after a real test connection through a fresh circuit works; up to 3 starts with fresh guard state (Snowflake is intermittent); sing-box routes the profile into Arti's SOCKS port; failover to the next profile if Tor can't connect; Tor profiles only run when selected
+- [x] Fail closed: a Tor profile never fails over to a non-Tor profile on its own, and the Tor client never logs the destinations it connects to
 - [x] Android packaging: `scripts/build-android-tor.sh` builds `omnitun-tor` with `cargo ndk` into `jniLibs/<abi>/libomnitun_tor.so` (6.2 MB per ABI); the core gets its path through `mobile.SetTorBinary`; the app is kept out of its own VPN so Tor and the bridge transports reach the network directly
 - [x] **Verified on the A30s in Iran (Tor blocked directly):** Tor over built-in Snowflake in proxy mode and in full VPN mode; Firefox through the tunnel reached `check.torproject.org` and reported `IsTor: true`. Findings that shaped the code: Arti keeps guards marked "down" between runs, so guard state is reset on every connect (with a separate directory per profile); the app being excluded from the VPN breaks sing-box's system TCP stack, so Tor mode uses the gVisor stack; Tor exits don't allow DNS over TLS (port 853), so DNS goes over DoH while Tor is active; Tor has no UDP, so QUIC falls back to TCP
 - [ ] Built-in obfs4 bridges were all unreachable from that network (blocked), and Arti rejects bridge lines without a fingerprint, which includes Tor Browser's built-in meek line (meek is not offered for now); custom bridges from bridges.torproject.org should work, untested
@@ -388,6 +389,8 @@ omnitun/
 - **Binary size**: Go core with sing-box (all protocol tags) ≈ 30–50 MB; use build tags so add-ons stay optional.
 
 ---
+
+**Dependency note:** do not run `go get -u ./...` blindly. Snowflake (via lyrebird) needs `pion/webrtc` v4.2.18 with `pion/transport` v4, and the latest pion releases move to transport v5, which breaks the build. Upgrade selected modules (e.g. `go get github.com/sagernet/sing-box@vX`) and run the tagged tests (`scripts/go.ps1 test ./...`).
 
 ## 9. References
 

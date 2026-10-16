@@ -66,3 +66,18 @@ func TestTorBridgeWithoutFingerprintIsReported(t *testing.T) {
 	}
 	t.Logf("shown to the user: %s", st.Error)
 }
+
+// With failover on, a failing Tor profile must stop with an error instead of
+// quietly switching to a non-Tor profile.
+func TestTorDoesNotFailOverToOtherProfiles(t *testing.T) {
+	e := New(Config{DataDir: t.TempDir()})
+	tp := &profile.Profile{Name: "Tor", Protocol: profile.Tor, Tor: &profile.TorOpts{Bridges: []string{"meek_lite 192.0.2.20:80 url=x"}}}
+	ss := &profile.Profile{Name: "SS", Protocol: profile.Shadowsocks, Server: "127.0.0.1", Port: 1, Method: "aes-128-gcm", Password: "x"}
+	tp.EnsureID()
+	ss.EnsureID()
+	e.Start([]*profile.Profile{tp, ss}, singbox.Options{Mode: singbox.ModeProxy, Selected: tp.ID, Failover: true})
+	st := e.State()
+	if st.Status != StatusError || st.Selected == ss.ID || st.Failover != nil {
+		t.Fatalf("state = %+v", st)
+	}
+}
