@@ -49,6 +49,7 @@ type Server struct {
 
 	hosts   map[string]hostproto.Server // running SSTP / IKEv2 servers
 	undoNAT func()
+	meters  hostMeters       // per-user traffic of the host-level servers
 	runner  hostproto.Runner // runs nft/iptables; tests replace it
 
 	wgMu    sync.RWMutex

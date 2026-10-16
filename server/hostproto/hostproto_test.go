@@ -176,6 +176,13 @@ func serverDevices(t *testing.T) {
 // ICMP echo crosses the tunnel and back.
 func pingThrough(t *testing.T, key string, port int, password string) error {
 	t.Helper()
+	return pingThroughWith(t, key, port, password, nil)
+}
+
+// pingThroughWith is pingThrough that calls during, while the tunnel is
+// still up, after the reply arrived.
+func pingThroughWith(t *testing.T, key string, port int, password string, during func()) error {
+	t.Helper()
 	proto, _ := protocols.Get(key)
 	acct := alice
 	acct.Password = password
@@ -206,7 +213,131 @@ func pingThrough(t *testing.T, key string, port int, password string) error {
 	case <-time.After(10 * time.Second):
 		t.Fatal("no ping reply through the tunnel")
 	}
+	if during != nil {
+		during()
+	}
 	return nil
+}
+
+// usageOf is what a host server counted for one user.
+func usageOf(t *testing.T, srv Server, user string) Usage {
+	t.Helper()
+	m, ok := srv.(Meter)
+	if !ok {
+		t.Fatalf("%T does not count traffic per user", srv)
+	}
+	for _, u := range m.Usage() {
+		if u.User == user {
+			return u
+		}
+	}
+	return Usage{User: user}
+}
+
+// A user's traffic is counted: both directions while connected, and what was
+// counted stays after they leave.
+func TestSSTPCountsTrafficPerUser(t *testing.T) {
+	serverDevices(t)
+	dir := tempDir(t)
+	cert, key := certFiles(t, dir)
+	certPEM, _ := os.ReadFile(cert)
+	keyPEM, _ := os.ReadFile(key)
+	port := freeBoth(t)
+	srv, err := Start("sstp", Config{Env: env(), Port: port, Users: []protocols.Account{alice}, DataDir: dir, CertPEM: certPEM, KeyPEM: keyPEM})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	waitTCP(t, port)
+	if u := usageOf(t, srv, "alice"); u.Up != 0 || u.Down != 0 {
+		t.Fatalf("traffic before anyone connected: %+v", u)
+	}
+	if err := pingThrough(t, "sstp", port, alice.Password); err != nil {
+		t.Fatal(err)
+	}
+	u := usageOf(t, srv, "alice")
+	if u.Up < 28 || u.Down < 28 { // an echo request and its reply, 28 bytes each at least
+		t.Fatalf("usage after a ping: %+v", u)
+	}
+	again := usageOf(t, srv, "alice")
+	if again.Up < u.Up || again.Down < u.Down {
+		t.Fatalf("counted traffic went down: %+v then %+v", u, again)
+	}
+	if other := usageOf(t, srv, "bob"); other.Up != 0 || other.Down != 0 {
+		t.Fatalf("someone else was charged: %+v", other)
+	}
+}
+
+func TestIKEv2CountsTrafficPerUser(t *testing.T) {
+	serverDevices(t)
+	dir := tempDir(t)
+	certFile, keyFile := certFiles(t, dir)
+	port := freeBoth(t)
+	udp, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ike := udp.LocalAddr().(*net.UDPAddr).Port
+	udp.Close()
+	srv, err := Start("ikev2", Config{Env: env(), Port: port, IKEPort: ike, CertFile: certFile, KeyFile: keyFile, Users: []protocols.Account{alice}, DataDir: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	waitTCP(t, port)
+
+	var live Usage
+	err = pingThroughWith(t, "ikev2", port, alice.Password, func() {
+		// The peer's counters are read while its tunnel exists.
+		for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+			if live = usageOf(t, srv, "alice"); live.Up > 0 && live.Down > 0 {
+				return
+			}
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if live.Up < 28 || live.Down < 28 {
+		t.Fatalf("usage while connected: %+v", live)
+	}
+	// After the user left, what was counted is still there.
+	time.Sleep(200 * time.Millisecond)
+	if after := usageOf(t, srv, "alice"); after.Up < live.Up || after.Down < live.Down {
+		t.Fatalf("usage forgotten after disconnect: %+v then %+v", live, after)
+	}
+}
+
+func TestIKEMeterSumsChangesNotSnapshots(t *testing.T) {
+	m := &ikeMeter{last: map[string][2]uint64{}, total: map[string][2]uint64{}}
+	key := "alice\x00" + "10.10.10.2"
+	get := func(cur map[string][2]uint64) Usage {
+		for _, u := range m.add(cur) {
+			if u.User == "alice" {
+				return u
+			}
+		}
+		t.Fatal("alice missing")
+		return Usage{}
+	}
+	if u := get(map[string][2]uint64{key: {100, 40}}); u.Up != 100 || u.Down != 40 {
+		t.Fatalf("first reading: %+v", u)
+	}
+	if u := get(map[string][2]uint64{key: {150, 90}}); u.Up != 150 || u.Down != 90 {
+		t.Fatalf("second reading: %+v", u)
+	}
+	// The tunnel ended; the same address is taken again by a new one that starts at zero.
+	if u := get(map[string][2]uint64{}); u.Up != 150 || u.Down != 90 {
+		t.Fatalf("no peer: %+v", u)
+	}
+	if u := get(map[string][2]uint64{key: {10, 5}}); u.Up != 160 || u.Down != 95 {
+		t.Fatalf("new tunnel: %+v", u)
+	}
+	// A shrinking counter at the same address is a new tunnel too.
+	get(map[string][2]uint64{key: {50, 20}})
+	if u := get(map[string][2]uint64{key: {3, 1}}); u.Up != 203 || u.Down != 111 {
+		t.Fatalf("restarted counter: %+v", u)
+	}
 }
 
 func waitTCP(t *testing.T, port int) {

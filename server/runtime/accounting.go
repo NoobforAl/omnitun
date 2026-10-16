@@ -247,6 +247,7 @@ func (s *Server) accountingLoop(ctx context.Context) {
 			s.coll.tick()
 		}
 		s.accMu.Unlock()
+		s.meters.collect(s.tracker)
 		if n%enforceEvery == 0 {
 			s.enforceQuotas()
 			if err := s.tracker.Save(); err != nil {

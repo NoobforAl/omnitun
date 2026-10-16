@@ -13,3 +13,8 @@ Trimmed: docs, tests, CLI (`cmd/`), packaging and upstream agent files.
    authenticates the server by its certificate (CERTREQ + optional IDr in the
    first IKE_AUTH, chain verified against `CAFile` or the system roots) — the
    usual strongSwan / provider setup. Upstream only supported EAP with a PSK.
+4. `sstp/server.go`: `Server.Traffic()` counts the inner bytes each user moved
+   (up = from the client, down = to the client), kept after their sessions end.
+   `internal/ikev2/ike/peers.go`, `ikev2/server.go`: the EAP-MSCHAPv2 user name
+   is reported as the peer's `Name` (the IKE ID is whatever the client sends), so
+   `Peers()` can be summed per user.

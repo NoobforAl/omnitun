@@ -228,3 +228,35 @@ func TestAmneziaWGServerRefusesBadSetup(t *testing.T) {
 		t.Error("started although the interface could not be brought up")
 	}
 }
+
+// The device's peer counters become per-user usage.
+func TestAmneziaWGCountsTrafficPerUser(t *testing.T) {
+	f := startAWGServer(t)
+	m, ok := f.srv.(Meter)
+	if !ok {
+		t.Fatalf("%T does not count traffic per user", f.srv)
+	}
+	usage := func() Usage {
+		for _, u := range m.Usage() {
+			if u.User == "alice" {
+				return u
+			}
+		}
+		return Usage{}
+	}
+	if u := usage(); u.Up != 0 || u.Down != 0 {
+		t.Fatalf("traffic before anyone connected: %+v", u)
+	}
+	if !f.pingAWG(t, 10*time.Second, nil) {
+		t.Fatal("no ping through the tunnel")
+	}
+	u := usage()
+	if u.Up < 28 || u.Down < 28 {
+		t.Fatalf("usage after a ping: %+v", u)
+	}
+	for _, other := range m.Usage() {
+		if other.User == "" {
+			t.Fatal("a peer without an owner was reported")
+		}
+	}
+}

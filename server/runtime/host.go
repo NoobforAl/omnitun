@@ -54,6 +54,9 @@ func (s *Server) startHostLocked(st *store.State) {
 			s.hosts = map[string]hostproto.Server{}
 		}
 		s.hosts[key] = srv
+		if m, ok := srv.(hostproto.Meter); ok {
+			s.meters.add(key, m)
+		}
 		pools = append(pools, srv.Pool())
 		s.logf("serving %s on port %d", key, p.Port)
 	}
@@ -74,6 +77,7 @@ func (s *Server) startHostLocked(st *store.State) {
 // stopHostLocked stops the host-level servers and removes their NAT rules.
 func (s *Server) stopHostLocked() {
 	for key, srv := range s.hosts {
+		s.meters.remove(key, s.tracker) // the last reading, while the server still counts
 		srv.Close()
 		delete(s.hosts, key)
 	}

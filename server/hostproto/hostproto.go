@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/xen0bit/veepin/ikev2"
 	"github.com/xen0bit/veepin/sstp"
@@ -50,6 +51,20 @@ type Server interface {
 	Pool() string
 }
 
+// Usage is what one user moved through a host server since it started:
+// Up from the client, Down to the client, in bytes of tunnelled traffic.
+type Usage struct {
+	User     string
+	Up, Down uint64
+}
+
+// Meter is implemented by the host servers that count traffic per user.
+// Usage is cumulative since the server started (it never goes down while the
+// server runs), so a reader works out what is new by keeping the last values.
+type Meter interface {
+	Usage() []Usage
+}
+
 // Keys lists the protocols this package serves.
 func Keys() []string { return []string{"sstp", "ikev2", "amneziawg"} }
 
@@ -78,6 +93,14 @@ type sstpServer struct{ s *sstp.Server }
 func (x sstpServer) Close() error { return x.s.Close() }
 func (sstpServer) Pool() string   { return protocols.SSTPPool }
 
+func (x sstpServer) Usage() []Usage {
+	var out []Usage
+	for _, t := range x.s.Traffic() {
+		out = append(out, Usage{User: t.User, Up: t.Up, Down: t.Down})
+	}
+	return out
+}
+
 func startSSTP(cfg Config) (Server, error) {
 	if len(cfg.CertPEM) == 0 || len(cfg.KeyPEM) == 0 {
 		return nil, fmt.Errorf("sstp: the server has no TLS certificate")
@@ -100,6 +123,54 @@ func startSSTP(cfg Config) (Server, error) {
 type ikev2Server struct {
 	s     *ikev2.Server
 	users string
+	m     *ikeMeter
+}
+
+// Usage sums the live peers by the user they signed in as. A peer's counters
+// belong to its tunnel, which ends with the session, so what a user moved is
+// the total of the changes seen since the server started: traffic that came
+// after the last reading and before a peer left is not seen.
+func (x ikev2Server) Usage() []Usage {
+	cur := map[string][2]uint64{} // by user and address: what each live tunnel carried
+	for _, p := range x.s.Peers() {
+		if p.Name == "" {
+			continue
+		}
+		k := p.Name + "\x00" + p.Address
+		v := cur[k]
+		cur[k] = [2]uint64{v[0] + p.RxBytes, v[1] + p.TxBytes}
+	}
+	return x.m.add(cur)
+}
+
+// ikeMeter turns the live tunnels' counters into per-user totals.
+type ikeMeter struct {
+	mu    sync.Mutex
+	last  map[string][2]uint64
+	total map[string][2]uint64
+}
+
+func (m *ikeMeter) add(cur map[string][2]uint64) []Usage {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for k, v := range cur {
+		prev := m.last[k]
+		d := [2]uint64{v[0] - prev[0], v[1] - prev[1]}
+		for i := range d {
+			if v[i] < prev[i] { // a new tunnel at the same address
+				d[i] = v[i]
+			}
+		}
+		user := k[:strings.IndexByte(k, 0)]
+		t := m.total[user]
+		m.total[user] = [2]uint64{t[0] + d[0], t[1] + d[1]}
+	}
+	m.last = cur
+	out := make([]Usage, 0, len(m.total))
+	for user, t := range m.total {
+		out = append(out, Usage{User: user, Up: t[0], Down: t[1]})
+	}
+	return out
 }
 
 func (x ikev2Server) Close() error {
@@ -150,5 +221,5 @@ func startIKEv2(cfg Config) (Server, error) {
 		return nil, err
 	}
 	go srv.ListenAndServe()
-	return ikev2Server{s: srv, users: file}, nil
+	return ikev2Server{s: srv, users: file, m: &ikeMeter{last: map[string][2]uint64{}, total: map[string][2]uint64{}}}, nil
 }

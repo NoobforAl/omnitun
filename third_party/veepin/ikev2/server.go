@@ -357,6 +357,7 @@ func (s *Server) Peers() []client.PeerInfo {
 	for _, p := range peers {
 		info := client.PeerInfo{
 			ID:      p.ID,
+			Name:    p.EAPIdentity,
 			Address: p.Address,
 			State:   "connected",
 		}

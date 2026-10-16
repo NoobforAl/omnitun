@@ -15,9 +15,12 @@ import (
 
 // Peer is one live client's identity, assigned address and traffic.
 type Peer struct {
-	ID         string
-	Address    string
-	LastActive time.Time
+	ID string
+	// EAPIdentity is the user name the peer proved with EAP-MSCHAPv2, empty
+	// for other methods. The IKE ID is whatever the client chose to send.
+	EAPIdentity string
+	Address     string
+	LastActive  time.Time
 	// Traffic is what this Child SA has actually carried. Zero when the data
 	// path cannot report it -- which is a real distinction from "carried
 	// nothing", and the facade preserves it.
@@ -66,9 +69,10 @@ func (s *Server) Peers() []Peer {
 		sa.mu.Lock()
 		for _, child := range sa.Children {
 			p := Peer{
-				ID:         peerIDString(sa.PeerID),
-				Address:    peerAddress(child),
-				LastActive: sa.lastSeen,
+				ID:          peerIDString(sa.PeerID),
+				EAPIdentity: sa.EAPIdentity,
+				Address:     peerAddress(child),
+				LastActive:  sa.lastSeen,
 			}
 			if traffic != nil {
 				p.Traffic, p.HasTraffic = traffic.ChildTraffic(child.InboundSPI)

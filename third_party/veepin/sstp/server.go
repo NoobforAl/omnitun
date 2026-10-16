@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/xen0bit/veepin/client"
@@ -114,6 +115,7 @@ type Server struct {
 
 	mu      sync.Mutex
 	clients map[uint32]*sstpClient // keyed by assigned inner IP
+	usage   map[string]*userUsage  // per user, kept after the sessions end
 
 	closeOnce sync.Once
 	closed    chan struct{}
@@ -382,9 +384,49 @@ type sstpClient struct {
 	writeMu sync.Mutex
 
 	// Set on authentication, read when the crypto binding arrives.
+	username   string
 	password   string
 	ntResponse [mschap.NTResponseLen]byte
 	authed     bool
+
+	// use counts this client's user's traffic; set when the network comes up.
+	use *userUsage
+}
+
+// userUsage is what one user has moved through the server, across all their sessions.
+type userUsage struct{ up, down atomic.Uint64 }
+
+// UserTraffic is what a user has moved through the server since it started:
+// Up is from the client, Down to the client, as inner IP bytes.
+type UserTraffic struct {
+	User     string
+	Up, Down uint64
+}
+
+func (s *Server) usageFor(user string) *userUsage {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.usage == nil {
+		s.usage = map[string]*userUsage{}
+	}
+	u := s.usage[user]
+	if u == nil {
+		u = &userUsage{}
+		s.usage[user] = u
+	}
+	return u
+}
+
+// Traffic reports every user's traffic since the server started, including
+// sessions that have ended.
+func (s *Server) Traffic() []UserTraffic {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]UserTraffic, 0, len(s.usage))
+	for name, u := range s.usage {
+		out = append(out, UserTraffic{User: name, Up: u.up.Load(), Down: u.down.Load()})
+	}
+	return out
 }
 
 // SendPPP frames a PPP payload in an SSTP data packet and writes it to the client.
@@ -400,6 +442,9 @@ func (c *sstpClient) SendPPP(frame []byte) error {
 // padTo pads the PPP Information field out to that size, so the TLS record this
 // becomes is the same size whatever the packet was (dataplane/shape.go).
 func (c *sstpClient) sendIP(ipPacket []byte, padTo int) {
+	if c.use != nil {
+		c.use.down.Add(uint64(len(ipPacket)))
+	}
 	frame := ppp.EncapsulateIPPadded(ipPacket, padTo)
 	pkt, err := wire.EncodeData(frame)
 	if err != nil {
@@ -417,7 +462,8 @@ func (c *sstpClient) write(pkt []byte) error {
 }
 
 // Authenticated records the credentials the crypto binding needs.
-func (c *sstpClient) Authenticated(_, password string, ntResponse [mschap.NTResponseLen]byte) {
+func (c *sstpClient) Authenticated(username, password string, ntResponse [mschap.NTResponseLen]byte) {
+	c.username = username
 	c.password = password
 	c.ntResponse = ntResponse
 	c.authed = true
@@ -425,6 +471,7 @@ func (c *sstpClient) Authenticated(_, password string, ntResponse [mschap.NTResp
 
 // NetworkUp registers the client so the TUN loop routes its address to it.
 func (c *sstpClient) NetworkUp() {
+	c.use = c.srv.usageFor(c.username)
 	c.srv.register(c)
 	c.srv.logger.Printf("sstp: client %s up, assigned %s", c.conn.RemoteAddr(), c.assignedIP)
 }
@@ -469,6 +516,9 @@ func (c *sstpClient) readLoop() {
 		}
 
 		if ipPacket, ok := ppp.IsIP(body); ok {
+			if c.use != nil {
+				c.use.up.Add(uint64(len(ipPacket)))
+			}
 			if _, err := c.srv.tun.Write(ipPacket); err != nil {
 				c.srv.logger.Printf("sstp: TUN write: %v", err)
 			}
