@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net"
 	"net/netip"
+	"slices"
 	"sync"
 
 	"github.com/sagernet/sing-box/adapter"
@@ -18,6 +19,8 @@ import (
 	"github.com/sagernet/sing/common/control"
 	"github.com/sagernet/sing/common/logger"
 	"github.com/sagernet/sing/common/x/list"
+
+	"github.com/NoobforAl/omnitun/core/singbox"
 )
 
 var errUnsupported = errors.New("not supported on this platform")
@@ -35,6 +38,7 @@ type tunConfig struct {
 	Inet6RouteExclude []string     `json:"inet6_route_exclude"`
 	IncludePackage    []string     `json:"include_package"`
 	ExcludePackage    []string     `json:"exclude_package"`
+	ExcludeSelf       bool         `json:"exclude_self,omitempty"`
 	HTTPProxy         *httpProxyCf `json:"http_proxy,omitempty"`
 }
 
@@ -113,6 +117,10 @@ func (w *platformWrapper) OpenInterface(options *tun.Options, platformOptions op
 		Inet6RouteExclude: prefixStrings(options.Inet6RouteExcludeAddress, nil),
 		IncludePackage:    append([]string{}, options.IncludePackage...),
 		ExcludePackage:    append([]string{}, options.ExcludePackage...),
+	}
+	if i := slices.Index(cfg.ExcludePackage, singbox.SelfPackage); i >= 0 {
+		cfg.ExcludePackage = slices.Delete(cfg.ExcludePackage, i, i+1)
+		cfg.ExcludeSelf = true
 	}
 	for _, a := range dns {
 		cfg.DNSServers = append(cfg.DNSServers, a.String())

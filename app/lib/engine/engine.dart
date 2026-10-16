@@ -27,6 +27,9 @@ class ProfileInfo {
   final String server;
   final int port;
 
+  /// What to show as the profile's address (Tor has no server).
+  String get address => protocol == 'tor' ? 'Tor network' : '$server:$port';
+
   /// [defaultGroup] or the ID of the subscription the profile came from.
   final String group;
 
@@ -110,7 +113,7 @@ class ConnectOptions {
 
 /// One connection stage (see PLAN.md 3.3 #6). [percent] runs 0-100.
 class ConnectProgress {
-  const ConnectProgress(this.stage, this.percent, {this.profile});
+  const ConnectProgress(this.stage, this.percent, {this.profile, this.detail});
 
   final String stage;
   final int percent;
@@ -118,10 +121,14 @@ class ConnectProgress {
   /// Display name of the profile being tried, when relevant.
   final String? profile;
 
+  /// Finer-grained status that replaces the stage label, e.g. "Connecting to Tor 40%".
+  final String? detail;
+
   factory ConnectProgress.fromJson(Map<String, dynamic> j) => ConnectProgress(
         j['stage'] as String,
         (j['percent'] as num).toInt(),
         profile: j['profile'] as String?,
+        detail: j['detail'] as String?,
       );
 }
 

@@ -37,6 +37,8 @@ type Progress struct {
 	Percent int    `json:"percent"`
 	// Profile is the display name of the profile being tried, if relevant.
 	Profile string `json:"profile,omitempty"`
+	// Detail is a finer-grained status, e.g. Tor's bootstrap step.
+	Detail string `json:"detail,omitempty"`
 }
 
 func progress(stage, profile string) *Progress {

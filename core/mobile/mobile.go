@@ -7,6 +7,7 @@ package mobile
 
 import (
 	"encoding/json"
+	"os"
 	"sync"
 
 	"github.com/NoobforAl/omnitun/core/control"
@@ -99,6 +100,11 @@ func Start(dataDir string, platform Platform) (string, error) {
 	srv, info = s, string(b)
 	return info, nil
 }
+
+// SetTorBinary tells the core where the Tor client executable is (the app's
+// native library directory, where Android allows executing it). Go does not
+// see environment variables set natively after startup, hence this call.
+func SetTorBinary(path string) { os.Setenv("OMNITUN_TOR_BIN", path) }
 
 // StopTunnel stops the running tunnel but keeps the server (e.g. VPN revoked by the OS).
 func StopTunnel() {

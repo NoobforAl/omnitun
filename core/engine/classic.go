@@ -195,8 +195,8 @@ func (e *Engine) classicFailedLocked(run *classicRun, cause error) {
 	if wasRunning {
 		stage = StageConnected
 	}
-	msg := fmt.Sprintf("%s failed: %v", stageLabel[StageHandshake], cause)
-	e.logf("error", "%s", msg)
+	e.logf("error", "%s failed: %v", stageLabel[StageHandshake], cause)
+	msg := fmt.Sprintf("%s failed: %s", stageLabel[StageHandshake], plainError(cause))
 	e.setState(State{Status: StatusError, Error: msg, Selected: run.profile.ID, Progress: progress(stage, e.name(run.profile.ID))})
 }
 

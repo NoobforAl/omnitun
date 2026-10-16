@@ -49,6 +49,9 @@ func Import(text string) (*Result, error) {
 		}
 		return &Result{Profiles: []*profile.Profile{p}}, nil
 	}
+	if p := parseBridgeLines(text); p != nil {
+		return &Result{Profiles: []*profile.Profile{p}}, nil
+	}
 	if !strings.Contains(text, "://") {
 		if decoded, ok := decodeBase64(text); ok && strings.Contains(decoded, "://") {
 			text = decoded
@@ -113,6 +116,8 @@ func ParseLink(link string) (*profile.Profile, error) {
 		p, err = parseIKEv2(link)
 	case "sstp":
 		p, err = parseSSTP(link)
+	case "tor":
+		p, err = parseTorLink(link)
 	default:
 		return nil, fmt.Errorf("%w: %s://", ErrUnsupported, scheme)
 	}

@@ -57,6 +57,7 @@ type Profile struct {
 	SSH        *SSHOpts   `json:"ssh,omitempty"`
 	Naive      *NaiveOpts `json:"naive,omitempty"`
 	IKEv2      *IKEv2Opts `json:"ikev2,omitempty"`
+	Tor        *TorOpts   `json:"tor,omitempty"`
 	Plugin     string     `json:"plugin,omitempty"` // shadowsocks SIP003 plugin
 	PluginOpts string     `json:"plugin_opts,omitempty"`
 
@@ -125,6 +126,15 @@ type IKEv2Opts struct {
 	// System uses the OS's IKEv2 client (Android 11+ with IPsec support)
 	// instead of the built-in one.
 	System bool `json:"system,omitempty"`
+}
+
+// TorOpts configures a Tor profile (Server and Port are unused).
+type TorOpts struct {
+	// Builtin picks Tor Browser's built-in bridges: "obfs4", "snowflake" or
+	// "meek"; empty with no Bridges connects to Tor directly.
+	Builtin string `json:"builtin,omitempty"`
+	// Bridges are custom bridge lines (as in a torrc, without "Bridge ").
+	Bridges []string `json:"bridges,omitempty"`
 }
 
 // NaiveOpts holds NaiveProxy options. User and password are in Username/Password.
@@ -202,6 +212,9 @@ type OVPNRemote struct {
 func (p *Profile) Validate() error {
 	if p.Protocol == "" {
 		return fmt.Errorf("profile %q: missing protocol", p.Name)
+	}
+	if p.Protocol == Tor {
+		return nil
 	}
 	if p.Server == "" {
 		return fmt.Errorf("profile %q: missing server", p.Name)
@@ -282,6 +295,9 @@ func (p *Profile) EnsureID() {
 	key := p.Source
 	if key == "" {
 		key = fmt.Sprintf("%s|%s|%d|%s|%s", p.Protocol, p.Server, p.Port, p.UUID, p.Password)
+		if p.Tor != nil {
+			key += fmt.Sprintf("|%s|%q", p.Tor.Builtin, p.Tor.Bridges)
+		}
 	}
 	sum := sha256.Sum256([]byte(key))
 	p.ID = hex.EncodeToString(sum[:6])

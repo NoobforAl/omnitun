@@ -121,7 +121,7 @@ class _GroupList extends ConsumerWidget {
               leading: Icon(p.id == selectedId ? Icons.radio_button_checked : Icons.radio_button_off),
               title: Text(p.name, overflow: TextOverflow.ellipsis),
               subtitle: Text(
-                p.needsCredentials && !p.hasCredentials ? '${p.server}:${p.port} · needs sign-in' : '${p.server}:${p.port}',
+                p.needsCredentials && !p.hasCredentials ? '${p.address} · needs sign-in' : p.address,
                 overflow: TextOverflow.ellipsis,
               ),
               trailing: Row(
@@ -350,7 +350,7 @@ class _ImportSheetState extends ConsumerState<_ImportSheet> {
           Text('Import config', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 4),
           const Text('Paste share links (vless://, trojan://, ss://, hy2://, anytls://, ssh://, sstp://, ikev2://, …), a Clash or sing-box config, a subscription, '
-              'a WireGuard .conf or an OpenVPN .ovpn — or open a file or scan a QR code.'),
+              'a WireGuard .conf, an OpenVPN .ovpn or Tor bridge lines — or open a file or scan a QR code.'),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -376,6 +376,26 @@ class _ImportSheetState extends ConsumerState<_ImportSheet> {
                 onPressed: _busy ? null : _openSubscription,
                 icon: const Icon(Icons.add_link),
                 label: const Text('Subscription'),
+              ),
+              PopupMenuButton<String>(
+                enabled: !_busy,
+                tooltip: 'Add Tor',
+                onSelected: (kind) {
+                  _controller.text = 'tor://$kind';
+                  _import();
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: '', child: Text('Tor (direct)')),
+                  PopupMenuItem(value: 'snowflake', child: Text('Tor + Snowflake bridge')),
+                  PopupMenuItem(value: 'obfs4', child: Text('Tor + obfs4 bridges')),
+                ],
+                child: IgnorePointer(
+                  child: FilledButton.tonalIcon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.security),
+                    label: const Text('Tor'),
+                  ),
+                ),
               ),
             ],
           ),

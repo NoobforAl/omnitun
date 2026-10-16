@@ -58,6 +58,7 @@ async fn serve(client: Arc<TorClient<PreferredRuntime>>, mut conn: TcpStream) {
             let _ = tokio::io::copy_bidirectional(&mut conn, &mut stream).await;
         }
         Err(e) => {
+            eprintln!("connect to {}:{} failed: {e}", target.host, target.port);
             let code = match e.kind() {
                 arti_client::ErrorKind::RemoteHostNotFound | arti_client::ErrorKind::RemoteNetworkFailed => {
                     socks::reply::HOST_UNREACHABLE
@@ -107,7 +108,7 @@ async fn main() {
         .with_writer(std::io::stderr)
         .with_ansi(false)
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "warn".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "warn,tor_circmgr=info,tor_guardmgr=info,tor_chanmgr=info".into()),
         )
         .init();
     let a = match args::parse(std::env::args().skip(1)) {

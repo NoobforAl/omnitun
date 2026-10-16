@@ -73,7 +73,7 @@ class HomeScreen extends ConsumerWidget {
                     child: ListTile(
                       leading: const Icon(Icons.public),
                       title: Text(profile.name, overflow: TextOverflow.ellipsis),
-                      subtitle: Text('${profile.server}:${profile.port}', overflow: TextOverflow.ellipsis),
+                      subtitle: Text(profile.address, overflow: TextOverflow.ellipsis),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [ProtocolBadge(profile.protocol), const Icon(Icons.chevron_right)],
@@ -153,8 +153,8 @@ class _StatusLineState extends State<_StatusLine> {
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
               child: Text(
-                [stageLabel(s.progress!.stage), ?s.progress!.profile].join(' · '),
-                key: ValueKey('${s.progress!.stage}${s.progress!.profile}'),
+                [s.progress!.detail ?? stageLabel(s.progress!.stage), ?s.progress!.profile].join(' · '),
+                key: ValueKey('${s.progress!.stage}${s.progress!.profile}${s.progress!.detail}'),
                 style: Theme.of(context).textTheme.bodyMedium,
                 textAlign: TextAlign.center,
               ),

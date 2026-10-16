@@ -206,7 +206,8 @@ Still to do on the server: see the checklist in §7 (traffic accounting, ACME ce
 
 ### 5.2 Navigation (adaptive)
 
-- **Phone**: bottom `NavigationBar` — Home · Profiles · Logs · Settings.
+- **Phone (planned redesign, see Phase 7)**: no bottom bar. One very simple home screen in the style of Mullvad VPN — status, the country/location of the selected server, one connect button — and other pages (servers, logs, settings) are opened from the home screen and closed with back navigation, not through a footer.
+- **Phone (today)**: bottom `NavigationBar` — Home · Profiles · Logs · Settings.
 - **Desktop/tablet (≥ 840 px)**: `NavigationRail` on the left with a two-pane layout (list + details).
 - **Windows**: system tray icon (connect/disconnect, profile quick-switch, quit); close-to-tray is configurable.
 
@@ -311,6 +312,7 @@ omnitun/
 - [x] Connection progress ring 0–100 % with step labels; failure stops at the failed step
 - [x] Groups (manual + one per subscription), reorder within a group
 - [x] Subscriptions: auth (none/Basic/Bearer/header/URL token), usage + expiry, auto-refresh, errors shown per subscription
+- [x] Plain-language errors on the Home screen (timeouts, refused connections, bad bridges, blocked Tor …); the log keeps the raw text
 - [ ] Typed, translatable error messages (`NO_NETWORK`, `AUTH_FAILED`, `TLS_ERROR`, `HANDSHAKE_TIMEOUT`, …)
 - [ ] More strategies: lowest latency, round-robin; per-group strategy setting
 - [ ] Fetch subscriptions through the tunnel when the provider is blocked
@@ -335,10 +337,20 @@ omnitun/
 - [x] Rust crate with C ABI (stub)
 - [x] `omnitun-tor` binary (Rust, `tor/`): Arti 0.47 (rustls + ring, static sqlite) behind a minimal local SOCKS5 port; JSON progress lines on stdout (`listening`, `bootstrap` %, `ready`, `error`); exits when stdin closes; bridge lines and unmanaged transports as arguments; unit tests (args, SOCKS)
 - [x] `core/tor`: bridge pluggable transports in Go (lyrebird 0.8.1: obfs4, WebTunnel, Snowflake, meek), each on a local PT-SOCKS port for Arti; process manager (start, progress, ready, stop); Tor Browser's built-in bridges embedded (obfs4, Snowflake, meek); bridge-line parsing; opt-in live test (`OMNITUN_LIVE_TOR=obfs4|snowflake|meek|direct`, `OMNITUN_TOR_BIN`)
-- [ ] **Not yet working end to end:** from the dev PC (Mullvad + Kaspersky) direct Tor stalls at 15% (relay connections never complete) and built-in Snowflake reaches the broker but bootstrap doesn't finish in 8 min. Next: try built-in obfs4 and meek, and real bridges from bridges.torproject.org; run the live test on the phone's network
-- [ ] Engine: Tor profile type (`tor` + bridges), started like the other external engines (async bootstrap → progress ring "Connecting to Tor NN%"), then sing-box routes the profile to Arti's SOCKS port; keep the app's own sockets out of the VPN for Tor profiles (Tor and the PTs run as the app)
-- [ ] Android packaging: `cargo ndk` builds of `omnitun-tor` shipped as `jniLibs/<abi>/libomnitun_tor.so`, path passed to the core (`OMNITUN_TOR_BIN` via `Os.setenv`); measure the APK size cost
-- [ ] App UI: Tor profile ("Connect to Tor"), bridge settings (none / built-in obfs4 / Snowflake / meek / custom bridge lines), import bridge lines (paste / QR / file); quiet Snowflake's verbose logging
+- [x] Engine: `tor` profile (`tor://`, `tor://snowflake`, `tor://obfs4`, pasted bridge lines): Tor starts first and its bootstrap fills the progress ring ("Connecting to Tor NN%", then "Building a Tor circuit"); the tunnel only opens after a real test connection through a fresh circuit works; up to 3 starts with fresh guard state (Snowflake is intermittent); sing-box routes the profile into Arti's SOCKS port; failover to the next profile if Tor can't connect; Tor profiles only run when selected
+- [x] Android packaging: `scripts/build-android-tor.sh` builds `omnitun-tor` with `cargo ndk` into `jniLibs/<abi>/libomnitun_tor.so` (6.2 MB per ABI); the core gets its path through `mobile.SetTorBinary`; the app is kept out of its own VPN so Tor and the bridge transports reach the network directly
+- [x] **Verified on the A30s in Iran (Tor blocked directly):** Tor over built-in Snowflake in proxy mode and in full VPN mode; Firefox through the tunnel reached `check.torproject.org` and reported `IsTor: true`. Findings that shaped the code: Arti keeps guards marked "down" between runs, so guard state is reset on every connect (with a separate directory per profile); the app being excluded from the VPN breaks sing-box's system TCP stack, so Tor mode uses the gVisor stack; Tor exits don't allow DNS over TLS (port 853), so DNS goes over DoH while Tor is active; Tor has no UDP, so QUIC falls back to TCP
+- [ ] Built-in obfs4 bridges were all unreachable from that network (blocked), and Arti rejects bridge lines without a fingerprint, which includes Tor Browser's built-in meek line (meek is not offered for now); custom bridges from bridges.torproject.org should work, untested
+- [ ] App UI: bridge settings screen (none / Snowflake / obfs4 / custom lines, QR and file import) — today the Import sheet has a "Tor" quick-add menu only; Tor exit country/IP shown after connecting; quiet Snowflake's verbose logging
+- [ ] Desktop (Windows): run `omnitun-tor` next to the service; Tor on other ABIs (armeabi-v7a, x86_64) is built by the release script but untested
+
+### Phase 7 — UI redesign (Mullvad-style, very simple)
+- [ ] Home like Mullvad VPN: dark, calm, almost empty; shows the connection state (honest, as today) and the **country** (flag + country/city name) of the server in use, plus one big connect/disconnect button
+- [ ] **No footer / bottom navigation bar**: the other pages (server list, logs, settings) open from icons or the location row on the home screen and close with back; nothing to switch between at the bottom
+- [ ] Location picker like Mullvad: countries → cities → servers (profiles), with the flag and a latency dot; "Auto" on top; the same screen holds groups/subscriptions
+- [ ] Country for every profile: from the server's GeoIP (offline database, or a lookup through the tunnel after connecting) and from names like "DE-Berlin-01"; manual override in the profile editor; Tor shows the exit country once connected
+- [ ] Advanced things (protocol, logs, split tunneling, DNS, bridges) stay out of the main flow, inside Settings
+- [ ] Same design on desktop (one narrow window / tray popup) and Android; keep the failover toast and the connection progress ring (Phase 4)
 
 ### Phase 8 — Server (`omnitun-server`)
 - [x] `init` with Reality keys, Shadowsocks-2022 key, self-signed certificate

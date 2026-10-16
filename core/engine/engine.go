@@ -128,6 +128,8 @@ type Engine struct {
 	platformRun *platformRun
 	// classicRun is the SSTP/IKEv2 tunnel run in the core.
 	classicRun *classicRun
+	// torRun is the Tor client behind a selected Tor profile.
+	torRun *torRun
 	// carryFailover is reported once the next connection succeeds (a failover
 	// that had to restart the engine, e.g. from AmneziaWG to sing-box).
 	carryFailover *FailoverEvent
@@ -269,14 +271,11 @@ func (e *Engine) startLocked(profiles []*profile.Profile, opts singbox.Options) 
 		p.EnsureID()
 		e.names[p.ID] = p.DisplayName()
 	}
-	fail := func(stage string, err error) error {
-		err = fmt.Errorf("%s failed: %w", stageLabel[stage], err)
-		e.logf("error", "%v", err)
-		e.setState(State{Status: StatusError, Error: err.Error(), Progress: progress(stage, "")})
-		return err
-	}
-
 	e.setState(State{Status: StatusStarting, Selected: selected, Progress: progress(StagePrepare, "")})
+	fail := func(stage string, err error) error { return e.failLocked(stage, err) }
+	if sel := findProfile(profiles, selected); sel != nil && sel.Protocol == profile.Tor {
+		return e.startTorLocked(sel, profiles, opts)
+	}
 	if sel := findProfile(profiles, selected); sel != nil && usesClassic(sel) {
 		return e.startClassicLocked(sel, profiles, opts)
 	}
@@ -289,6 +288,23 @@ func (e *Engine) startLocked(profiles []*profile.Profile, opts singbox.Options) 
 			return fail(StagePrepare, errors.New("AmneziaWG works in VPN mode on Android (desktop support comes later)"))
 		}
 		return e.startAWGLocked(sel, profiles, opts)
+	}
+	return e.startSingboxLocked(profiles, opts, selected)
+}
+
+// failLocked reports a failure at a connection stage. e.mu must be held.
+func (e *Engine) failLocked(stage string, err error) error {
+	e.logf("error", "%s failed: %v", stageLabel[stage], err)
+	e.setState(State{Status: StatusError, Error: fmt.Sprintf("%s failed: %s", stageLabel[stage], plainError(err)), Progress: progress(stage, "")})
+	return fmt.Errorf("%s failed: %w", stageLabel[stage], err)
+}
+
+// startSingboxLocked builds and starts the sing-box tunnel. e.mu must be held.
+func (e *Engine) startSingboxLocked(profiles []*profile.Profile, opts singbox.Options, selected string) error {
+	fail := func(stage string, err error) error { return e.failLocked(stage, err) }
+	if opts.TorSocks == "" {
+		// Tor profiles only run when selected (Tor must bootstrap first).
+		profiles = withoutTor(profiles)
 	}
 	cfg, skipped, err := singbox.Build(profiles, opts)
 	if err != nil {
@@ -376,8 +392,8 @@ func (e *Engine) Select(tag string) error {
 	defer e.mu.Unlock()
 	// AmneziaWG runs outside sing-box, so switching to or from it restarts the tunnel.
 	target := findProfile(e.profiles, tag)
-	if e.awgRun != nil || e.platformRun != nil || e.classicRun != nil ||
-		(e.instance != nil && target != nil && (target.Protocol == profile.AmneziaWG || isPlatformProtocol(target.Protocol) || usesClassic(target))) {
+	if e.awgRun != nil || e.platformRun != nil || e.classicRun != nil || e.torRun != nil ||
+		(e.instance != nil && target != nil && (target.Protocol == profile.Tor || target.Protocol == profile.AmneziaWG || isPlatformProtocol(target.Protocol) || usesClassic(target))) {
 		if tag != singbox.TagAuto && target == nil {
 			return fmt.Errorf("unknown profile %q", tag)
 		}
@@ -414,6 +430,9 @@ func (e *Engine) Selected() string {
 	}
 	if e.classicRun != nil {
 		return e.classicRun.profile.ID
+	}
+	if e.torRun != nil && e.instance == nil {
+		return e.torRun.profile.ID
 	}
 	if e.instance == nil {
 		return ""
@@ -461,7 +480,7 @@ func (e *Engine) Stop() error {
 }
 
 func (e *Engine) stopLocked() error {
-	if e.instance == nil && e.awgRun == nil && e.platformRun == nil && e.classicRun == nil {
+	if e.instance == nil && e.awgRun == nil && e.platformRun == nil && e.classicRun == nil && e.torRun == nil {
 		return nil
 	}
 	err := e.teardownLocked()
@@ -472,6 +491,10 @@ func (e *Engine) stopLocked() error {
 
 // teardownLocked closes the running tunnel without reporting a state.
 func (e *Engine) teardownLocked() error {
+	if run := e.torRun; run != nil {
+		e.torRun = nil
+		defer run.stop()
+	}
 	if run := e.classicRun; run != nil {
 		e.classicRun = nil
 		run.stop()

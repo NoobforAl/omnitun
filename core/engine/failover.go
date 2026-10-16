@@ -158,8 +158,15 @@ func (e *Engine) probe(ctx context.Context, instance *box.Box, tag, testURL stri
 	// Endpoints that connect in the background (OpenVPN) refuse traffic until
 	// their handshake finishes; wait for that instead of failing at once.
 	readyBy := time.Now().Add(endpointReadyTimeout)
+	// Tor builds circuits on the first connection, which takes a while.
+	timeout := 8 * time.Second
+	e.mu.Lock()
+	if e.torRun != nil {
+		timeout = 40 * time.Second
+	}
+	e.mu.Unlock()
 	for {
-		pctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+		pctx, cancel := context.WithTimeout(ctx, timeout)
 		_, err := urltest.URLTest(pctx, testURL, dialer)
 		cancel()
 		if err == nil || !strings.Contains(err.Error(), "not ready") || time.Now().After(readyBy) {

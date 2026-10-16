@@ -3,6 +3,7 @@ package singbox
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"slices"
 	"strconv"
@@ -59,7 +60,16 @@ type Options struct {
 
 	Failover         bool
 	FailoverInterval time.Duration
+
+	// TorSocks is the running Tor client's SOCKS5 address (host:port); Tor
+	// profiles are skipped without it.
+	TorSocks string
 }
+
+// SelfPackage in ExcludePackages stands for this app: the platform replaces it
+// with the app's own package so its sockets (Tor, bridge transports) stay off
+// the VPN.
+const SelfPackage = "@self"
 
 func (o *Options) defaults() {
 	if o.Mode == "" {
@@ -78,6 +88,11 @@ func (o *Options) defaults() {
 		o.TestURL = "https://www.gstatic.com/generate_204"
 	}
 	if o.DNS == "" {
+		o.DNS = "https://1.1.1.1/dns-query"
+	}
+	// Tor exits don't allow DNS over TLS (port 853) or plain DNS, but they do
+	// allow HTTPS: resolve through DoH while Tor is the way out.
+	if o.TorSocks != "" && !strings.HasPrefix(o.DNS, "https://") {
 		o.DNS = "https://1.1.1.1/dns-query"
 	}
 	if o.Selected == "" {
@@ -100,7 +115,17 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 	)
 	for _, p := range profiles {
 		p.EnsureID()
-		out, isEndpoint, extras, err := convert(p, p.ID)
+		var (
+			out        obj
+			isEndpoint bool
+			extras     []obj
+			err        error
+		)
+		if p.Protocol == profile.Tor {
+			out, err = torOutbound(opts.TorSocks, p.ID)
+		} else {
+			out, isEndpoint, extras, err = convert(p, p.ID)
+		}
 		if err != nil {
 			skipped = append(skipped, fmt.Errorf("%s: %w", p.DisplayName(), err))
 			continue
@@ -162,6 +187,12 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 			"auto_route":   true,
 			"strict_route": true,
 			"stack":        "mixed",
+		}
+		// Tor runs as this app, which is kept out of the VPN; the system TCP
+		// stack answers through a listener in this app, and those replies
+		// would then bypass the tunnel. gVisor handles everything in userspace.
+		if opts.TorSocks != "" {
+			tun["stack"] = "gvisor"
 		}
 		// Local networks don't enter the VPN at all (unless ProxyPrivate).
 		if !opts.ProxyPrivate {
@@ -690,4 +721,17 @@ func orDefault(s, def string) string {
 // outbounds it depends on (ShadowTLS) and must be included too.
 func Outbound(p *profile.Profile, tag string) (out map[string]any, isEndpoint bool, extras []map[string]any, err error) {
 	return convert(p, tag)
+}
+
+// torOutbound routes a Tor profile into the local Tor client's SOCKS5 port.
+func torOutbound(socks, tag string) (obj, error) {
+	host, port, err := net.SplitHostPort(socks)
+	if err != nil || socks == "" {
+		return nil, fmt.Errorf("Tor is not running")
+	}
+	n, err := strconv.Atoi(port)
+	if err != nil {
+		return nil, fmt.Errorf("bad Tor SOCKS address %q", socks)
+	}
+	return obj{"type": "socks", "tag": tag, "server": host, "server_port": n, "version": "5"}, nil
 }

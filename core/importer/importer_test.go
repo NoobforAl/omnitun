@@ -199,3 +199,24 @@ func TestImportRejectsGarbage(t *testing.T) {
 		t.Fatal("expected error for empty host")
 	}
 }
+
+func TestImportTorBridges(t *testing.T) {
+	res, err := Import("Bridge obfs4 192.0.2.1:443 0123456789ABCDEF0123456789ABCDEF01234567 cert=abc iat-mode=0\n" +
+		"webtunnel [2001:db8::1]:443 0123456789ABCDEF0123456789ABCDEF01234567 url=https://example.com/x ver=0.0.3")
+	if err != nil || len(res.Profiles) != 1 {
+		t.Fatalf("res=%v err=%v", res, err)
+	}
+	p := res.Profiles[0]
+	if p.Protocol != "tor" || len(p.Tor.Bridges) != 2 || p.Tor.Bridges[0][:5] != "obfs4" {
+		t.Fatalf("profile = %+v", p)
+	}
+	for link, kind := range map[string]string{"tor://": "", "tor://snowflake": "snowflake", "tor://obfs4/": "obfs4"} {
+		p, err := ParseLink(link)
+		if err != nil || p.Protocol != "tor" || p.Tor.Builtin != kind {
+			t.Errorf("%s: %+v %v", link, p, err)
+		}
+	}
+	if _, err := ParseLink("tor://nope"); err == nil {
+		t.Error("tor://nope should fail")
+	}
+}

@@ -169,6 +169,8 @@ class CorePlatform(context: Context) : Platform {
         fun start(context: Context): String {
             info?.let { return it }
             val dataDir = context.filesDir.resolve("core").apply { mkdirs() }
+            // The Tor client ships as a native library so Android lets us run it.
+            Mobile.setTorBinary(context.applicationInfo.nativeLibraryDir + "/libomnitun_tor.so")
             return Mobile.start(dataDir.absolutePath, CorePlatform(context)).also { info = it }
         }
     }

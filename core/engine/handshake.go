@@ -65,7 +65,8 @@ func (e *Engine) handshake(ctx context.Context, instance *box.Box, order []strin
 	}
 
 	// Nothing answered: tell "offline" apart from "servers unreachable".
-	msg := fmt.Sprintf("%s failed: %v", stageLabel[StageHandshake], firstErr)
+	e.logf("error", "%s failed: %v", stageLabel[StageHandshake], firstErr)
+	msg := fmt.Sprintf("%s failed: %s", stageLabel[StageHandshake], plainError(firstErr))
 	if nerr := e.netCheck(ctx, instance); nerr != nil {
 		msg = "No internet connection"
 	}
@@ -74,7 +75,6 @@ func (e *Engine) handshake(ctx context.Context, instance *box.Box, order []strin
 	if e.instance != instance {
 		return
 	}
-	e.logf("error", "%s", msg)
 	failed := progress(StageHandshake, e.name(selected))
 	e.stopLocked()
 	e.setState(State{Status: StatusError, Error: msg, Progress: failed, NoNetwork: msg == "No internet connection"})

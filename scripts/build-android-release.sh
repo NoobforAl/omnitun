@@ -22,7 +22,7 @@ if [[ ! -f "$PROPS" ]]; then
   echo "Created release keystore app/android/omnitun-release.jks — back it up together with $PROPS."
 fi
 
-[[ "${1:-}" == "--skip-core" ]] || scripts/build-android-core.sh
+[[ "${1:-}" == "--skip-core" ]] || { scripts/build-android-core.sh; scripts/build-android-tor.sh arm64-v8a armeabi-v7a x86_64; }
 cd app
 "$FLUTTER" build apk --release --split-per-abi
 ls -lh build/app/outputs/flutter-apk/*-release.apk
