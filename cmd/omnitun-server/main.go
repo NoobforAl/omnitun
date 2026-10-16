@@ -58,8 +58,9 @@ func newRootCmd() *cobra.Command {
 		Use:   "omnitun-server",
 		Short: "Multi-protocol VPN server with user management",
 		Long: `omnitun-server runs VLESS+Reality, Shadowsocks-2022, Trojan, Hysteria2, TUIC,
-AnyTLS, ShadowTLS, NaiveProxy and OpenVPN from one process, with a user
-database, one subscription link per user, a terminal UI and a web API.
+AnyTLS, ShadowTLS, NaiveProxy, WireGuard and OpenVPN from one process, plus SSTP,
+IKEv2/IPsec and AmneziaWG on Linux, with a user database, quotas and traffic
+accounting, one subscription link per user, a terminal UI and a web API.
 
 Quick start:
   omnitun-server init --host YOUR_IP_OR_DOMAIN
