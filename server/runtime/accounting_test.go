@@ -16,6 +16,7 @@ import (
 
 	"github.com/NoobforAl/omnitun/core/engine"
 	"github.com/NoobforAl/omnitun/core/importer"
+	"github.com/NoobforAl/omnitun/core/profile"
 	"github.com/NoobforAl/omnitun/core/singbox"
 	"github.com/NoobforAl/omnitun/server/logs"
 	"github.com/NoobforAl/omnitun/server/serverconf"
@@ -165,4 +166,68 @@ func snapUser(t *testing.T, dir string) stats.User {
 		t.Fatalf("no stats for alice: %v", err)
 	}
 	return *snap.Users["alice"]
+}
+
+// WireGuard peers carry no user name, so their traffic is attributed by the
+// tunnel address each user was given.
+func TestWireGuardTrafficIsCountedForTheUser(t *testing.T) {
+	oldInterval, oldEvery := accountingInterval, enforceEvery
+	accountingInterval, enforceEvery = 100*time.Millisecond, 2
+	defer func() { accountingInterval, enforceEvery = oldInterval, oldEvery }()
+
+	s, srv := setup(t)
+	st, _ := s.Load()
+
+	const payload = 200 << 10
+	web := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, strings.Repeat("w", payload))
+	}))
+	web.Listener.Close()
+	var err error
+	if web.Listener, err = net.Listen("tcp", net.JoinHostPort(lanIPv4(t), "0")); err != nil {
+		t.Fatal(err)
+	}
+	web.Start()
+	defer web.Close()
+
+	profiles, err := serverconf.Profiles(st, s, st.User("alice"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p *profile.Profile
+	for _, c := range profiles {
+		if c.Protocol == profile.WireGuard {
+			p = c
+		}
+	}
+	if p == nil {
+		t.Fatal("no WireGuard profile")
+	}
+	proxyPort := freeTCP(t)
+	e := engine.New(engine.Config{DataDir: t.TempDir()})
+	if err := e.Start(p.AsSlice(), singbox.Options{
+		ListenPort: proxyPort, LogLevel: "error", ProxyPrivate: true, Selected: p.ID, TestURL: web.URL + "/probe",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	defer e.Stop()
+	waitFor(t, "client to connect", 15*time.Second, func() bool { return e.State().Status == engine.StatusRunning })
+
+	proxy, _ := url.Parse("socks5://127.0.0.1:" + strconv.Itoa(proxyPort))
+	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxy), DisableKeepAlives: true}, Timeout: 10 * time.Second}
+	resp, err := client.Get(web.URL + "/data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+
+	waitFor(t, "WireGuard traffic to be counted for alice", 10*time.Second, func() bool {
+		return srv.tracker.MonthTotal("alice") >= payload
+	})
+	srv.tracker.Save()
+	snap, _ := stats.Read(s.Dir)
+	if wg := snap.Protocols["wireguard"]; wg == nil || wg.Down < payload {
+		t.Fatalf("wireguard protocol traffic = %+v", wg)
+	}
 }

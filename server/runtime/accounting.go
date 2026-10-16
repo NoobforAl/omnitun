@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"net/netip"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
@@ -47,17 +48,32 @@ type seenConn struct {
 
 // collector turns sing-box's per-connection counters into per-user totals.
 type collector struct {
-	tm      *trafficcontrol.Manager
-	tr      *stats.Tracker
-	seen    map[uuid.UUID]seenConn
-	done    map[uuid.UUID]bool // closed connections already counted
-	last    time.Time
-	started time.Time
+	tm *trafficcontrol.Manager
+	tr *stats.Tracker
+	// userByIP names the user behind a WireGuard tunnel address: the
+	// endpoint does not report users, but every user has a fixed address.
+	userByIP func(netip.Addr) string
+	seen     map[uuid.UUID]seenConn
+	done     map[uuid.UUID]bool // closed connections already counted
+	last     time.Time
+	started  time.Time
 }
 
-func newCollector(tm *trafficcontrol.Manager, tr *stats.Tracker) *collector {
+func newCollector(tm *trafficcontrol.Manager, tr *stats.Tracker, userByIP func(netip.Addr) string) *collector {
 	now := time.Now()
-	return &collector{tm: tm, tr: tr, seen: map[uuid.UUID]seenConn{}, done: map[uuid.UUID]bool{}, last: now, started: now}
+	return &collector{tm: tm, tr: tr, userByIP: userByIP, seen: map[uuid.UUID]seenConn{}, done: map[uuid.UUID]bool{}, last: now, started: now}
+}
+
+// userOf is the user a connection belongs to: the authenticated user the
+// inbound reported, or for WireGuard the owner of the source address.
+func (c *collector) userOf(md *trafficcontrol.TrackerMetadata) string {
+	if u := md.Metadata.User; u != "" {
+		return u
+	}
+	if protocolKey(md.Metadata.Inbound) == "wireguard" && c.userByIP != nil && md.Metadata.Source.IsValid() {
+		return c.userByIP(md.Metadata.Source.Addr)
+	}
+	return ""
 }
 
 // tick counts the traffic since the previous tick.
@@ -81,7 +97,7 @@ func (c *collector) tick() {
 		up, down := md.Upload.Load(), md.Download.Load()
 		prev := c.seen[md.ID]
 		du, dd := up-prev.up, down-prev.down
-		user, proto := md.Metadata.User, protocolKey(md.Metadata.Inbound)
+		user, proto := c.userOf(md), protocolKey(md.Metadata.Inbound)
 		c.seen[md.ID] = seenConn{user: user, up: up, down: down}
 		c.tr.AddProtocol(proto, du, dd)
 		if proto != "" {
@@ -108,7 +124,7 @@ func (c *collector) tick() {
 		prev := c.seen[md.ID] // zero when the connection opened and closed between ticks
 		du, dd := up-prev.up, down-prev.down
 		c.tr.AddProtocol(protocolKey(md.Metadata.Inbound), du, dd)
-		if user := md.Metadata.User; user != "" {
+		if user := c.userOf(md); user != "" {
 			c.tr.Add(user, du, dd)
 			speed(user, du, dd)
 		}
@@ -170,6 +186,7 @@ func (s *Server) enforceQuotas() {
 		return
 	}
 	s.tracker.Forget(func(name string) bool { return st.User(name) != nil })
+	s.setWireGuardUsers(st)
 	type change struct {
 		name     string
 		exceeded bool

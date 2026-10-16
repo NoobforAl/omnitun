@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"sync"
 	"time"
@@ -44,6 +45,28 @@ type Server struct {
 	accMu   sync.Mutex     // guards the collector's tick against the final flush
 	coll    *collector     // the running instance's collector (guarded by accMu)
 	accStop context.CancelFunc
+
+	wgMu    sync.RWMutex
+	wgUsers map[netip.Addr]string // WireGuard tunnel address -> user name
+}
+
+// setWireGuardUsers remembers which user owns which tunnel address.
+func (s *Server) setWireGuardUsers(st *store.State) {
+	m := map[netip.Addr]string{}
+	for _, u := range st.Users {
+		if p, err := netip.ParsePrefix(u.WGAddress); err == nil {
+			m[p.Addr()] = u.Name
+		}
+	}
+	s.wgMu.Lock()
+	s.wgUsers = m
+	s.wgMu.Unlock()
+}
+
+func (s *Server) userByWireGuardIP(a netip.Addr) string {
+	s.wgMu.RLock()
+	defer s.wgMu.RUnlock()
+	return s.wgUsers[a.Unmap()]
 }
 
 // New prepares a server for the store.
@@ -71,6 +94,7 @@ func (s *Server) Start() error {
 		return err
 	}
 	s.tracker = stats.NewTracker(s.store.Dir)
+	s.setWireGuardUsers(st)
 	accCtx, accCancel := context.WithCancel(context.Background())
 	s.accStop = accCancel
 	go s.accountingLoop(accCtx)
@@ -127,7 +151,7 @@ func (s *Server) startBoxLocked(st *store.State) error {
 				s.instance, s.cancel = instance, cancel
 				if tm := service.PtrFromContext[trafficcontrol.Manager](ctx); tm != nil {
 					s.accMu.Lock()
-					s.coll = newCollector(tm, s.tracker)
+					s.coll = newCollector(tm, s.tracker, s.userByWireGuardIP)
 					s.accMu.Unlock()
 				}
 				s.logf("serving %d protocol(s) for %d user(s)", len(inbounds)+len(endpoints), len(st.ActiveUsers(time.Now())))
