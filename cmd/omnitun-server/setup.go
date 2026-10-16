@@ -13,36 +13,6 @@ import (
 	"github.com/NoobforAl/omnitun/server/store"
 )
 
-func newInitCmd(o *options) *cobra.Command {
-	var opts manager.InitOptions
-	cmd := &cobra.Command{
-		Use:   "init",
-		Short: "Create a new server (keys, certificate, all protocols enabled)",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			m := o.manager()
-			info, err := m.Init(opts)
-			if err != nil {
-				return err
-			}
-			protos, _ := m.Protocols()
-			return o.print(map[string]any{"server": info, "protocols": protos}, func() {
-				fmt.Printf("Initialized %q in %s\n\n", info.Name, o.dataDir)
-				printProtocols(protos, info.SubscriptionPort)
-				fmt.Println("\nNext: omnitun-server user add <name>   then   omnitun-server run")
-				fmt.Println("Open the ports above in your firewall (TCP for vless-reality/shadowsocks/trojan, UDP for hysteria2/tuic/shadowsocks).")
-			})
-		},
-	}
-	f := cmd.Flags()
-	f.StringVar(&opts.PublicHost, "host", "", "public IP or domain clients connect to (required)")
-	f.StringVar(&opts.Name, "name", "Omnitun", "server name shown in clients")
-	f.StringVar(&opts.RealityHandshake, "reality-site", "www.microsoft.com:443", "site VLESS+Reality impersonates")
-	f.IntVar(&opts.SubPort, "sub-port", 2096, "subscription endpoint port")
-	cmd.MarkFlagRequired("host")
-	return cmd
-}
-
 func newStatusCmd(o *options) *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",

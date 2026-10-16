@@ -199,6 +199,20 @@ func New(o Options) http.Handler {
 	})
 
 	huma.Register(a, huma.Operation{
+		OperationID: "import-xray", Method: http.MethodPost, Path: "/api/v1/import/xray",
+		Summary: "Import users (UUIDs, passwords, Reality identity) from an Xray/V2Ray server config", Security: bearer,
+		MaxBodyBytes: 4 << 20,
+	}, func(ctx context.Context, in *struct {
+		Body struct {
+			Config  string                    `json:"config" doc:"The server config.json as text" minLength:"2"`
+			Options manager.ImportXrayOptions `json:"options,omitempty"`
+		}
+	}) (*body[*manager.ImportXrayResult], error) {
+		res, err := m.ImportXray(in.Body.Config, in.Body.Options)
+		return &body[*manager.ImportXrayResult]{Body: res}, toHTTP(err)
+	})
+
+	huma.Register(a, huma.Operation{
 		OperationID: "download-backup", Method: http.MethodGet, Path: "/api/v1/backup",
 		Summary: "Download a backup (.tar.gz) of the state, keys and certificates; it holds every secret", Security: bearer,
 	}, func(ctx context.Context, _ *struct{}) (*struct {

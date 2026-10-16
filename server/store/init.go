@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/NoobforAl/omnitun/core/protocols"
@@ -27,6 +28,8 @@ type InitOptions struct {
 	// RealityHandshake is the site Reality impersonates (default www.microsoft.com:443).
 	RealityHandshake string
 	SubPort          int
+	// Enabled lists the protocols to switch on; empty enables all of them.
+	Enabled []string
 }
 
 // DefaultPorts per protocol, from the protocol registry. TCP and UDP
@@ -79,7 +82,7 @@ func Init(s *Store, opts InitOptions) (*State, error) {
 		if v, ok := opts.Ports[p]; ok {
 			port = v
 		}
-		st.Server.Protocols[p] = &Proto{Enabled: true, Port: port}
+		st.Server.Protocols[p] = &Proto{Enabled: len(opts.Enabled) == 0 || slices.Contains(opts.Enabled, p), Port: port}
 	}
 	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
 		return nil, err

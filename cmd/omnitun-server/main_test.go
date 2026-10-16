@@ -37,6 +37,14 @@ func run(t *testing.T, dataDir string, args ...string) (string, error) {
 	old := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
+	// Drain the pipe while the command runs: a Windows pipe holds only a few
+	// KB, so a long output would otherwise block the command forever.
+	done := make(chan string)
+	go func() {
+		var buf bytes.Buffer
+		buf.ReadFrom(r)
+		done <- buf.String()
+	}()
 	root := newRootCmd()
 	root.SetArgs(append([]string{"--data", dataDir}, args...))
 	root.SetOut(io.Discard)
@@ -44,9 +52,7 @@ func run(t *testing.T, dataDir string, args ...string) (string, error) {
 	err := root.Execute()
 	w.Close()
 	os.Stdout = old
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	return buf.String(), err
+	return <-done, err
 }
 
 func TestCLIFlow(t *testing.T) {
@@ -136,6 +142,55 @@ func TestBackupRestoreCommands(t *testing.T) {
 	}
 	if _, err := run(t, filepath.Join(dst, "data"), "restore", file); exitCode(err) != 4 {
 		t.Fatalf("restore over a server: code %d", exitCode(err))
+	}
+}
+
+func TestInitWithProtocolFlagsAndFirstUser(t *testing.T) {
+	dir := tempDir(t)
+	out, err := run(t, dir, "--json", "init", "--host", "203.0.113.7", "--protocols", "vless-reality,trojan",
+		"--port", "trojan=9443", "--first-user", "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Protocols []manager.ProtocolInfo `json:"protocols"`
+		FirstUser *manager.LinkSet       `json:"first_user"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil || got.FirstUser == nil || got.FirstUser.User != "alice" {
+		t.Fatalf("init output: %v\n%s", err, out)
+	}
+	if len(got.FirstUser.Links) != 2 {
+		t.Fatalf("alice has %d links, want the 2 enabled protocols", len(got.FirstUser.Links))
+	}
+	for _, p := range got.Protocols {
+		on := p.Key == "vless-reality" || p.Key == "trojan"
+		if p.Enabled != on || (p.Key == "trojan" && p.Port != 9443) {
+			t.Errorf("protocol %+v", p)
+		}
+	}
+	if _, err := run(t, tempDir(t), "init", "--host", "x", "--protocols", "trojan,anytls", "--port", "anytls=8443"); exitCode(err) != 4 {
+		t.Fatalf("clashing ports: code %d", exitCode(err))
+	}
+	// Without a terminal and without --host there is nothing to ask.
+	if _, err := run(t, tempDir(t), "init"); exitCode(err) != 2 {
+		t.Fatalf("init without host in a script: code %d", exitCode(err))
+	}
+}
+
+func TestImportXrayCommand(t *testing.T) {
+	dir := tempDir(t)
+	cfg := filepath.Join(tempDir(t), "config.json")
+	os.WriteFile(cfg, []byte(`{"inbounds":[{"port":443,"protocol":"trojan","settings":{"clients":[{"password":"pw1","email":"dave@x.org"}]}}]}`), 0o600)
+	out, err := run(t, dir, "--json", "import", "xray", cfg, "--host", "203.0.113.7")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var res manager.ImportXrayResult
+	if err := json.Unmarshal([]byte(out), &res); err != nil || !res.CreatedServer || len(res.UsersAdded) != 1 || res.UsersAdded[0] != "dave" {
+		t.Fatalf("import: %v %+v", err, res)
+	}
+	if _, err := run(t, dir, "import", "xray", filepath.Join(dir, "missing.json")); err == nil {
+		t.Fatal("a missing file was accepted")
 	}
 }
 

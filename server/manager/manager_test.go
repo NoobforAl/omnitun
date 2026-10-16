@@ -220,3 +220,54 @@ func TestUsageAndQuotaFlag(t *testing.T) {
 		t.Fatal("server still reported as running")
 	}
 }
+
+func TestInitChoosesProtocolsAndRejectsPortClashes(t *testing.T) {
+	m := New(store.Open(tempDir(t)))
+	if _, err := m.Init(InitOptions{PublicHost: "example.com", Enabled: []string{"nope"}}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("unknown protocol: %v", err)
+	}
+	if _, err := m.Init(InitOptions{PublicHost: "example.com", Enabled: []string{store.Trojan, store.AnyTLS},
+		Ports: map[string]int{store.AnyTLS: 8443}}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("two TCP protocols on one port: %v", err)
+	}
+	if m.Store.Exists() {
+		t.Fatal("a rejected init left a server behind")
+	}
+	info, err := m.Init(InitOptions{PublicHost: "example.com", Enabled: []string{store.VLESSReality, store.Trojan},
+		Ports: map[string]int{store.Trojan: 9443}})
+	if err != nil || info.Protocols != 2 {
+		t.Fatalf("init = %+v err = %v", info, err)
+	}
+	protos, _ := m.Protocols()
+	for _, p := range protos {
+		want := p.Key == store.VLESSReality || p.Key == store.Trojan
+		if p.Enabled != want {
+			t.Errorf("%s enabled = %v", p.Key, p.Enabled)
+		}
+		if p.Key == store.Trojan && p.Port != 9443 {
+			t.Errorf("trojan port = %d", p.Port)
+		}
+	}
+}
+
+func TestPortConflictOnPatch(t *testing.T) {
+	m := newManager(t)
+	// Trojan (tcp 8443) and Hysteria2 (udp 8443) coexist; AnyTLS (tcp) on 8443 does not.
+	p := 8443
+	if _, err := m.SetProtocol(store.AnyTLS, ProtocolPatch{Port: &p}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("clash with trojan: %v", err)
+	}
+	if protos, _ := m.Protocols(); protos[5].Key != store.AnyTLS || protos[5].Port != 8445 {
+		t.Fatalf("a rejected change was saved: %+v", protos[5])
+	}
+	off := false
+	m.SetProtocol(store.Trojan, ProtocolPatch{Enabled: &off})
+	if _, err := m.SetProtocol(store.AnyTLS, ProtocolPatch{Port: &p}); err != nil {
+		t.Fatalf("after disabling trojan: %v", err)
+	}
+	// Shadowsocks is tcp+udp: sharing a number with a UDP-only protocol clashes.
+	port := 8444 // TUIC is udp 8444
+	if _, err := m.SetProtocol(store.Shadowsocks, ProtocolPatch{Port: &port}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("tcp+udp vs udp: %v", err)
+	}
+}

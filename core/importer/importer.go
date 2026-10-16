@@ -30,6 +30,14 @@ func Import(text string) (*Result, error) {
 		return nil, ErrUnsupported
 	}
 	if looksLikeJSON(text) {
+		switch kindOfJSON(text) {
+		case "sip008":
+			return ImportSIP008(text)
+		case "xray":
+			return ImportXray(text)
+		case "xray-server":
+			return nil, errors.New("this is an Xray server config; import it on the server (omnitun-server import xray), not as a client profile")
+		}
 		return ImportSingBoxJSON(text)
 	}
 	if looksLikeClash(text) {

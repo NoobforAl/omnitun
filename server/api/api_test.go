@@ -181,6 +181,22 @@ func TestProtocolsAndServer(t *testing.T) {
 	}
 }
 
+func TestImportXray(t *testing.T) {
+	c := newClient(t)
+	cfg := `{"inbounds":[{"port":443,"protocol":"vless","settings":{"clients":[{"id":"11111111-1111-4111-8111-111111111111","email":"erin@x.org"}]}}]}`
+	var res manager.ImportXrayResult
+	json.Unmarshal(c.ok("POST", "/api/v1/import/xray", map[string]any{"config": cfg}, 200), &res)
+	if len(res.UsersAdded) != 1 || res.UsersAdded[0] != "erin" {
+		t.Fatalf("result = %+v", res)
+	}
+	if status, _ := c.do("POST", "/api/v1/import/xray", map[string]any{"config": "not json at all"}, "Bearer "+token); status != 422 {
+		t.Errorf("garbage config = %d, want 422", status)
+	}
+	if status, _ := c.do("POST", "/api/v1/import/xray", map[string]any{"config": cfg}, ""); status != 401 {
+		t.Errorf("without a token = %d, want 401", status)
+	}
+}
+
 func TestBackupDownload(t *testing.T) {
 	c := newClient(t)
 	if status, _ := c.do("GET", "/api/v1/backup", nil, ""); status != 401 {

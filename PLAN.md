@@ -313,7 +313,7 @@ omnitun/
 - [x] Android bridge: gomobile `core/mobile` + Kotlin `VpnService` (minSdk 29)
 - [x] Importer: Clash / Clash.Meta YAML (`proxies:`), sing-box JSON (outbounds + WireGuard endpoints) — also as subscription bodies
 - [x] Importer: `.ovpn`, `naive+https://`, Tor bridge lines and `tor://` links
-- [ ] Importer: Xray/V2Ray JSON (also for importing an existing server's users), SIP008
+- [x] Importer: Xray/V2Ray client JSON (vless/vmess/trojan/shadowsocks/wireguard outbounds; ws/grpc/httpupgrade/h2, TLS and Reality; both vnext and flat layouts; xhttp reported as unsupported) and SIP008; an Xray *server* config is refused with a hint to use `omnitun-server import xray`
 - [x] AmneziaWG engine on Android (amneziawg-go 1.x params Jc/Jmin/Jmax/S1/S2/H1-H4; handshake check, traffic, failover to the next profile; dev server `tools/awgdev`) — verified on device: handshake, ping through tunnel, notification speed, failover to the next profile
 - [ ] AmneziaWG 2.0 params (S3/S4, I1-I5) — reported as unsupported for now; AmneziaWG on desktop (Windows phase)
 - [x] Export a profile as a share link (`core/links`, round-trip tested)
@@ -418,7 +418,9 @@ Step 3 — more protocols and setup
 - [ ] Registry follow-ups: `Option`s drive the `init` wizard and the app's server-creation form; client-side protocol form schema (profile editor) from the same Specs; WireGuard/AmneziaWG, Tor bridge and IKEv2/SSTP server protocols as registry entries
 - [ ] ACME/Let's Encrypt certificates for a domain (no more `insecure=1`); HTTPS for the subscription endpoint
 - [ ] WireGuard / AmneziaWG server, Tor bridge (obfs4/WebTunnel), IKEv2 / SSTP via system packages
-- [ ] Easy v2ray-style setup: `init` wizard (choose protocols, domain, ports), import an existing v2ray/xray config and its users, one-command install
+- [x] Easy setup: `omnitun-server init` is a wizard in a terminal (public address auto-detected, protocols from the registry, ports, imitated site, first user) and fully scriptable with `--host --protocols a,b --port p=N --first-user`; choices are validated before anything is written and port clashes (same port, overlapping TCP/UDP) are rejected on init and on every port or enable change
+- [x] `omnitun-server import xray <config.json> [--host H] [--adopt-reality]` and `POST /api/v1/import/xray`: moves an Xray/V2Ray server's users with their UUIDs and Trojan passwords, and (new server) the VLESS+Reality key, short ID, site and port, so users' existing links keep working
+- [ ] One-command install (`install` command, below)
 - [ ] Firewall/NAT setup (nftables), `install` command that writes and enables the systemd unit
 
 ### Phase 9 — Polish & release

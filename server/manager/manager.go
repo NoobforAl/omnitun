@@ -128,6 +128,26 @@ func (m *Manager) Init(o InitOptions) (*ServerInfo, error) {
 	if m.Store.Exists() {
 		return nil, fmt.Errorf("%w: already initialized in %s", ErrConflict, m.Store.Dir)
 	}
+	// Check the choices before anything is written.
+	probe := &store.State{Server: store.Server{Protocols: map[string]*store.Proto{}}}
+	for _, key := range append(append([]string{}, o.Enabled...), mapKeys(o.Ports)...) {
+		if !slices.Contains(store.AllProtocols, key) {
+			return nil, invalid("unknown protocol %q (have: %s)", key, strings.Join(store.AllProtocols, ", "))
+		}
+	}
+	for _, key := range store.AllProtocols {
+		port := store.DefaultPorts[key]
+		if v, ok := o.Ports[key]; ok {
+			if v < 1 || v > 65535 {
+				return nil, invalid("port %d for %s is out of range", v, key)
+			}
+			port = v
+		}
+		probe.Server.Protocols[key] = &store.Proto{Enabled: len(o.Enabled) == 0 || slices.Contains(o.Enabled, key), Port: port}
+	}
+	if err := portConflict(probe); err != nil {
+		return nil, err
+	}
 	st, err := store.Init(m.Store, o)
 	if err != nil {
 		return nil, err
@@ -212,6 +232,41 @@ type ProtocolPatch struct {
 	Port    *int  `json:"port,omitempty" minimum:"1" maximum:"65535"`
 }
 
+// portConflict returns an error when two enabled protocols would listen on
+// the same port with overlapping transports (TCP+UDP counts as both).
+func portConflict(st *store.State) error {
+	type use struct {
+		key      string
+		tcp, udp bool
+	}
+	byPort := map[int][]use{}
+	for _, key := range store.AllProtocols {
+		p := st.Server.Protocols[key]
+		if p == nil || !p.Enabled {
+			continue
+		}
+		t := transportOf(key)
+		byPort[p.Port] = append(byPort[p.Port], use{key, strings.Contains(t, "tcp"), strings.Contains(t, "udp")})
+	}
+	for port, uses := range byPort {
+		for i := range uses {
+			for j := i + 1; j < len(uses); j++ {
+				if (uses[i].tcp && uses[j].tcp) || (uses[i].udp && uses[j].udp) {
+					return fmt.Errorf("%w: %s and %s would both listen on port %d", ErrConflict, uses[i].key, uses[j].key, port)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func transportOf(key string) string {
+	if p, ok := protocols.Get(key); ok {
+		return p.Spec().Transport
+	}
+	return "tcp"
+}
+
 // SetProtocol applies a patch to one protocol.
 func (m *Manager) SetProtocol(key string, patch ProtocolPatch) (*ProtocolInfo, error) {
 	if !slices.Contains(store.AllProtocols, key) {
@@ -228,6 +283,9 @@ func (m *Manager) SetProtocol(key string, patch ProtocolPatch) (*ProtocolInfo, e
 		}
 		if patch.Port != nil {
 			p.Port = *patch.Port
+		}
+		if err := portConflict(st); err != nil {
+			return err
 		}
 		out = protocolInfo(st, key)
 		return nil
@@ -520,4 +578,12 @@ func monthTotal(snap stats.Snapshot, name string) int64 {
 		return u.MonthTotal()
 	}
 	return 0
+}
+
+func mapKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
