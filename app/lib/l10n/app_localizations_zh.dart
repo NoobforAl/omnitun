@@ -1375,4 +1375,108 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get importNoServer => '在这段文字中没有找到有效的服务器';
+
+  @override
+  String get ipdbTitle => '离线国家数据库';
+
+  @override
+  String get ipdbIntro => '下载一次数据库，Omnitun 就能自己判断服务器或地址所在的国家，无需询问网站。';
+
+  @override
+  String ipdbSizeNote(String size) {
+    return '约 $size · 免费数据（公有领域）';
+  }
+
+  @override
+  String get ipdbDownload => '下载';
+
+  @override
+  String get ipdbContinue => '继续';
+
+  @override
+  String get ipdbPause => '暂停';
+
+  @override
+  String get ipdbUpdate => '更新';
+
+  @override
+  String get ipdbDelete => '删除';
+
+  @override
+  String get ipdbDeleteTitle => '删除数据库？';
+
+  @override
+  String get ipdbUse => '使用数据库';
+
+  @override
+  String get ipdbStepV4 => 'IPv4';
+
+  @override
+  String get ipdbStepV6 => 'IPv6';
+
+  @override
+  String get ipdbStepPrepare => '准备';
+
+  @override
+  String get ipdbPreparing => '正在准备…';
+
+  @override
+  String get ipdbReady => '就绪';
+
+  @override
+  String ipdbStoppedAt(int percent) {
+    return '停在 $percent%。点“继续”从该处接着下载。';
+  }
+
+  @override
+  String ipdbFailed(String reason) {
+    return '下载失败：$reason';
+  }
+
+  @override
+  String ipdbReadyLine(String ranges, String size) {
+    return '$ranges 个区段 · $size';
+  }
+
+  @override
+  String ipdbVersion(String version, String date) {
+    return '版本 $version · $date';
+  }
+
+  @override
+  String ipdbLeft(String time) {
+    return '剩余 $time';
+  }
+
+  @override
+  String get ipdbSource => '数据来源：各区域互联网注册机构与 ASN 公告（CC0），ip-location-db 项目。';
+
+  @override
+  String get ipdbSubNone => '无需询问网站即可查国家';
+
+  @override
+  String ipdbSubReady(String size) {
+    return '已开启 · $size';
+  }
+
+  @override
+  String ipdbSubOff(String size) {
+    return '已关闭 · $size';
+  }
+
+  @override
+  String ipdbSubDownloading(int percent) {
+    return '正在下载 $percent%';
+  }
+
+  @override
+  String ipdbSubStopped(int percent) {
+    return '停在 $percent%';
+  }
+
+  @override
+  String get ipdbErrNetwork => '无法连接数据服务器';
+
+  @override
+  String get ipdbErrMirrors => '数据服务器返回的文件不正确';
 }

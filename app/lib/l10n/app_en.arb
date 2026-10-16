@@ -807,5 +807,109 @@
       }
     }
   },
-  "importNoServer": "No valid server was found in this text"
+  "importNoServer": "No valid server was found in this text",
+  "ipdbTitle": "Offline country database",
+  "ipdbIntro": "Download a database once, and Omnitun finds the country of a server or an address by itself, without asking a website.",
+  "ipdbSizeNote": "About {size} · free data (public domain)",
+  "@ipdbSizeNote": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "ipdbDownload": "Download",
+  "ipdbContinue": "Continue",
+  "ipdbPause": "Pause",
+  "ipdbUpdate": "Update",
+  "ipdbDelete": "Delete",
+  "ipdbDeleteTitle": "Delete the database?",
+  "ipdbUse": "Use the database",
+  "ipdbStepV4": "IPv4",
+  "ipdbStepV6": "IPv6",
+  "ipdbStepPrepare": "Prepare",
+  "ipdbPreparing": "Preparing…",
+  "ipdbReady": "Ready",
+  "ipdbStoppedAt": "Stopped at {percent}%. Continue picks up right there.",
+  "@ipdbStoppedAt": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "ipdbFailed": "Download failed: {reason}",
+  "@ipdbFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "ipdbReadyLine": "{ranges} ranges · {size}",
+  "@ipdbReadyLine": {
+    "placeholders": {
+      "ranges": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "ipdbVersion": "Version {version} · {date}",
+  "@ipdbVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "ipdbLeft": "{time} left",
+  "@ipdbLeft": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "ipdbSource": "Data: regional internet registries and ASN announcements (CC0), from the ip-location-db project.",
+  "ipdbSubNone": "Find countries without asking a website",
+  "ipdbSubReady": "On · {size}",
+  "@ipdbSubReady": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "ipdbSubOff": "Off · {size}",
+  "@ipdbSubOff": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "ipdbSubDownloading": "Downloading {percent}%",
+  "@ipdbSubDownloading": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "ipdbSubStopped": "Stopped at {percent}%",
+  "@ipdbSubStopped": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "ipdbErrNetwork": "no connection to the data servers",
+  "ipdbErrMirrors": "the data servers did not send the right file"
 }

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Omnitun
+Comment=VPN, proxy and Tor client
+Exec=omnitun %U
+Icon=omnitun
+Terminal=false
+Categories=Network;Security;
+# The system offers Omnitun for these: VPN config files and share links (vless://, trojan://, ...).
+MimeType=application/x-openvpn-profile;application/x-wireguard-profile;application/json;application/x-yaml;text/plain;x-scheme-handler/vless;x-scheme-handler/vmess;x-scheme-handler/trojan;x-scheme-handler/ss;x-scheme-handler/hysteria2;x-scheme-handler/hy2;x-scheme-handler/hysteria;x-scheme-handler/tuic;x-scheme-handler/wireguard;x-scheme-handler/awg;x-scheme-handler/anytls;x-scheme-handler/sstp;x-scheme-handler/ikev2;x-scheme-handler/nordvpn;x-scheme-handler/naive+https;

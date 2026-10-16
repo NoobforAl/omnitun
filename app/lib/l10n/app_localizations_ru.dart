@@ -1455,4 +1455,110 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get importNoServer =>
       'В этом тексте нет ни одного подходящего сервера';
+
+  @override
+  String get ipdbTitle => 'Офлайн-база стран';
+
+  @override
+  String get ipdbIntro =>
+      'Скачайте базу один раз, и Omnitun сам определит страну сервера или адреса, не обращаясь к сайтам.';
+
+  @override
+  String ipdbSizeNote(String size) {
+    return 'Около $size · свободные данные (общественное достояние)';
+  }
+
+  @override
+  String get ipdbDownload => 'Скачать';
+
+  @override
+  String get ipdbContinue => 'Продолжить';
+
+  @override
+  String get ipdbPause => 'Пауза';
+
+  @override
+  String get ipdbUpdate => 'Обновить';
+
+  @override
+  String get ipdbDelete => 'Удалить';
+
+  @override
+  String get ipdbDeleteTitle => 'Удалить базу?';
+
+  @override
+  String get ipdbUse => 'Использовать базу';
+
+  @override
+  String get ipdbStepV4 => 'IPv4';
+
+  @override
+  String get ipdbStepV6 => 'IPv6';
+
+  @override
+  String get ipdbStepPrepare => 'Подготовка';
+
+  @override
+  String get ipdbPreparing => 'Подготовка…';
+
+  @override
+  String get ipdbReady => 'Готово';
+
+  @override
+  String ipdbStoppedAt(int percent) {
+    return 'Остановлено на $percent%. «Продолжить» начнёт с того же места.';
+  }
+
+  @override
+  String ipdbFailed(String reason) {
+    return 'Не удалось скачать: $reason';
+  }
+
+  @override
+  String ipdbReadyLine(String ranges, String size) {
+    return '$ranges диапазонов · $size';
+  }
+
+  @override
+  String ipdbVersion(String version, String date) {
+    return 'Версия $version · $date';
+  }
+
+  @override
+  String ipdbLeft(String time) {
+    return 'Осталось $time';
+  }
+
+  @override
+  String get ipdbSource =>
+      'Данные: региональные интернет-реестры и анонсы ASN (CC0), проект ip-location-db.';
+
+  @override
+  String get ipdbSubNone => 'Определять страны, не обращаясь к сайтам';
+
+  @override
+  String ipdbSubReady(String size) {
+    return 'Вкл. · $size';
+  }
+
+  @override
+  String ipdbSubOff(String size) {
+    return 'Выкл. · $size';
+  }
+
+  @override
+  String ipdbSubDownloading(int percent) {
+    return 'Загрузка $percent%';
+  }
+
+  @override
+  String ipdbSubStopped(int percent) {
+    return 'Остановлено на $percent%';
+  }
+
+  @override
+  String get ipdbErrNetwork => 'нет соединения с серверами данных';
+
+  @override
+  String get ipdbErrMirrors => 'серверы данных прислали не тот файл';
 }

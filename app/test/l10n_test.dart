@@ -187,7 +187,7 @@ void main() {
       await tester.tap(find.text(l.buttonConnect));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text(l.statusConnecting), findsOneWidget, reason: code);
-      await tester.tap(find.text(l.buttonCancel));
+      await tester.tap(find.textContaining(l.buttonCancel)); // "Cancel · 40%": the button shows the progress
       await tester.pump(const Duration(milliseconds: 900));
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pumpWidget(const SizedBox());

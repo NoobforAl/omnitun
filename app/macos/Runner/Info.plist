@@ -28,5 +28,90 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>dev.omnitun.share-link</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>vless</string>
+				<string>vmess</string>
+				<string>trojan</string>
+				<string>ss</string>
+				<string>hysteria2</string>
+				<string>hy2</string>
+				<string>hysteria</string>
+				<string>tuic</string>
+				<string>wireguard</string>
+				<string>awg</string>
+				<string>anytls</string>
+				<string>sstp</string>
+				<string>ikev2</string>
+				<string>nordvpn</string>
+				<string>naive+https</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Omnitun config</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.json</string>
+				<string>public.plain-text</string>
+				<string>public.yaml</string>
+				<string>dev.omnitun.ovpn</string>
+				<string>dev.omnitun.wgconf</string>
+			</array>
+		</dict>
+	</array>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>dev.omnitun.ovpn</string>
+			<key>UTTypeDescription</key>
+			<string>OpenVPN profile</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.plain-text</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>ovpn</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>application/x-openvpn-profile</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>dev.omnitun.wgconf</string>
+			<key>UTTypeDescription</key>
+			<string>WireGuard configuration</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.plain-text</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>conf</string>
+				</array>
+				<key>public.mime-type</key>
+				<string>application/x-wireguard-profile</string>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>

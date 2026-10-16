@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/l10n.dart';
 import '../../state/providers.dart';
+import '../../state/ipdb_state.dart';
 import 'bypass_screen.dart';
+import 'ipdb_screen.dart';
 import 'logs_screen.dart';
 import 'notices_screen.dart';
 import 'profiles_screen.dart';
@@ -83,6 +85,13 @@ class SettingsScreen extends ConsumerWidget {
                   subtitle: Text(bypassEntries == 0 ? l.bypassListsHint : l.bypassListsInUse(bypassEntries)),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => open(const BypassScreen()),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.storage_rounded),
+                  title: Text(l.ipdbTitle),
+                  subtitle: Text(ipDbSubtitle(l, ref.watch(ipDbProvider))),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => open(const IpDbScreen()),
                 ),
                 if (Platform.isAndroid)
                   ListTile(

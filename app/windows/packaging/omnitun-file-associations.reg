@@ -1,0 +1,134 @@
+Windows Registry Editor Version 5.00
+
+; Lets Windows offer Omnitun for VPN config files and share links, for the current user only.
+; Edit the path to omnitun.exe below (use \\ for each backslash), then double-click this file.
+; Files are added to "Open with" (the default program is not changed); links are claimed.
+
+[HKEY_CURRENT_USER\Software\Classes\Omnitun.Config]
+@="Omnitun configuration"
+
+[HKEY_CURRENT_USER\Software\Classes\Omnitun.Config\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\.ovpn\OpenWithProgids]
+"Omnitun.Config"=hex(0):
+
+[HKEY_CURRENT_USER\Software\Classes\.conf\OpenWithProgids]
+"Omnitun.Config"=hex(0):
+
+[HKEY_CURRENT_USER\Software\Classes\.json\OpenWithProgids]
+"Omnitun.Config"=hex(0):
+
+[HKEY_CURRENT_USER\Software\Classes\.yaml\OpenWithProgids]
+"Omnitun.Config"=hex(0):
+
+[HKEY_CURRENT_USER\Software\Classes\.yml\OpenWithProgids]
+"Omnitun.Config"=hex(0):
+
+[HKEY_CURRENT_USER\Software\Classes\.txt\OpenWithProgids]
+"Omnitun.Config"=hex(0):
+
+[HKEY_CURRENT_USER\Software\Classes\vless]
+@="URL:vless link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\vless\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\vmess]
+@="URL:vmess link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\vmess\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\trojan]
+@="URL:trojan link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\trojan\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\ss]
+@="URL:ss link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\ss\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\hysteria2]
+@="URL:hysteria2 link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\hysteria2\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\hy2]
+@="URL:hy2 link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\hy2\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\hysteria]
+@="URL:hysteria link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\hysteria\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\tuic]
+@="URL:tuic link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\tuic\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\wireguard]
+@="URL:wireguard link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\wireguard\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\awg]
+@="URL:awg link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\awg\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\anytls]
+@="URL:anytls link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\anytls\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\sstp]
+@="URL:sstp link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\sstp\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\ikev2]
+@="URL:ikev2 link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\ikev2\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\nordvpn]
+@="URL:nordvpn link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\nordvpn\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""
+
+[HKEY_CURRENT_USER\Software\Classes\naive+https]
+@="URL:naive+https link"
+"URL Protocol"=""
+
+[HKEY_CURRENT_USER\Software\Classes\naive+https\shell\open\command]
+@="\"C:\\Program Files\\Omnitun\\omnitun.exe\" \"%1\""

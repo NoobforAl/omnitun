@@ -2,19 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'l10n/l10n.dart';
+import 'state/incoming.dart';
 import 'state/providers.dart';
 import 'state/store.dart';
 import 'state/subscriptions.dart';
+import 'ui/incoming_import.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/screens/onboarding_screen.dart';
 import 'ui/screens/profiles_screen.dart';
 import 'ui/theme.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   final store = await AppStore.open();
+  // On a computer, opening a link or config file with Omnitun starts it with that as an argument.
+  final startup = await IncomingShare.fromArguments(args);
   runApp(ProviderScope(
-    overrides: [storeProvider.overrideWithValue(store)],
+    overrides: [storeProvider.overrideWithValue(store), startupSharesProvider.overrideWithValue(startup)],
     child: const OmnitunApp(),
   ));
 }
@@ -32,10 +36,15 @@ class _OmnitunAppState extends ConsumerState<OmnitunApp> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Update subscriptions whose refresh interval has passed.
       ref.read(subscriptionsProvider.notifier).refreshDue();
-      _introduction();
+      // A link or file sent by another app comes first; the introduction steps aside for it.
+      final shared = await IncomingShare.start(
+        (text) => importShared(_navigator, ref, text),
+        startup: ref.read(startupSharesProvider),
+      );
+      if (!shared) _introduction();
     });
   }
 

@@ -1423,4 +1423,110 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get importNoServer => 'در این متن هیچ سرور معتبری پیدا نشد';
+
+  @override
+  String get ipdbTitle => 'پایگاه‌داده‌ی کشور (آفلاین)';
+
+  @override
+  String get ipdbIntro =>
+      'یک بار پایگاه‌داده را دانلود کنید تا Omnitun کشورِ سرور یا نشانی را خودش و بدون پرسیدن از وب‌سایت پیدا کند.';
+
+  @override
+  String ipdbSizeNote(String size) {
+    return 'حدود $size · داده‌ی رایگان (دامنه‌ی عمومی)';
+  }
+
+  @override
+  String get ipdbDownload => 'دانلود';
+
+  @override
+  String get ipdbContinue => 'ادامه';
+
+  @override
+  String get ipdbPause => 'توقف';
+
+  @override
+  String get ipdbUpdate => 'به‌روزرسانی';
+
+  @override
+  String get ipdbDelete => 'حذف';
+
+  @override
+  String get ipdbDeleteTitle => 'پایگاه‌داده حذف شود؟';
+
+  @override
+  String get ipdbUse => 'استفاده از پایگاه‌داده';
+
+  @override
+  String get ipdbStepV4 => 'IPv4';
+
+  @override
+  String get ipdbStepV6 => 'IPv6';
+
+  @override
+  String get ipdbStepPrepare => 'آماده‌سازی';
+
+  @override
+  String get ipdbPreparing => 'در حال آماده‌سازی…';
+
+  @override
+  String get ipdbReady => 'آماده';
+
+  @override
+  String ipdbStoppedAt(int percent) {
+    return 'در $percent% متوقف شد. «ادامه» از همان‌جا پیش می‌رود.';
+  }
+
+  @override
+  String ipdbFailed(String reason) {
+    return 'دانلود ناموفق بود: $reason';
+  }
+
+  @override
+  String ipdbReadyLine(String ranges, String size) {
+    return '$ranges بازه · $size';
+  }
+
+  @override
+  String ipdbVersion(String version, String date) {
+    return 'نسخه‌ی $version · $date';
+  }
+
+  @override
+  String ipdbLeft(String time) {
+    return '$time مانده';
+  }
+
+  @override
+  String get ipdbSource =>
+      'داده: ثبت‌کنندگان منطقه‌ای اینترنت و اعلان‌های ASN (CC0)، از پروژه‌ی ip-location-db.';
+
+  @override
+  String get ipdbSubNone => 'یافتن کشور بدون پرسیدن از وب‌سایت';
+
+  @override
+  String ipdbSubReady(String size) {
+    return 'روشن · $size';
+  }
+
+  @override
+  String ipdbSubOff(String size) {
+    return 'خاموش · $size';
+  }
+
+  @override
+  String ipdbSubDownloading(int percent) {
+    return 'در حال دانلود $percent%';
+  }
+
+  @override
+  String ipdbSubStopped(int percent) {
+    return 'متوقف در $percent%';
+  }
+
+  @override
+  String get ipdbErrNetwork => 'اتصال به سرورهای داده برقرار نشد';
+
+  @override
+  String get ipdbErrMirrors => 'سرورهای داده فایل درست را نفرستادند';
 }

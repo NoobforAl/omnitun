@@ -1470,4 +1470,110 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get importNoServer => 'لم يُعثر على أي خادم صالح في هذا النص';
+
+  @override
+  String get ipdbTitle => 'قاعدة بيانات الدول (دون اتصال)';
+
+  @override
+  String get ipdbIntro =>
+      'نزّل قاعدة البيانات مرة واحدة، وسيعرف Omnitun بلد الخادم أو العنوان بنفسه دون سؤال أي موقع.';
+
+  @override
+  String ipdbSizeNote(String size) {
+    return 'نحو $size · بيانات مجانية (ملكية عامة)';
+  }
+
+  @override
+  String get ipdbDownload => 'تنزيل';
+
+  @override
+  String get ipdbContinue => 'متابعة';
+
+  @override
+  String get ipdbPause => 'إيقاف مؤقت';
+
+  @override
+  String get ipdbUpdate => 'تحديث';
+
+  @override
+  String get ipdbDelete => 'حذف';
+
+  @override
+  String get ipdbDeleteTitle => 'حذف قاعدة البيانات؟';
+
+  @override
+  String get ipdbUse => 'استخدام قاعدة البيانات';
+
+  @override
+  String get ipdbStepV4 => 'IPv4';
+
+  @override
+  String get ipdbStepV6 => 'IPv6';
+
+  @override
+  String get ipdbStepPrepare => 'تجهيز';
+
+  @override
+  String get ipdbPreparing => 'جارٍ التجهيز…';
+
+  @override
+  String get ipdbReady => 'جاهزة';
+
+  @override
+  String ipdbStoppedAt(int percent) {
+    return 'توقف عند $percent%. «متابعة» تكمل من النقطة نفسها.';
+  }
+
+  @override
+  String ipdbFailed(String reason) {
+    return 'فشل التنزيل: $reason';
+  }
+
+  @override
+  String ipdbReadyLine(String ranges, String size) {
+    return '$ranges نطاق · $size';
+  }
+
+  @override
+  String ipdbVersion(String version, String date) {
+    return 'الإصدار $version · $date';
+  }
+
+  @override
+  String ipdbLeft(String time) {
+    return 'المتبقي $time';
+  }
+
+  @override
+  String get ipdbSource =>
+      'البيانات: سجلات الإنترنت الإقليمية وإعلانات ASN (CC0)، من مشروع ip-location-db.';
+
+  @override
+  String get ipdbSubNone => 'معرفة البلد دون سؤال أي موقع';
+
+  @override
+  String ipdbSubReady(String size) {
+    return 'مفعّلة · $size';
+  }
+
+  @override
+  String ipdbSubOff(String size) {
+    return 'متوقفة · $size';
+  }
+
+  @override
+  String ipdbSubDownloading(int percent) {
+    return 'جارٍ التنزيل $percent%';
+  }
+
+  @override
+  String ipdbSubStopped(int percent) {
+    return 'توقف عند $percent%';
+  }
+
+  @override
+  String get ipdbErrNetwork => 'تعذّر الاتصال بخوادم البيانات';
+
+  @override
+  String get ipdbErrMirrors => 'لم ترسل خوادم البيانات الملف الصحيح';
 }

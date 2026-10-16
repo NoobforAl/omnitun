@@ -101,10 +101,11 @@ void main() {
     ));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
-    expect(find.text('85%'), findsOneWidget);
+    // The Connect button is the progress: it says Cancel with the percent and fills as far.
+    expect(find.text('Cancel · 85%'), findsOneWidget);
     expect(find.text('Contacting server · PC-dev'), findsOneWidget);
-    final bar = tester.widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator));
-    expect(bar.value, closeTo(0.85, 0.01));
+    final fill = tester.widget<FractionallySizedBox>(find.byKey(const Key('connect-progress')));
+    expect(fill.widthFactor, closeTo(0.85, 0.01));
 
     // A failure takes the bar away and shows the reason.
     engine.controller.add(const EngineState(
@@ -115,8 +116,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('Contacting server failed: connection refused'), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsNothing);
-    expect(find.text('85%'), findsNothing);
+    expect(find.byKey(const Key('connect-progress')), findsNothing);
+    expect(find.textContaining('85%'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
 }

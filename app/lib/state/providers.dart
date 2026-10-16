@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../engine/core_engine.dart';
 import '../engine/engine.dart';
 import 'countries.dart';
+import 'ipdb_state.dart';
 import 'location.dart';
 import 'store.dart';
 
@@ -185,13 +186,20 @@ class LearnedCountries extends Notifier<Map<String, String>> {
 
 final learnedCountriesProvider = NotifierProvider<LearnedCountries, Map<String, String>>(LearnedCountries.new);
 
-/// The country of a profile: the user's choice, else the one seen when connected, else a guess
-/// from its name and address.
+/// The country of a profile: the user's choice, else the one seen when connected, else the one the
+/// offline database gives for the server's address (when it is installed), else a guess from the
+/// server's name and address.
 final profileCountryProvider = Provider<String? Function(ProfileInfo)>((ref) {
   final overrides = ref.watch(countryOverridesProvider);
   final learned = ref.watch(learnedCountriesProvider);
+  final fromDb = ref.watch(dbCountriesProvider);
+  final active = ref.watch(ipDbActiveProvider) != null; // a database that is switched off or deleted says nothing
   final guesses = <String, String?>{};
-  return (p) => overrides[p.id] ?? learned[p.id] ?? guesses.putIfAbsent(p.id, () => guessCountry(p));
+  return (p) =>
+      overrides[p.id] ??
+      learned[p.id] ??
+      (active ? fromDb[p.server] : null) ??
+      guesses.putIfAbsent(p.id, () => guessCountry(p));
 });
 
 /// The profile to start with and the ones to fall back to, for the current choice.
@@ -295,7 +303,7 @@ class ExitController extends Notifier<ExitInfo?> {
     final generation = ++_generation;
     state = null;
     try {
-      final info = await ref.read(engineProvider).exitInfo();
+      final info = withDbCountry(await ref.read(engineProvider).exitInfo(), ref.read(ipDbActiveProvider));
       if (generation != _generation) return; // connected elsewhere, or disconnected, meanwhile
       state = info;
       // Tor's exit changes with every circuit, so it says nothing about the profile.
@@ -391,7 +399,7 @@ class HomeLocation extends Notifier<ExitInfo?> {
         const {ConnStatus.disconnected, ConnStatus.error}.contains(ref.read(connectionProvider).status);
     if (!idle()) return;
     try {
-      final info = await ref.read(directLookupProvider)();
+      final info = withDbCountry(await ref.read(directLookupProvider)(), ref.read(ipDbActiveProvider));
       if (!idle()) return; // connected meanwhile: that answer would describe the VPN, not the device
       state = info;
       if (info.country != null) ref.read(storeProvider).write(_key, info.country);

@@ -1421,4 +1421,110 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importNoServer => 'No valid server was found in this text';
+
+  @override
+  String get ipdbTitle => 'Offline country database';
+
+  @override
+  String get ipdbIntro =>
+      'Download a database once, and Omnitun finds the country of a server or an address by itself, without asking a website.';
+
+  @override
+  String ipdbSizeNote(String size) {
+    return 'About $size · free data (public domain)';
+  }
+
+  @override
+  String get ipdbDownload => 'Download';
+
+  @override
+  String get ipdbContinue => 'Continue';
+
+  @override
+  String get ipdbPause => 'Pause';
+
+  @override
+  String get ipdbUpdate => 'Update';
+
+  @override
+  String get ipdbDelete => 'Delete';
+
+  @override
+  String get ipdbDeleteTitle => 'Delete the database?';
+
+  @override
+  String get ipdbUse => 'Use the database';
+
+  @override
+  String get ipdbStepV4 => 'IPv4';
+
+  @override
+  String get ipdbStepV6 => 'IPv6';
+
+  @override
+  String get ipdbStepPrepare => 'Prepare';
+
+  @override
+  String get ipdbPreparing => 'Preparing…';
+
+  @override
+  String get ipdbReady => 'Ready';
+
+  @override
+  String ipdbStoppedAt(int percent) {
+    return 'Stopped at $percent%. Continue picks up right there.';
+  }
+
+  @override
+  String ipdbFailed(String reason) {
+    return 'Download failed: $reason';
+  }
+
+  @override
+  String ipdbReadyLine(String ranges, String size) {
+    return '$ranges ranges · $size';
+  }
+
+  @override
+  String ipdbVersion(String version, String date) {
+    return 'Version $version · $date';
+  }
+
+  @override
+  String ipdbLeft(String time) {
+    return '$time left';
+  }
+
+  @override
+  String get ipdbSource =>
+      'Data: regional internet registries and ASN announcements (CC0), from the ip-location-db project.';
+
+  @override
+  String get ipdbSubNone => 'Find countries without asking a website';
+
+  @override
+  String ipdbSubReady(String size) {
+    return 'On · $size';
+  }
+
+  @override
+  String ipdbSubOff(String size) {
+    return 'Off · $size';
+  }
+
+  @override
+  String ipdbSubDownloading(int percent) {
+    return 'Downloading $percent%';
+  }
+
+  @override
+  String ipdbSubStopped(int percent) {
+    return 'Stopped at $percent%';
+  }
+
+  @override
+  String get ipdbErrNetwork => 'no connection to the data servers';
+
+  @override
+  String get ipdbErrMirrors => 'the data servers did not send the right file';
 }

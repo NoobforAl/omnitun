@@ -35,6 +35,85 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Share links (vless://, trojan://, …) open Omnitun, which imports them. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="vless" />
+                <data android:scheme="vmess" />
+                <data android:scheme="trojan" />
+                <data android:scheme="ss" />
+                <data android:scheme="hysteria2" />
+                <data android:scheme="hy2" />
+                <data android:scheme="hysteria" />
+                <data android:scheme="tuic" />
+                <data android:scheme="wireguard" />
+                <data android:scheme="awg" />
+                <data android:scheme="anytls" />
+                <data android:scheme="sstp" />
+                <data android:scheme="ikev2" />
+                <data android:scheme="nordvpn" />
+                <data android:scheme="naive+https" />
+            </intent-filter>
+            <!-- Config files by their type (what well-known VPN apps and file managers send). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/x-openvpn-profile" />
+                <data android:mimeType="application/x-wireguard-profile" />
+                <data android:mimeType="application/json" />
+                <data android:mimeType="application/x-yaml" />
+                <data android:mimeType="text/yaml" />
+                <data android:mimeType="application/yaml" />
+            </intent-filter>
+            <!-- Config files by their name, when the type is a generic one (.ovpn, .conf, .json, .yaml, .txt). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.ovpn" />
+                <data android:pathPattern=".*\\..*\\.ovpn" />
+                <data android:pathPattern=".*\\..*\\..*\\.ovpn" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.ovpn" />
+                <data android:pathPattern=".*\\.conf" />
+                <data android:pathPattern=".*\\..*\\.conf" />
+                <data android:pathPattern=".*\\..*\\..*\\.conf" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.conf" />
+                <data android:pathPattern=".*\\.json" />
+                <data android:pathPattern=".*\\..*\\.json" />
+                <data android:pathPattern=".*\\..*\\..*\\.json" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.json" />
+                <data android:pathPattern=".*\\.yaml" />
+                <data android:pathPattern=".*\\..*\\.yaml" />
+                <data android:pathPattern=".*\\..*\\..*\\.yaml" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.yaml" />
+                <data android:pathPattern=".*\\.yml" />
+                <data android:pathPattern=".*\\..*\\.yml" />
+                <data android:pathPattern=".*\\..*\\..*\\.yml" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.yml" />
+                <data android:pathPattern=".*\\.txt" />
+                <data android:pathPattern=".*\\..*\\.txt" />
+                <data android:pathPattern=".*\\..*\\..*\\.txt" />
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.txt" />
+            </intent-filter>
+            <!-- "Share" from another app: a link, some text, or a config file. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="application/x-openvpn-profile" />
+                <data android:mimeType="application/x-wireguard-profile" />
+                <data android:mimeType="application/json" />
+                <data android:mimeType="application/x-yaml" />
+                <data android:mimeType="text/yaml" />
+                <data android:mimeType="application/yaml" />
+            </intent-filter>
         </activity>
         <service
             android:name=".OmnitunVpnService"

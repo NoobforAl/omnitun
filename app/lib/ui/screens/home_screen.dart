@@ -150,17 +150,24 @@ String? _exitCode(WidgetRef ref, EngineState s) {
   return ref.watch(exitProvider)?.country ?? ref.watch(profileCountryProvider)(active);
 }
 
-/// Where things sit: the globe under the top bar, the status block right under the globe.
+/// Where things sit: the globe and the status block under it form one group, centred (a little
+/// above the middle) between the top bar and the bottom panel.
 class _Geometry {
-  _Geometry(BoxConstraints box, double safeTop)
-    : d = math.min(math.min(box.maxWidth * 0.74, 400.0), box.maxHeight * 0.4),
-      left = (box.maxWidth - math.min(math.min(box.maxWidth * 0.74, 400.0), box.maxHeight * 0.4)) / 2,
-      top = safeTop + 54;
+  factory _Geometry(BoxConstraints box, double safeTop) {
+    const topBar = 54.0, gap = 22.0, status = 176.0;
+    final region = box.maxHeight - safeTop - topBar;
+    final d = math.max(150.0, math.min(math.min(box.maxWidth * 0.74, 400.0), region - gap - status));
+    final free = math.max(0.0, region - (d + gap + status));
+    return _Geometry._(d, (box.maxWidth - d) / 2, safeTop + topBar + free * 0.38, gap);
+  }
+
+  _Geometry._(this.d, this.left, this.top, this._gap);
 
   final double d, left, top;
+  final double _gap;
 
   /// Below the globe: nothing is written on the Earth.
-  double get contentTop => top + d + 22;
+  double get contentTop => top + d + _gap;
 }
 
 /// The Earth. Not connected: it shows where you really are (red). Connecting and connected:
@@ -315,35 +322,6 @@ class _HeroState extends ConsumerState<_Hero> {
                 style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween(end: progress.percent / 100),
-                    duration: const Duration(milliseconds: 450),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, value, _) => ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: value,
-                        minHeight: 6,
-                        color: color,
-                        backgroundColor: color.withValues(alpha: 0.18),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  '${progress.percent}%',
-                  style: text.titleMedium?.copyWith(
-                    color: color,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
             ),
           ],
           // Not connected: where you are right now.
@@ -628,6 +606,7 @@ class _BottomPanel extends ConsumerWidget {
                   ? _ButtonKind.stop
                   : (active ? _ButtonKind.cancel : _ButtonKind.go),
               onPressed: busy ? null : () => _toggle(context, ref),
+              progress: state.status == ConnStatus.connecting ? state.progress?.percent : null,
             ),
           ],
         ],
@@ -638,29 +617,27 @@ class _BottomPanel extends ConsumerWidget {
 
 enum _ButtonKind { go, stop, cancel }
 
-/// The one big button: a gradient to connect, a red tint to disconnect, a quiet one to cancel.
+/// The one big button: a gradient to connect, a red tint to disconnect, and while connecting it IS the
+/// progress: it fills from the start side as the core reports its steps, with the percent in it; tapping cancels.
 class _MainButton extends StatelessWidget {
-  const _MainButton({
-    required this.label,
-    required this.kind,
-    required this.onPressed,
-  });
+  const _MainButton({required this.label, required this.kind, required this.onPressed, this.progress});
 
   final String label;
   final _ButtonKind kind;
   final VoidCallback? onPressed;
+
+  /// 0-100 while connecting, otherwise null.
+  final int? progress;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final (fill, fg) = switch (kind) {
       _ButtonKind.go => (null, Colors.white),
-      _ButtonKind.stop => (
-        disconnectRed.withValues(alpha: 0.16),
-        disconnectRed,
-      ),
+      _ButtonKind.stop => (disconnectRed.withValues(alpha: 0.16), disconnectRed),
       _ButtonKind.cancel => (scheme.surfaceContainerHighest, scheme.onSurface),
     };
+    final p = progress;
     return Opacity(
       opacity: onPressed == null ? 0.5 : 1,
       child: Material(
@@ -677,18 +654,51 @@ class _MainButton extends StatelessWidget {
                   )
                 : null,
           ),
-          child: InkWell(
-            onTap: onPressed,
-            child: SizedBox(
-              height: 48,
-              child: Center(
-                child: Text(
-                  label,
-                  style: Theme.of(context).textTheme.titleMedium
-                      ?.copyWith(color: fg, fontWeight: FontWeight.w700),
+          child: Stack(
+            children: [
+              if (p != null)
+                Positioned.fill(
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(end: p / 100),
+                      duration: const Duration(milliseconds: 450),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, _) => FractionallySizedBox(
+                        key: const Key('connect-progress'),
+                        widthFactor: value.clamp(0.0, 1.0),
+                        heightFactor: 1,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                brandIndigo.withValues(alpha: 0.55),
+                                brandViolet.withValues(alpha: 0.55),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              InkWell(
+                onTap: onPressed,
+                child: SizedBox(
+                  height: 48,
+                  child: Center(
+                    child: Text(
+                      p == null ? label : '$label · $p%',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: fg,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),

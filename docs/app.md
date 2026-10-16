@@ -6,6 +6,14 @@ One calm screen: an Earth that shows where you are and where you exit, the state
 
 A dark-fantasy look in cold, muted blues (a light "stone" theme is in Settings). Behind the home screen is a dotted Earth: when you connect it turns to the exit country and marks it with a glow; it moves only for that turn. Fonts are open (SIL OFL, texts in the app's assets): Cinzel for headings, Inter for text, Vazirmatn for Persian and Arabic. The land outlines are Natural Earth (public domain). `scripts/gen-icon.py`, `gen-fonts.py` and `gen-globe.py` rebuild the icon, the fonts and the globe data.
 
+## Opening files and links with Omnitun
+
+Tap a share link (`vless://…`, `trojan://…`, `ss://…`, `hy2://…`, …) anywhere on the phone, or open or share a VPN config file (OpenVPN `.ovpn`, WireGuard `.conf`, Clash/sing-box `.json` or `.yaml`, a `.txt` of links) with Omnitun, and it imports the servers at once ("Imported 2 profiles"). A subscription link (`https://…`) opens the subscription form instead. On Windows, Linux and macOS the system starts Omnitun with the file or link, once the file types are registered (`app/windows/packaging`, `app/linux/packaging`); on iPhone and Mac the declarations are in the project but the receiving code is not written yet.
+
+## Offline country database (optional)
+
+Settings → **Offline country database**. Not installed by default. Download it once (about 23 MB, free data) and Omnitun gives servers a country from their addresses without asking any website, and gives a country to an address a lookup found. The download carries on where it stopped after an error, a pause or a closed app, and every file is checked (size and SHA-256) before it is used. Switch it off or delete it at any time. Data: regional internet registries and ASN announcements (CC0), from the ip-location-db project.
+
 ## First start
 
 Three short screens say what the app does, how to add servers and what Android will ask. **Skip** is always there. They are only shown when the app has no servers yet.
@@ -15,7 +23,7 @@ Three short screens say what the app does, how to add servers and what Android w
 * The ring fills while connecting (the real progress: network check, configuration, engine, tunnel, handshake). If something fails it stops red at the step that failed and says why, in your language.
 * "Connected" is only shown after a real test connection through the tunnel worked.
 * **Not connected:** the Earth is turned to where you really are, with a red marker and your country (found with a direct request to Cloudflare or `api.country.is`; Settings → "Show exit address and country" turns it off, and then the Earth just rests).
-* **Connecting:** the Earth flies to the server's country and a slim bar shows the real progress. **Connected:** it says **Connected to <country>** with the flag, the server's name and part of the exit address (`147.78.x.x`). Disconnecting flies back. Nothing is written on the Earth.
+* **Connecting:** the Earth flies to the server's country and the big button fills with the real progress ("Cancel · 48%"). **Connected:** it says **Connected to <country>** with the flag, the server's name and part of the exit address (`147.78.x.x`). Disconnecting flies back. Nothing is written on the Earth.
 * **Location** opens the list of places. **Connect / Cancel / Disconnect** is the only button.
 * Settings (the sliders icon) is at the top, and Logs are in Settings. Everything else opens from there and closes with Back; there is no footer.
 * A notification (Android) shows the speed and has a Disconnect button.

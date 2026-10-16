@@ -2443,6 +2443,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No valid server was found in this text'**
   String get importNoServer;
+
+  /// No description provided for @ipdbTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline country database'**
+  String get ipdbTitle;
+
+  /// No description provided for @ipdbIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Download a database once, and Omnitun finds the country of a server or an address by itself, without asking a website.'**
+  String get ipdbIntro;
+
+  /// No description provided for @ipdbSizeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'About {size} · free data (public domain)'**
+  String ipdbSizeNote(String size);
+
+  /// No description provided for @ipdbDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get ipdbDownload;
+
+  /// No description provided for @ipdbContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get ipdbContinue;
+
+  /// No description provided for @ipdbPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get ipdbPause;
+
+  /// No description provided for @ipdbUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get ipdbUpdate;
+
+  /// No description provided for @ipdbDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get ipdbDelete;
+
+  /// No description provided for @ipdbDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete the database?'**
+  String get ipdbDeleteTitle;
+
+  /// No description provided for @ipdbUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the database'**
+  String get ipdbUse;
+
+  /// No description provided for @ipdbStepV4.
+  ///
+  /// In en, this message translates to:
+  /// **'IPv4'**
+  String get ipdbStepV4;
+
+  /// No description provided for @ipdbStepV6.
+  ///
+  /// In en, this message translates to:
+  /// **'IPv6'**
+  String get ipdbStepV6;
+
+  /// No description provided for @ipdbStepPrepare.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare'**
+  String get ipdbStepPrepare;
+
+  /// No description provided for @ipdbPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing…'**
+  String get ipdbPreparing;
+
+  /// No description provided for @ipdbReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get ipdbReady;
+
+  /// No description provided for @ipdbStoppedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped at {percent}%. Continue picks up right there.'**
+  String ipdbStoppedAt(int percent);
+
+  /// No description provided for @ipdbFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed: {reason}'**
+  String ipdbFailed(String reason);
+
+  /// No description provided for @ipdbReadyLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{ranges} ranges · {size}'**
+  String ipdbReadyLine(String ranges, String size);
+
+  /// No description provided for @ipdbVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} · {date}'**
+  String ipdbVersion(String version, String date);
+
+  /// No description provided for @ipdbLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'{time} left'**
+  String ipdbLeft(String time);
+
+  /// No description provided for @ipdbSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Data: regional internet registries and ASN announcements (CC0), from the ip-location-db project.'**
+  String get ipdbSource;
+
+  /// No description provided for @ipdbSubNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Find countries without asking a website'**
+  String get ipdbSubNone;
+
+  /// No description provided for @ipdbSubReady.
+  ///
+  /// In en, this message translates to:
+  /// **'On · {size}'**
+  String ipdbSubReady(String size);
+
+  /// No description provided for @ipdbSubOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off · {size}'**
+  String ipdbSubOff(String size);
+
+  /// No description provided for @ipdbSubDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading {percent}%'**
+  String ipdbSubDownloading(int percent);
+
+  /// No description provided for @ipdbSubStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped at {percent}%'**
+  String ipdbSubStopped(int percent);
+
+  /// No description provided for @ipdbErrNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'no connection to the data servers'**
+  String get ipdbErrNetwork;
+
+  /// No description provided for @ipdbErrMirrors.
+  ///
+  /// In en, this message translates to:
+  /// **'the data servers did not send the right file'**
+  String get ipdbErrMirrors;
 }
 
 class _AppLocalizationsDelegate

@@ -6,8 +6,10 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.net.Uri
 import android.net.VpnService
 import android.os.Build
+import android.os.Bundle
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -27,8 +29,75 @@ class MainActivity : FlutterActivity() {
     private val io = Executors.newSingleThreadExecutor()
     private var pendingVpn: MethodChannel.Result? = null
 
+    /** A link or config file another app sent us, until Flutter has taken it (see "omnitun/incoming"). */
+    private var incoming: String? = null
+    private var incomingChannel: MethodChannel? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Only a fresh start: after a rotation the same intent would import the file again.
+        if (savedInstanceState == null) takeIncoming(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        takeIncoming(intent)
+    }
+
+    private fun takeIncoming(intent: Intent?) {
+        val text = incomingText(intent) ?: return
+        incoming = text
+        incomingChannel?.invokeMethod("incoming", null) // the app is running: tell it now; else it asks at start
+    }
+
+    /** The text a VIEW or SEND intent carries: the link itself, or the contents of the file (up to 2 MB). */
+    private fun incomingText(intent: Intent?): String? {
+        intent ?: return null
+        return when (intent.action) {
+            Intent.ACTION_VIEW -> {
+                val uri = intent.data ?: return null
+                if (uri.scheme == "content" || uri.scheme == "file") readText(uri) else uri.toString()
+            }
+            Intent.ACTION_SEND -> {
+                @Suppress("DEPRECATION")
+                val stream: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                } else {
+                    intent.getParcelableExtra(Intent.EXTRA_STREAM)
+                }
+                stream?.let { readText(it) } ?: intent.getStringExtra(Intent.EXTRA_TEXT)
+            }
+            else -> null
+        }
+    }
+
+    private fun readText(uri: Uri): String? = runCatching {
+        contentResolver.openInputStream(uri)?.use { input ->
+            val out = ByteArrayOutputStream()
+            val buf = ByteArray(8192)
+            while (true) {
+                val n = input.read(buf)
+                if (n < 0) break
+                out.write(buf, 0, n)
+                if (out.size() > MAX_INCOMING) return@runCatching null // not a config file
+            }
+            out.toString(Charsets.UTF_8.name())
+        }
+    }.getOrNull()
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        incomingChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "omnitun/incoming").also { ch ->
+            ch.setMethodCallHandler { call, result ->
+                if (call.method == "take") {
+                    result.success(incoming)
+                    incoming = null
+                } else {
+                    result.notImplemented()
+                }
+            }
+        }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "omnitun/core").setMethodCallHandler { call, result ->
             when (call.method) {
                 "start" -> io.execute {
@@ -145,5 +214,6 @@ class MainActivity : FlutterActivity() {
     companion object {
         private const val REQUEST_VPN = 1001
         private const val REQUEST_NOTIFICATIONS = 1002
+        private const val MAX_INCOMING = 2 * 1024 * 1024
     }
 }
