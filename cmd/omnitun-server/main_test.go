@@ -145,4 +145,3 @@ func TestLiveTokenFollowsTheState(t *testing.T) {
 		t.Fatal("disabled API still has a token")
 	}
 }
-
