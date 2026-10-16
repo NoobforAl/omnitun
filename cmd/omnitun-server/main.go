@@ -52,11 +52,15 @@ func (o *options) print(v any, text func()) error {
 	return nil
 }
 
+// version is set at build time (-X main.version=...).
+var version = "dev"
+
 func newRootCmd() *cobra.Command {
 	o := &options{}
 	root := &cobra.Command{
-		Use:   "omnitun-server",
-		Short: "Multi-protocol VPN server with user management",
+		Use:     "omnitun-server",
+		Version: version,
+		Short:   "Multi-protocol VPN server with user management",
 		Long: `omnitun-server runs VLESS+Reality, Shadowsocks-2022, Trojan, Hysteria2, TUIC,
 AnyTLS, ShadowTLS, NaiveProxy, WireGuard and OpenVPN from one process, plus SSTP,
 IKEv2/IPsec and AmneziaWG on Linux, with a user database, quotas and traffic
