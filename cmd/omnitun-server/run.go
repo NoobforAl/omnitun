@@ -57,21 +57,32 @@ func newRunCmd(o *options) *cobra.Command {
 	}
 }
 
-// liveToken returns the API's current token, re-read when the state file
-// changes, so `api token --new` and `api disable` take effect on a running
-// server without a restart.
+// tokenTTL bounds how long a rotated or disabled token can still be accepted
+// by a running server, whatever the file system's timestamp resolution.
+var tokenTTL = 2 * time.Second
+
+// liveToken returns the API's current token, re-read from the state file at
+// least every tokenTTL (and sooner when its size or modification time change),
+// so `api token --new` and `api disable` take effect on a running server
+// without a restart.
 func liveToken(m *manager.Manager) func() string {
-	var mu sync.Mutex
-	var seen time.Time
-	var token string
+	var (
+		mu      sync.Mutex
+		at      time.Time
+		modTime time.Time
+		size    int64
+		token   string
+	)
 	return func() string {
 		mu.Lock()
 		defer mu.Unlock()
-		if mt := m.Store.ModTime(); !mt.Equal(seen) {
-			seen, token = mt, ""
-			if a, err := m.API(); err == nil && a.Enabled {
-				token = a.Token
-			}
+		mt, sz := m.Store.ModTime(), m.Store.Size()
+		if time.Since(at) < tokenTTL && mt.Equal(modTime) && sz == size {
+			return token
+		}
+		at, modTime, size, token = time.Now(), mt, sz, ""
+		if a, err := m.API(); err == nil && a.Enabled {
+			token = a.Token
 		}
 		return token
 	}

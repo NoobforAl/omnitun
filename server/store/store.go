@@ -188,6 +188,15 @@ func (s *Store) ModTime() time.Time {
 	return fi.ModTime()
 }
 
+// Size of the state file in bytes (0 if it does not exist).
+func (s *Store) Size() int64 {
+	fi, err := os.Stat(s.path())
+	if err != nil {
+		return 0
+	}
+	return fi.Size()
+}
+
 // Load reads the state.
 func (s *Store) Load() (*State, error) {
 	data, err := os.ReadFile(s.path())
