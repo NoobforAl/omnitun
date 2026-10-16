@@ -4,6 +4,17 @@
 /// channel to the Android VpnService. [MockEngine] lets the UI run without it.
 library;
 
+/// Thrown for typed failures reported by the core; [message] is fit to show.
+class EngineException implements Exception {
+  EngineException(this.code, this.message);
+
+  final String code;
+  final String message;
+
+  @override
+  String toString() => '$code: $message';
+}
+
 enum ConnStatus { disconnected, connecting, connected, disconnecting, error, noInternet }
 
 class ProfileInfo {
@@ -244,6 +255,59 @@ class SubscriptionResult {
   final SubscriptionInfo info;
 }
 
+/// One input of a protocol's profile editor (see core/profile/form.go).
+class FormFieldSpec {
+  const FormFieldSpec({
+    required this.key,
+    required this.label,
+    required this.kind,
+    this.help = '',
+    this.required = false,
+    this.choices = const [],
+    this.defaultValue = '',
+    this.advanced = false,
+  });
+
+  final String key;
+  final String label;
+
+  /// text, secret, int, bool, choice, multiline or list.
+  final String kind;
+  final String help;
+  final bool required;
+  final List<String> choices;
+  final String defaultValue;
+
+  /// Shown only after "More options".
+  final bool advanced;
+
+  factory FormFieldSpec.fromJson(Map<String, dynamic> j) => FormFieldSpec(
+    key: j['key'] as String,
+    label: j['label'] as String,
+    kind: j['kind'] as String,
+    help: j['help'] as String? ?? '',
+    required: j['required'] as bool? ?? false,
+    choices: [for (final c in (j['choices'] as List? ?? const [])) c as String],
+    defaultValue: j['default'] as String? ?? '',
+    advanced: j['advanced'] as bool? ?? false,
+  );
+}
+
+/// The editor of one protocol.
+class ProtocolFormSpec {
+  const ProtocolFormSpec({required this.protocol, required this.label, required this.fields});
+
+  final String protocol;
+  final String label;
+  final List<FormFieldSpec> fields;
+
+  factory ProtocolFormSpec.fromJson(Map<String, dynamic> j) => ProtocolFormSpec(
+    protocol: j['protocol'] as String,
+    label: j['label'] as String,
+    fields: [for (final f in (j['fields'] as List? ?? const [])) FormFieldSpec.fromJson(f as Map<String, dynamic>)],
+  );
+}
+
 abstract class VpnEngine {
   /// Status, traffic and failover updates.
   Stream<EngineState> get states;
@@ -271,6 +335,20 @@ abstract class VpnEngine {
 
   /// "Stop VPN when app is closed". Used where the OS reports app closure (Android).
   Future<void> setStopOnClose(bool value);
+
+  /// The profile editor of every protocol the core can build by hand.
+  Future<List<ProtocolFormSpec>> forms();
+
+  /// Builds a profile from the editor's [values] ([protocol] for a new one), or
+  /// applies them to a copy of [profile] when editing. Throws [EngineException]
+  /// with a message for the user when a value is wrong.
+  Future<ProfileInfo> buildProfile(Map<String, String> values, {String? protocol, ProfileInfo? profile});
+
+  /// What the editor shows for [profile].
+  Future<Map<String, String>> profileValues(ProfileInfo profile);
+
+  /// The share link of [profile]. Throws [EngineException] when the protocol has none.
+  Future<String> exportLink(ProfileInfo profile);
 
   void dispose();
 }

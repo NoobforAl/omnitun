@@ -4,16 +4,7 @@ import 'dart:io';
 
 import 'engine.dart';
 
-/// Thrown for typed failures reported by the core.
-class EngineException implements Exception {
-  EngineException(this.code, this.message);
-
-  final String code;
-  final String message;
-
-  @override
-  String toString() => '$code: $message';
-}
+export 'engine.dart' show EngineException;
 
 /// Talks to the omnitun-svc daemon over its loopback control protocol
 /// (newline-delimited JSON, token-authenticated). See core/control.
@@ -255,6 +246,30 @@ class DaemonEngine implements VpnEngine {
     }) as List;
     return ((res.first as Map<String, dynamic>)['ms'] as num).toInt();
   }
+
+  @override
+  Future<List<ProtocolFormSpec>> forms() async => [
+    for (final f in await _call('forms') as List) ProtocolFormSpec.fromJson(f as Map<String, dynamic>),
+  ];
+
+  @override
+  Future<ProfileInfo> buildProfile(Map<String, String> values, {String? protocol, ProfileInfo? profile}) async {
+    final res = await _call('build_profile', {
+      'values': values,
+      if (profile != null) 'profile': profile.raw else 'protocol': protocol,
+    });
+    return ProfileInfo.fromJson(res as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Map<String, String>> profileValues(ProfileInfo profile) async {
+    final res = await _call('profile_values', {'profile': profile.raw}) as Map<String, dynamic>;
+    return {for (final e in res.entries) e.key: e.value as String};
+  }
+
+  @override
+  Future<String> exportLink(ProfileInfo profile) async =>
+      await _call('export_link', {'profile': profile.raw}) as String;
 
   /// Desktop: the daemon follows the app's lifetime (lease + parent-pid).
   @override

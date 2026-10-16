@@ -8,7 +8,9 @@ import '../../state/providers.dart';
 import '../../state/subscriptions.dart';
 import '../widgets/protocol_badge.dart';
 import 'location_screen.dart';
+import 'profile_editor_screen.dart';
 import 'qr_scan_screen.dart';
+import 'share_screen.dart';
 import 'subscription_screen.dart';
 import '../widgets/credentials_dialog.dart';
 
@@ -20,6 +22,7 @@ class ProfilesScreen extends ConsumerWidget {
     final profiles = ref.watch(profilesProvider);
     final subs = ref.watch(subscriptionsProvider);
     final selected = ref.watch(selectedProfileIdProvider);
+    ref.watch(formsProvider); // loads the editors, so Edit appears in the menus
     final manual = profiles.where((p) => p.group == ProfileInfo.defaultGroup).toList();
 
     return Scaffold(
@@ -124,10 +127,19 @@ class _GroupList extends ConsumerWidget {
                   ProtocolBadge(p.protocol),
                   PopupMenuButton<String>(
                     onSelected: (v) {
+                      if (v == 'edit') {
+                        Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ProfileEditorScreen(profile: p)));
+                      }
+                      if (v == 'share') {
+                        Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ShareScreen(profile: p)));
+                      }
                       if (v == 'delete') ref.read(profilesProvider.notifier).remove(p.id);
                       if (v == 'credentials') askCredentials(context, ref, p);
                     },
                     itemBuilder: (_) => [
+                      if (ref.read(formsProvider).value?.any((f) => f.protocol == p.protocol) ?? false)
+                        PopupMenuItem(value: 'edit', child: Text(p.protocol == 'tor' ? 'Bridge settings' : 'Edit')),
+                      const PopupMenuItem(value: 'share', child: Text('Share link or QR')),
                       if (p.needsCredentials)
                         const PopupMenuItem(value: 'credentials', child: Text('Username and password')),
                       const PopupMenuItem(value: 'delete', child: Text('Delete')),

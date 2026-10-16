@@ -33,6 +33,15 @@ class ScriptedEngine implements VpnEngine {
   @override
   Future<void> setStopOnClose(bool value) async {}
   @override
+  Future<List<ProtocolFormSpec>> forms() async => const [];
+  @override
+  Future<ProfileInfo> buildProfile(Map<String, String> values, {String? protocol, ProfileInfo? profile}) async =>
+      throw UnimplementedError();
+  @override
+  Future<Map<String, String>> profileValues(ProfileInfo profile) async => const {};
+  @override
+  Future<String> exportLink(ProfileInfo profile) async => '';
+  @override
   void dispose() => controller.close();
 }
 

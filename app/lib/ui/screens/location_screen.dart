@@ -8,7 +8,9 @@ import '../../state/providers.dart';
 import '../widgets/country_flag.dart';
 import '../widgets/credentials_dialog.dart';
 import '../widgets/protocol_badge.dart';
+import 'profile_editor_screen.dart';
 import 'profiles_screen.dart';
+import 'share_screen.dart';
 import 'subscription_screen.dart';
 
 /// Measures every profile's latency, for the dots and for Auto.
@@ -110,6 +112,8 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
               switch (v) {
                 case 'import':
                   showImportSheet(context, ref);
+                case 'new':
+                  Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NewServerScreen()));
                 case 'subscription':
                   Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SubscriptionScreen()));
                 case 'manage':
@@ -118,6 +122,7 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
             },
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'import', child: Text('Import a config, link or QR')),
+              PopupMenuItem(value: 'new', child: Text('Add a server by hand')),
               PopupMenuItem(value: 'subscription', child: Text('Add a subscription')),
               PopupMenuItem(value: 'manage', child: Text('Manage servers and subscriptions')),
             ],
@@ -286,6 +291,8 @@ class _ServerRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final p = profile;
+    // Only the protocols the core has an editor for can be edited.
+    final editable = ref.watch(formsProvider).value?.any((f) => f.protocol == p.protocol) ?? false;
     return ListTile(
       contentPadding: const EdgeInsetsDirectional.only(start: 40, end: 4),
       title: Text(p.name, overflow: TextOverflow.ellipsis),
@@ -306,6 +313,10 @@ class _ServerRow extends ConsumerWidget {
             tooltip: 'More',
             onSelected: (v) async {
               switch (v) {
+                case 'edit':
+                  Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ProfileEditorScreen(profile: p)));
+                case 'share':
+                  Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ShareScreen(profile: p)));
                 case 'country':
                   final code = await pickCountry(context, ref.read(profileCountryProvider)(p));
                   if (code != null) ref.read(countryOverridesProvider.notifier).set(p.id, code == '' ? null : code);
@@ -316,6 +327,8 @@ class _ServerRow extends ConsumerWidget {
               }
             },
             itemBuilder: (_) => [
+              if (editable) PopupMenuItem(value: 'edit', child: Text(tor ? 'Bridge settings' : 'Edit')),
+              const PopupMenuItem(value: 'share', child: Text('Share link or QR')),
               if (!tor) const PopupMenuItem(value: 'country', child: Text('Set country')),
               if (p.needsCredentials) const PopupMenuItem(value: 'credentials', child: Text('Username and password')),
               const PopupMenuItem(value: 'delete', child: Text('Delete')),

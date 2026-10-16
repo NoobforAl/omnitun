@@ -112,6 +112,68 @@ class MockEngine implements VpnEngine {
   Future<void> setStopOnClose(bool value) async {}
 
   @override
+  Future<List<ProtocolFormSpec>> forms() async => const [
+    ProtocolFormSpec(
+      protocol: 'trojan',
+      label: 'Trojan',
+      fields: [
+        FormFieldSpec(key: 'name', label: 'Name', kind: 'text'),
+        FormFieldSpec(key: 'server', label: 'Server', kind: 'text', required: true),
+        FormFieldSpec(key: 'port', label: 'Port', kind: 'int'),
+        FormFieldSpec(key: 'password', label: 'Password', kind: 'secret', required: true),
+        FormFieldSpec(key: 'tls.fingerprint', label: 'Fingerprint', kind: 'choice', choices: ['', 'chrome', 'firefox'], advanced: true),
+      ],
+    ),
+    ProtocolFormSpec(
+      protocol: 'tor',
+      label: 'Tor',
+      fields: [
+        FormFieldSpec(key: 'name', label: 'Name', kind: 'text'),
+        FormFieldSpec(key: 'tor.builtin', label: 'Bridges', kind: 'choice', choices: ['', 'snowflake', 'obfs4']),
+        FormFieldSpec(key: 'tor.bridges', label: 'Bridge lines', kind: 'multiline'),
+      ],
+    ),
+  ];
+
+  @override
+  Future<ProfileInfo> buildProfile(Map<String, String> values, {String? protocol, ProfileInfo? profile}) async {
+    final merged = {...?profile?.raw, ...values};
+    final p = protocol ?? profile!.protocol;
+    for (final f in (await forms()).firstWhere((f) => f.protocol == p).fields) {
+      if (f.required && (merged[f.key] ?? '').toString().trim().isEmpty) {
+        throw EngineException('BAD_REQUEST', '${f.label} is required');
+      }
+    }
+    final server = (merged['server'] ?? '').toString();
+    final port = int.tryParse((merged['port'] ?? '').toString()) ?? 443;
+    final name = (merged['name'] ?? '').toString();
+    return ProfileInfo.fromJson({
+      ...?profile?.raw,
+      ...values,
+      'id': profile?.id ?? '$p-$server-$port',
+      'name': name.isEmpty ? (server.isEmpty ? p : server) : name,
+      'protocol': p,
+      'server': server,
+      'port': port,
+    });
+  }
+
+  @override
+  Future<Map<String, String>> profileValues(ProfileInfo profile) async => {
+    'name': profile.name,
+    'server': profile.server,
+    'port': '${profile.port}',
+    'password': profile.raw['password'] as String? ?? '',
+  };
+
+  @override
+  Future<String> exportLink(ProfileInfo profile) async {
+    if (profile.protocol != 'trojan') throw EngineException('BAD_REQUEST', 'no share link for ${profile.protocol}');
+    return 'trojan://${Uri.encodeComponent(profile.raw['password'] as String? ?? '')}@${profile.server}:${profile.port}'
+        '#${Uri.encodeComponent(profile.name)}';
+  }
+
+  @override
   void dispose() {
     _traffic?.cancel();
     _states.close();

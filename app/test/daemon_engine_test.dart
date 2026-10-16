@@ -95,4 +95,58 @@ void main() {
       throwsA(isA<EngineException>().having((e) => e.code, 'code', 'AUTH_FAILED')),
     );
   }, skip: exe == null ? 'omnitun-svc not built' : false, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('the profile editor of the real core: forms, build, edit, read back and share', () async {
+    final dir = await Directory.systemTemp.createTemp('omnitun-test');
+    final engine = await DaemonEngine.launch(exe!, controlFile: '${dir.path}${Platform.pathSeparator}control.json');
+    addTearDown(() async {
+      engine.dispose();
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await dir.delete(recursive: true).catchError((_) => dir);
+    });
+
+    final forms = await engine.forms();
+    expect(forms.map((f) => f.protocol), containsAll(['vless', 'trojan', 'wireguard', 'amneziawg', 'tor']));
+    final trojan = forms.firstWhere((f) => f.protocol == 'trojan');
+    expect(trojan.fields.firstWhere((f) => f.key == 'password').kind, 'secret');
+    expect(trojan.fields.firstWhere((f) => f.key == 'server').required, isTrue);
+    expect(trojan.fields.where((f) => f.advanced), isNotEmpty);
+    final tor = forms.firstWhere((f) => f.protocol == 'tor');
+    expect(tor.fields.firstWhere((f) => f.key == 'tor.builtin').choices, containsAll(['', 'snowflake', 'obfs4']));
+
+    // The core's own message reaches the app.
+    await expectLater(
+      engine.buildProfile({'server': 'de1.example.com'}, protocol: 'trojan'),
+      throwsA(isA<EngineException>().having((e) => e.message, 'message', contains('Password'))),
+    );
+
+    final built = await engine.buildProfile({
+      'name': 'Berlin',
+      'server': 'de1.example.com',
+      'password': 'pw',
+      'tls.server_name': 'de1.example.com',
+    }, protocol: 'trojan');
+    expect(built.name, 'Berlin');
+    expect(built.port, 443);
+    expect(built.id, isNotEmpty);
+
+    final edited = await engine.buildProfile({'name': 'Berlin 2', 'port': '8443'}, profile: built);
+    expect(edited.id, built.id);
+    expect(edited.port, 8443);
+    expect(edited.raw['password'], 'pw'); // what the editor does not touch is kept
+
+    final values = await engine.profileValues(edited);
+    expect(values['name'], 'Berlin 2');
+    expect(values['port'], '8443');
+    expect(values['tls.server_name'], 'de1.example.com');
+
+    final link = await engine.exportLink(edited);
+    expect(link, startsWith('trojan://pw@de1.example.com:8443'));
+    final again = await engine.importText(link);
+    expect(again.profiles.single.server, 'de1.example.com');
+
+    final torProfile = await engine.buildProfile({'tor.builtin': 'snowflake'}, protocol: 'tor');
+    expect(torProfile.protocol, 'tor');
+    expect(await engine.exportLink(torProfile), 'tor://snowflake');
+  }, skip: exe == null ? 'omnitun-svc not built' : false, timeout: const Timeout(Duration(seconds: 60)));
 }

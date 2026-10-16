@@ -51,6 +51,24 @@ class ProfilesController extends Notifier<List<ProfileInfo>> {
 
   void remove(String id) => _save(state.where((p) => p.id != id).toList());
 
+  /// Puts an edited profile where [oldId] was (same group and place in the list). If
+  /// the edit gave it a new ID, a selection of the old one follows.
+  void replace(String oldId, ProfileInfo edited) {
+    final at = state.indexWhere((p) => p.id == oldId);
+    if (at < 0) {
+      addAll([edited]);
+      return;
+    }
+    final keep = state[at];
+    final next = [...state];
+    next[at] = edited.group == keep.group ? edited : edited.inGroup(keep.group);
+    // Another profile with the ID the edit now has would be a duplicate.
+    _save([for (var i = 0; i < next.length; i++) if (i == at || next[i].id != edited.id) next[i]]);
+    if (edited.id != oldId && ref.read(selectedProfileIdProvider) == oldId) {
+      ref.read(selectedProfileIdProvider.notifier).select(edited.id);
+    }
+  }
+
   /// Replaces the profiles of [group] (a subscription refresh), keeping the
   /// group's position in the list. IDs are stable, so the selection survives.
   void replaceGroup(String group, List<ProfileInfo> profiles) {
@@ -101,6 +119,9 @@ class ProfilesController extends Notifier<List<ProfileInfo>> {
   void setLatency(String id, int ms) =>
       state = [for (final p in state) p.id == id ? p.copyWith(latencyMs: ms) : p];
 }
+
+/// The profile editors of the protocols the core can build by hand.
+final formsProvider = FutureProvider<List<ProtocolFormSpec>>((ref) => ref.read(engineProvider).forms());
 
 final profilesProvider =
     NotifierProvider<ProfilesController, List<ProfileInfo>>(ProfilesController.new);

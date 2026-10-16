@@ -189,6 +189,19 @@ class CoreEngine implements VpnEngine {
   Future<int> testLatency(ProfileInfo profile) async => (await _ready).testLatency(profile);
 
   @override
+  Future<List<ProtocolFormSpec>> forms() async => (await _ready).forms();
+
+  @override
+  Future<ProfileInfo> buildProfile(Map<String, String> values, {String? protocol, ProfileInfo? profile}) async =>
+      (await _ready).buildProfile(values, protocol: protocol, profile: profile);
+
+  @override
+  Future<Map<String, String>> profileValues(ProfileInfo profile) async => (await _ready).profileValues(profile);
+
+  @override
+  Future<String> exportLink(ProfileInfo profile) async => (await _ready).exportLink(profile);
+
+  @override
   Future<SubscriptionResult> fetchSubscription(Map<String, dynamic> request) async =>
       (await _ready).fetchSubscription(request);
 
