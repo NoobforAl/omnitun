@@ -18,7 +18,9 @@ func testEnv() Env {
 		SSServerKey: "c2VydmVyLWtleS0xMjM0NQ==",
 		OpenVPN:     OpenVPN{CA: "CA\n", ServerCert: "CERT", ServerKey: "KEY", TLSCrypt: "CRYPT\n"},
 		WireGuard:   WireGuard{PrivateKey: "c2VydmVyLXByaXZhdGU=", PublicKey: "c2VydmVyLXB1YmxpYw==", Address: "10.30.0.1/16"},
-		IKEv2PSK:    "ike-psk-secret",
+		AWG: AmneziaWG{PrivateKey: "YXdnLXByaXZhdGU=", PublicKey: "YXdnLXB1YmxpYw==", Params: map[string]string{
+			"jc": "5", "jmin": "42", "jmax": "105", "s1": "30", "s2": "94", "h1": "11", "h2": "12", "h3": "13", "h4": "14",
+		}},
 	}
 }
 
@@ -87,7 +89,7 @@ func TestEveryProtocolIsCoherent(t *testing.T) {
 				t.Fatalf("profile = %+v", p)
 			}
 			// SSTP, IKEv2 and AmneziaWG run on the core's own engines, not sing-box.
-			if _, _, _, err := singbox.Outbound(p, "t"); err != nil && !strings.Contains(err.Error(), "built-in") && !strings.Contains(err.Error(), "AmneziaWG") {
+			if _, _, _, err := singbox.Outbound(p, "t"); err != nil && !strings.Contains(err.Error(), "built-in") && !strings.Contains(err.Error(), "not run by sing-box") {
 				t.Fatalf("not usable as a sing-box outbound: %v", err)
 			}
 

@@ -149,7 +149,7 @@ func SubscriptionHandler(s *store.Store) http.Handler {
 			return
 		}
 		var lines []string
-		for _, l := range Links(st, user) {
+		for _, l := range Links(st, s, user) {
 			lines = append(lines, l.URL)
 		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")

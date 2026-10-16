@@ -9,7 +9,7 @@ import (
 	"github.com/NoobforAl/omnitun/server/tlsfiles"
 )
 
-// startHostLocked starts the host-level protocols (SSTP, IKEv2) that are
+// startHostLocked starts the host-level protocols (SSTP, IKEv2, AmneziaWG) that are
 // enabled and have users, and sets up NAT for their client networks. A
 // failure is logged and leaves the others running: these protocols need the
 // host's cooperation (Linux, CAP_NET_ADMIN, nftables or iptables) that the
@@ -27,16 +27,21 @@ func (s *Server) startHostLocked(st *store.State) {
 		}
 		cfg := hostproto.Config{
 			Env: serverconf.Env(st, s.store), Port: p.Port, Users: serverconf.Accounts(users), DataDir: s.store.Dir,
+			Runner: s.runner, Logf: s.logf,
 		}
-		if key == "sstp" {
+		if key == "sstp" || key == "ikev2" {
 			domain := ""
 			if st.Server.ACMEActive() {
 				domain = st.Server.ACME.Domain
 			}
 			src := tlsfiles.New(serverconf.ACMEDir(s.store), domain, s.store.Path(st.Server.CertFile), s.store.Path(st.Server.KeyFile))
 			var err error
+			if cfg.CertFile, cfg.KeyFile, err = src.Paths(); err != nil {
+				s.logf("%s: no certificate: %v", key, err)
+				continue
+			}
 			if cfg.CertPEM, cfg.KeyPEM, err = src.PEM(); err != nil {
-				s.logf("sstp: no certificate: %v", err)
+				s.logf("%s: no certificate: %v", key, err)
 				continue
 			}
 		}
@@ -57,7 +62,7 @@ func (s *Server) startHostLocked(st *store.State) {
 	}
 	undo, err := hostproto.EnableNAT(s.runner, s.store.Dir, pools)
 	if err != nil {
-		s.logf("NAT for SSTP/IKEv2 clients failed: %v (they can connect but will not reach the internet)", err)
+		s.logf("NAT for the clients of SSTP, IKEv2 and AmneziaWG failed: %v (they can connect but will not reach the internet)", err)
 		return
 	}
 	s.undoNAT = undo

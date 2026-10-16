@@ -123,8 +123,12 @@ func (st *State) migrate() (bool, error) {
 			changed = true
 		}
 	}
-	if st.Server.IKEv2PSK == "" {
-		st.Server.IKEv2PSK, changed = RandomHex(16), true
+	if st.Server.AmneziaWG.PrivateKey == "" || len(st.Server.AmneziaWG.Params) == 0 {
+		a, err := NewAmneziaWG()
+		if err != nil {
+			return false, err
+		}
+		st.Server.AmneziaWG, changed = a, true
 	}
 	if st.Server.API.Token == "" {
 		st.Server.API = API{Listen: "127.0.0.1", Port: DefaultAPIPort, Token: RandomHex(24)}

@@ -62,8 +62,8 @@ type ikev2 struct{ hostBase }
 func (ikev2) Spec() Spec {
 	return Spec{
 		Key: "ikev2", Name: "IKEv2/IPsec", Label: "IKEv2", Profile: profile.IKEv2,
-		Description: "IPsec with a pre-shared key and per-user passwords (EAP-MSCHAPv2); also over TCP for networks that block UDP. Needs Linux and root/CAP_NET_ADMIN. Uses UDP 500 and 4500.",
-		Transport:   "udp", DefaultPort: 4500, ShareLink: true,
+		Description: "IPsec with the server's certificate and per-user passwords (EAP-MSCHAPv2); also over TCP for networks that block UDP. Needs Linux and root/CAP_NET_ADMIN, and a trusted certificate for phones and Windows (use `cert acme`). Uses UDP 500 and 4500.",
+		Transport:   "udp", DefaultPort: 4500, NeedsCertificate: true, ShareLink: true,
 		Host: true, DefaultOff: true,
 	}
 }
@@ -74,17 +74,22 @@ func (ikev2) Listens(port int) []PortUse {
 }
 
 func (i ikev2) Profile(env Env, port int, u Account) (*profile.Profile, error) {
-	if env.IKEv2PSK == "" {
-		return nil, fmt.Errorf("the server has no IKEv2 pre-shared key")
-	}
 	if err := safeField("password", u.Password, unsafeInLines); err != nil {
 		return nil, err
 	}
+	// EAP identifies the user; the server proves itself with its certificate
+	// (no secret shared between users). A self-signed certificate is pinned,
+	// a real one is checked against the system's roots. TCP encapsulation
+	// works on networks that block UDP.
+	opts := &profile.IKEv2Opts{Auth: "eap", RemoteID: env.Host, TCP: true}
+	if env.SelfSigned {
+		if env.CertPEM == "" {
+			return nil, fmt.Errorf("the server certificate is needed to pin it for IKEv2")
+		}
+		opts.CACert = env.CertPEM
+	}
 	return &profile.Profile{
 		Name: profileName(env, i.Spec()), Protocol: profile.IKEv2, Server: env.Host, Port: port,
-		Username: u.Name, Password: u.Password,
-		// EAP identifies the user; the pre-shared key authenticates the server.
-		// TCP encapsulation works on networks that block UDP.
-		IKEv2: &profile.IKEv2Opts{Auth: "eap", PSK: env.IKEv2PSK, RemoteID: env.Host, TCP: true},
+		Username: u.Name, Password: u.Password, IKEv2: opts,
 	}, nil
 }

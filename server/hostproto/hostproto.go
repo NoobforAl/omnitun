@@ -1,5 +1,5 @@
 // Package hostproto runs the protocols that sing-box does not serve: SSTP
-// and IKEv2/IPsec, as in-process veepin servers. They need a TUN device and
+// and IKEv2/IPsec (in-process veepin servers) and AmneziaWG (amneziawg-go). They need a TUN device and
 // NAT on the host, so they work on Linux with CAP_NET_ADMIN (or root); the
 // installer grants the capability and enables IP forwarding.
 package hostproto
@@ -29,9 +29,17 @@ type Config struct {
 	DataDir string
 	// CertPEM and KeyPEM are the TLS certificate and key (SSTP).
 	CertPEM, KeyPEM []byte
+	// CertFile and KeyFile are the same as files (IKEv2 authenticates the
+	// server with its certificate; there is no shared secret).
+	CertFile, KeyFile string
 	// IKEPort is the UDP port IKE itself listens on (default 500, which
 	// clients and the standards fix; tests use another).
 	IKEPort int
+	// Runner runs host commands (the AmneziaWG interface address); nil means
+	// real commands.
+	Runner Runner
+	// Logf receives the servers' own error messages.
+	Logf func(format string, args ...any)
 }
 
 // Server is a running host-level server.
@@ -43,7 +51,7 @@ type Server interface {
 }
 
 // Keys lists the protocols this package serves.
-func Keys() []string { return []string{"sstp", "ikev2"} }
+func Keys() []string { return []string{"sstp", "ikev2", "amneziawg"} }
 
 // Start starts the host server for a protocol key. The server runs in the
 // background; Start returns once it is listening or has failed.
@@ -56,6 +64,8 @@ func Start(key string, cfg Config) (Server, error) {
 		return startSSTP(cfg)
 	case "ikev2":
 		return startIKEv2(cfg)
+	case "amneziawg":
+		return startAWG(cfg)
 	}
 	return nil, fmt.Errorf("%q is not a host-level protocol", key)
 }
@@ -103,8 +113,8 @@ func (ikev2Server) Pool() string { return protocols.IKEv2Pool }
 const defaultIKEPort = 500
 
 func startIKEv2(cfg Config) (Server, error) {
-	if cfg.Env.IKEv2PSK == "" {
-		return nil, fmt.Errorf("ikev2: the server has no pre-shared key")
+	if cfg.CertFile == "" || cfg.KeyFile == "" {
+		return nil, fmt.Errorf("ikev2: the server has no certificate")
 	}
 	// The user list (name:password per line) is a file veepin reads; it holds
 	// secrets, so it is private and removed when the server stops.
@@ -131,7 +141,7 @@ func startIKEv2(cfg Config) (Server, error) {
 		ikePort = defaultIKEPort
 	}
 	srv, err := ikev2.NewServer(ikev2.ServerConfig{
-		Port500: ikePort, Port4500: cfg.Port, PSK: cfg.Env.IKEv2PSK, LocalID: cfg.Env.Host,
+		Port500: ikePort, Port4500: cfg.Port, CertFile: cfg.CertFile, KeyFile: cfg.KeyFile, LocalID: cfg.Env.Host,
 		PublicIP: net.ParseIP(cfg.Env.Host), Pool: protocols.IKEv2Pool, DNS: publicDNS,
 		EAPUsers: file, TCP: true,
 	})

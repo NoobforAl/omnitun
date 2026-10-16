@@ -513,7 +513,9 @@ func (c *Client) saInit() error {
 	addFragSupported(b)
 	// Advertise RFC 7427 signature hashes when we will authenticate with a
 	// certificate, so the responder signs (and accepts) a Digital Signature.
-	if c.certCred != nil {
+	// EAP without a PSK also needs it: the server then proves itself with its
+	// certificate.
+	if c.certCred != nil || len(c.cfg.PSK) == 0 {
 		addSigHashNotify(b)
 	}
 	// Advertise IKE_INTERMEDIATE support (RFC 9242), but only when we have

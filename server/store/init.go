@@ -102,7 +102,9 @@ func Init(s *Store, opts InitOptions) (*State, error) {
 		return nil, err
 	}
 	st.Server.WireGuard = WireGuard{PrivateKey: wgPriv, PublicKey: wgPub}
-	st.Server.IKEv2PSK = RandomHex(16)
+	if st.Server.AmneziaWG, err = NewAmneziaWG(); err != nil {
+		return nil, err
+	}
 	if st.Server.OpenVPN, err = NewOpenVPN(opts.Name); err != nil {
 		return nil, err
 	}

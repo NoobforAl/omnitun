@@ -38,7 +38,7 @@ func Env(st *store.State, s *store.Store) protocols.Env {
 			ServerKey: srv.OpenVPN.ServerKey, TLSCrypt: srv.OpenVPN.TLSCrypt,
 		},
 		WireGuard: wireGuardEnv(srv),
-		IKEv2PSK:  srv.IKEv2PSK,
+		AWG:       awgEnv(srv),
 	}
 	if data, err := os.ReadFile(env.CertPath); err == nil {
 		env.CertPEM = string(data)
@@ -89,6 +89,10 @@ func Account(u *store.User) protocols.Account {
 		Name: u.Name, UUID: u.UUID, Password: u.Password, SSKey: u.SSKey,
 		WGPrivateKey: u.WGPrivateKey, WGPublicKey: u.WGPublicKey, WGAddress: u.WGAddress,
 	}
+}
+
+func awgEnv(srv store.Server) protocols.AmneziaWG {
+	return protocols.AmneziaWG{PrivateKey: srv.AmneziaWG.PrivateKey, PublicKey: srv.AmneziaWG.PublicKey, Params: srv.AmneziaWG.Params}
 }
 
 func wireGuardEnv(srv store.Server) protocols.WireGuard {
@@ -171,6 +175,7 @@ func File(st *store.State, u *store.User, key string) (name, content string, err
 		Name: st.Server.Name, Host: st.Server.PublicHost,
 		OpenVPN:   protocols.OpenVPN{CA: st.Server.OpenVPN.CA, TLSCrypt: st.Server.OpenVPN.TLSCrypt},
 		WireGuard: wireGuardEnv(st.Server),
+		AWG:       awgEnv(st.Server),
 	}
 	return fp.File(env, p.Port, Account(u))
 }
@@ -214,16 +219,8 @@ type Link struct {
 // Links returns the user's share links for every enabled protocol, in
 // failover-friendly order (Reality first, UDP protocols last). Protocols
 // without a share link (OpenVPN) are left out; see OVPN and OVPNURL.
-func Links(st *store.State, u *store.User) []Link {
-	env := protocols.Env{
-		Name: st.Server.Name, Host: st.Server.PublicHost, SelfSigned: st.Server.SelfSigned && !st.Server.ACMEActive(),
-		Reality: protocols.Reality{
-			PublicKey: st.Server.Reality.PublicKey, ShortID: st.Server.Reality.ShortID, Handshake: st.Server.Reality.Handshake,
-		},
-		SSServerKey: st.Server.SSServerKey,
-		WireGuard:   wireGuardEnv(st.Server),
-		IKEv2PSK:    st.Server.IKEv2PSK,
-	}
+func Links(st *store.State, s *store.Store, u *store.User) []Link {
+	env := Env(st, s)
 	var out []Link
 	for _, key := range store.AllProtocols {
 		p := st.Server.Protocols[key]

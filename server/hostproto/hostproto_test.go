@@ -138,8 +138,29 @@ func tempDir(t *testing.T) string {
 
 var alice = protocols.Account{Name: "alice", Password: "alice-password"}
 
+// testCertPEM is the certificate of the server under test; IKEv2 profiles
+// pin it.
+var testCertPEM string
+
 func env() protocols.Env {
-	return protocols.Env{Name: "Lab", Host: "127.0.0.1", SelfSigned: true, IKEv2PSK: "ike-psk"}
+	return protocols.Env{Name: "Lab", Host: "127.0.0.1", SelfSigned: true, CertPEM: testCertPEM}
+}
+
+// certFiles makes a self-signed certificate in dir and remembers it for
+// generated profiles.
+func certFiles(t *testing.T, dir string) (certFile, keyFile string) {
+	t.Helper()
+	certFile, keyFile = filepath.Join(dir, "tls.crt"), filepath.Join(dir, "tls.key")
+	if err := store.WriteSelfSignedCert(certFile, keyFile, "127.0.0.1"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(certFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testCertPEM = string(data)
+	t.Cleanup(func() { testCertPEM = "" })
+	return certFile, keyFile
 }
 
 // serverDevices makes the in-process servers use fake TUN devices.
@@ -202,10 +223,7 @@ func waitTCP(t *testing.T, port int) {
 func TestSSTPServerAndGeneratedProfile(t *testing.T) {
 	serverDevices(t)
 	dir := tempDir(t)
-	cert, key := filepath.Join(dir, "tls.crt"), filepath.Join(dir, "tls.key")
-	if err := store.WriteSelfSignedCert(cert, key, "127.0.0.1"); err != nil {
-		t.Fatal(err)
-	}
+	cert, key := certFiles(t, dir)
 	certPEM, _ := os.ReadFile(cert)
 	keyPEM, _ := os.ReadFile(key)
 	port := freeBoth(t)
@@ -230,6 +248,7 @@ func TestSSTPServerAndGeneratedProfile(t *testing.T) {
 func TestIKEv2ServerAndGeneratedProfile(t *testing.T) {
 	serverDevices(t)
 	dir := tempDir(t)
+	certFile, keyFile := certFiles(t, dir)
 	port := freeBoth(t)
 	udp, err := net.ListenPacket("udp", "127.0.0.1:0") // a free UDP port standing in for 500
 	if err != nil {
@@ -237,7 +256,7 @@ func TestIKEv2ServerAndGeneratedProfile(t *testing.T) {
 	}
 	ike := udp.LocalAddr().(*net.UDPAddr).Port
 	udp.Close()
-	srv, err := Start("ikev2", Config{Env: env(), Port: port, IKEPort: ike, Users: []protocols.Account{alice}, DataDir: dir})
+	srv, err := Start("ikev2", Config{Env: env(), Port: port, IKEPort: ike, CertFile: certFile, KeyFile: keyFile, Users: []protocols.Account{alice}, DataDir: dir})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,16 +288,37 @@ func TestStartRefusesWhatItCannotServe(t *testing.T) {
 	if _, err := Start("sstp", Config{Env: env(), Port: 1, Users: []protocols.Account{alice}}); err == nil {
 		t.Error("SSTP started without a certificate")
 	}
-	e := env()
-	e.IKEv2PSK = ""
-	if _, err := Start("ikev2", Config{Env: e, Port: 1, Users: []protocols.Account{alice}, DataDir: t.TempDir()}); err == nil {
-		t.Error("IKEv2 started without a pre-shared key")
+	if _, err := Start("ikev2", Config{Env: env(), Port: 1, Users: []protocols.Account{alice}, DataDir: t.TempDir()}); err == nil {
+		t.Error("IKEv2 started without a certificate")
 	}
+	dir := t.TempDir()
+	certFile, keyFile := certFiles(t, dir)
 	bad := protocols.Account{Name: "bob", Password: "a:b"}
-	if _, err := Start("ikev2", Config{Env: env(), Port: 1, Users: []protocols.Account{bad}, DataDir: t.TempDir()}); err == nil {
+	if _, err := Start("ikev2", Config{Env: env(), Port: 1, CertFile: certFile, KeyFile: keyFile, Users: []protocols.Account{bad}, DataDir: t.TempDir()}); err == nil {
 		t.Error("IKEv2 wrote a password with a colon into its user list")
 	}
 	if _, err := Start("trojan", Config{Env: env(), Users: []protocols.Account{alice}}); err == nil {
 		t.Error("started a protocol that sing-box serves")
+	}
+}
+
+// A client that pins one certificate refuses a server presenting another.
+func TestIKEv2ClientRefusesAnotherCertificate(t *testing.T) {
+	serverDevices(t)
+	serverDir, otherDir := tempDir(t), tempDir(t)
+	certFile, keyFile := certFiles(t, serverDir)
+	port := freeBoth(t)
+	udp, _ := net.ListenPacket("udp", "127.0.0.1:0")
+	ike := udp.LocalAddr().(*net.UDPAddr).Port
+	udp.Close()
+	srv, err := Start("ikev2", Config{Env: env(), Port: port, IKEPort: ike, CertFile: certFile, KeyFile: keyFile, Users: []protocols.Account{alice}, DataDir: serverDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	waitTCP(t, port)
+	certFiles(t, otherDir) // the profile now pins a different certificate
+	if err := pingThrough(t, "ikev2", port, alice.Password); err == nil {
+		t.Fatal("the client connected to a server whose certificate it had not pinned")
 	}
 }

@@ -18,8 +18,8 @@ import (
 	"github.com/NoobforAl/omnitun/core/profile"
 )
 
-// ErrNoLink means the protocol has no share-link format (OpenVPN and
-// AmneziaWG travel as config files).
+// ErrNoLink means the protocol has no share-link format (OpenVPN travels as
+// a config file).
 var ErrNoLink = errors.New("this protocol has no share link; export it as a config file")
 
 // Export returns the share link for p.
@@ -51,7 +51,7 @@ func Export(p *profile.Profile) (string, error) {
 		return sstp(p), nil
 	case profile.Tor:
 		return tor(p), nil
-	case profile.WireGuard:
+	case profile.WireGuard, profile.AmneziaWG:
 		return wireguard(p)
 	}
 	return "", fmt.Errorf("%w (%s)", ErrNoLink, p.Protocol)
@@ -389,5 +389,17 @@ func wireguard(p *profile.Profile) (string, error) {
 		}
 		q.add("reserved", strings.Join(parts, ","))
 	}
-	return build("wireguard", url.PathEscape(g.PrivateKey), hostPort(p), "", q, p.Name), nil
+	scheme := "wireguard"
+	if p.Protocol == profile.AmneziaWG {
+		scheme = "awg"
+		keys := make([]string, 0, len(g.Amnezia))
+		for k := range g.Amnezia {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			q.add(k, g.Amnezia[k])
+		}
+	}
+	return build(scheme, url.PathEscape(g.PrivateKey), hostPort(p), "", q, p.Name), nil
 }

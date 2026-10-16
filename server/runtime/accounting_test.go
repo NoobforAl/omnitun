@@ -64,7 +64,7 @@ func TestUserAccountingAndQuota(t *testing.T) {
 
 	// Connect with the user's Trojan link.
 	var trojan string
-	for _, l := range serverconf.Links(st, st.User("alice")) {
+	for _, l := range serverconf.Links(st, s, st.User("alice")) {
 		if l.Protocol == store.Trojan {
 			trojan = l.URL
 		}

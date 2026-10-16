@@ -186,10 +186,27 @@ func (s *Server) handleCertAuth(sa *IKESA, hdr payload.Header, inners []payload.
 // PSK AUTH, and the first EAP request (an MSCHAPv2 Challenge). The Child SA is
 // deferred until EAP completes.
 func (s *Server) handleEAPStart(sa *IKESA, hdr payload.Header, inners []payload.RawPayload, remote *net.UDPAddr) {
-	// Our AUTH uses PSK (the server authenticates itself with the PSK even when
-	// the client uses EAP).
+	// The server authenticates itself with its certificate when it has one and
+	// no PSK (the standard IKEv2 EAP deployment: no secret is shared between
+	// users); otherwise with the PSK.
 	localIDBody := idPayloadBody(s.cfg.LocalID)
-	ourAuth := computePSKAuth(sa.Suite.PRF, s.cfg.PSK, sa.ResponderSAInit, sa.Ni, sa.Keys.SKpr, localIDBody, sa.intAuth(sa.IKEAuthMsgID))
+	respOctets := AuthOctets(sa.Suite.PRF, sa.ResponderSAInit, sa.Ni, sa.Keys.SKpr, localIDBody, sa.intAuth(sa.IKEAuthMsgID))
+	var (
+		authMethod = payload.AuthSharedKeyMIC
+		ourAuth    []byte
+		certChain  [][]byte
+	)
+	if len(s.cfg.PSK) == 0 && s.serverCred != nil {
+		method, data, err := signAuth(s.serverCred, respOctets, sa.peerSigHashes)
+		if err != nil {
+			s.log.Printf("ikev2: signing server AUTH for %s: %v", remote, err)
+			s.respondEncryptedNotify(sa, payload.IKE_AUTH, hdr.MessageID, payload.AuthenticationFailed, remote)
+			return
+		}
+		authMethod, ourAuth, certChain = method, data, s.serverCred.chain
+	} else {
+		ourAuth = computePSKAuth(sa.Suite.PRF, s.cfg.PSK, sa.ResponderSAInit, sa.Ni, sa.Keys.SKpr, localIDBody, sa.intAuth(sa.IKEAuthMsgID))
+	}
 
 	// Start EAP-MSCHAPv2.
 	srv := eap.NewServer(s.cfg.EAPCredentials, s.cfg.EAPServerName)
@@ -217,8 +234,13 @@ func (s *Server) handleEAPStart(sa *IKESA, hdr payload.Header, inners []payload.
 
 	b := payload.NewBuilder()
 	b.Add(payload.TypeIDr, false, localIDBody)
+	for _, der := range certChain {
+		b.Add(payload.TypeCERT, false, payload.MarshalCert(payload.CertPayload{
+			Encoding: payload.CertX509Signature, Data: der,
+		}))
+	}
 	b.Add(payload.TypeAUTH, false, payload.MarshalAuth(payload.AuthPayload{
-		Method: payload.AuthSharedKeyMIC, Data: ourAuth,
+		Method: authMethod, Data: ourAuth,
 	}))
 	b.Add(payload.TypeEAP, false, challenge.Marshal())
 

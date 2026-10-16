@@ -37,29 +37,57 @@ func (ExecRunner) Has(name string) bool {
 // natTable is the nftables table the server owns; it is removed on stop.
 const natTable = "omnitun_hosts"
 
-// nftRules is the ruleset for the client pools: masquerade what leaves the
-// host and accept forwarding to and from the pools.
+// privateRanges are never reachable from clients: their traffic leaves the
+// host towards the internet, not towards the server's own network.
+var privateRanges = []string{
+	"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "100.64.0.0/10", "127.0.0.0/8",
+}
+
+// nftRules is the ruleset for the client pools. Forwarding is deliberately
+// narrow: replies may return to the pools, clients may reach the internet,
+// and everything else (client to client, client to the host's private
+// networks, unsolicited traffic towards a client) is dropped. Masquerade
+// covers what leaves the host.
 func nftRules(pools []string) string {
 	sorted := append([]string(nil), pools...)
 	sort.Strings(sorted)
 	set := strings.Join(sorted, ", ")
+	private := strings.Join(append(append([]string(nil), privateRanges...), sorted...), ", ")
 	return fmt.Sprintf(`table ip %[1]s {
 	chain forward {
 		type filter hook forward priority -1; policy accept;
+		ct state established,related ip daddr { %[2]s } accept
+		ip saddr { %[2]s } ip daddr { %[3]s } drop
 		ip saddr { %[2]s } accept
-		ip daddr { %[2]s } accept
+		ip daddr { %[2]s } drop
 	}
 	chain postrouting {
 		type nat hook postrouting priority 100; policy accept;
 		ip saddr { %[2]s } masquerade
 	}
 }
-`, natTable, set)
+`, natTable, set, private)
+}
+
+// iptablesRules are the same policy as iptables rules, in the order they
+// must match (first to last); each is inserted at the top of FORWARD.
+func iptablesRules(pool string, all []string) [][]string {
+	rules := [][]string{
+		{"-d", pool, "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"},
+	}
+	for _, dst := range append(append([]string(nil), privateRanges...), all...) {
+		rules = append(rules, []string{"-s", pool, "-d", dst, "-j", "DROP"})
+	}
+	return append(rules,
+		[]string{"-s", pool, "-j", "ACCEPT"},
+		[]string{"-d", pool, "-j", "DROP"},
+	)
 }
 
 // EnableNAT lets clients of the given pools reach the internet through this
-// host and returns a function that removes the rules again. It uses nftables
-// and falls back to iptables. dir is where the nft ruleset file is written.
+// host (and nothing else, see nftRules) and returns a function that removes
+// the rules again. It uses nftables and falls back to iptables. dir is where
+// the nft ruleset file is written.
 func EnableNAT(r Runner, dir string, pools []string) (undo func(), err error) {
 	if len(pools) == 0 {
 		return func() {}, nil
@@ -81,30 +109,32 @@ func EnableNAT(r Runner, dir string, pools []string) (undo func(), err error) {
 			os.Remove(file)
 		}, nil
 	case r.Has("iptables"):
-		var added [][]string
+		var removals [][]string // commands that take back what was added, newest first
 		undo := func() {
-			for _, rule := range added {
+			for _, rule := range removals {
 				r.Run(append([]string{"iptables"}, rule...)...)
 			}
 		}
+		add := func(add, del []string) error {
+			if err := r.Run(append([]string{"iptables"}, add...)...); err != nil {
+				return err
+			}
+			removals = append([][]string{del}, removals...)
+			return nil
+		}
 		for _, p := range pools {
-			for _, rule := range [][]string{
-				{"-t", "nat", "-A", "POSTROUTING", "-s", p, "-j", "MASQUERADE"},
-				{"-I", "FORWARD", "-s", p, "-j", "ACCEPT"},
-				{"-I", "FORWARD", "-d", p, "-j", "ACCEPT"},
-			} {
-				if err := r.Run(append([]string{"iptables"}, rule...)...); err != nil {
+			if err := add([]string{"-t", "nat", "-A", "POSTROUTING", "-s", p, "-j", "MASQUERADE"},
+				[]string{"-t", "nat", "-D", "POSTROUTING", "-s", p, "-j", "MASQUERADE"}); err != nil {
+				undo()
+				return nil, err
+			}
+			rules := iptablesRules(p, pools)
+			// Insert last-to-first so the first rule ends up on top.
+			for i := len(rules) - 1; i >= 0; i-- {
+				if err := add(append([]string{"-I", "FORWARD", "1"}, rules[i]...), append([]string{"-D", "FORWARD"}, rules[i]...)); err != nil {
 					undo()
 					return nil, err
 				}
-				// The same rule with -D removes it.
-				del := append([]string(nil), rule...)
-				for i, a := range del {
-					if a == "-A" || a == "-I" {
-						del[i] = "-D"
-					}
-				}
-				added = append([][]string{del}, added...)
 			}
 		}
 		return undo, nil

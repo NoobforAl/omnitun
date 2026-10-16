@@ -110,7 +110,7 @@ func ParseLink(link string) (*profile.Profile, error) {
 		p, err = parseHysteria2(link)
 	case "tuic":
 		p, err = parseTUIC(link)
-	case "wireguard", "wg":
+	case "wireguard", "wg", "awg":
 		p, err = parseWireGuardLink(link)
 	case "hysteria", "hy":
 		p, err = parseHysteria(link)

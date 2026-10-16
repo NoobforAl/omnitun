@@ -325,9 +325,22 @@ func parseWireGuardLink(link string) (*profile.Profile, error) {
 		}
 		wg.Reserved = append(wg.Reserved, n)
 	}
+	proto := profile.WireGuard
+	// awg:// is the same link with AmneziaWG's obfuscation parameters.
+	if strings.EqualFold(u.Scheme, "awg") {
+		proto = profile.AmneziaWG
+		for k := range amneziaKeys {
+			if v := q.Get(k); v != "" {
+				if wg.Amnezia == nil {
+					wg.Amnezia = map[string]string{}
+				}
+				wg.Amnezia[k] = v
+			}
+		}
+	}
 	return &profile.Profile{
 		Name:      fragmentName(u),
-		Protocol:  profile.WireGuard,
+		Protocol:  proto,
 		Server:    host,
 		Port:      port,
 		WireGuard: wg,

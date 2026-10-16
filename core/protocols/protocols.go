@@ -91,8 +91,7 @@ type Env struct {
 	SSServerKey string
 	OpenVPN     OpenVPN
 	WireGuard   WireGuard
-	// IKEv2PSK is the server's IKEv2 pre-shared key.
-	IKEv2PSK string
+	AWG         AmneziaWG
 }
 
 // Account is one user's credentials; every protocol uses the ones it needs.

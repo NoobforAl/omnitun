@@ -128,6 +128,15 @@ func (s *Source) GetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) 
 	return l.cert, nil
 }
 
+// Paths returns the certificate and key files currently served.
+func (s *Source) Paths() (cert, key string, err error) {
+	l, err := s.current()
+	if err != nil {
+		return "", "", err
+	}
+	return l.certPath, l.keyPath, nil
+}
+
 // PEM returns the certificate chain and private key currently served, for
 // servers that take PEM bytes (SSTP). They are read when called, so a renewed
 // certificate is used the next time such a server is started.

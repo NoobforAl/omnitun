@@ -27,7 +27,10 @@ func goldenState(t *testing.T) (*store.State, *store.Store) {
 			Subscription: store.Subscription{Enabled: true, Listen: "0.0.0.0", Port: 2096, Path: "subpath"},
 			OpenVPN:      store.OpenVPN{CA: "CA-PEM\n", ServerCert: "SERVER-CERT", ServerKey: "SERVER-KEY", TLSCrypt: "TLS-CRYPT\n"},
 			WireGuard:    store.WireGuard{PrivateKey: "c2VydmVyLXByaXZhdGU=", PublicKey: "c2VydmVyLXB1YmxpYw=="},
-			IKEv2PSK:     "ike-psk-secret",
+			AmneziaWG: store.AmneziaWG{PrivateKey: "YXdnLXByaXZhdGU=", PublicKey: "YXdnLXB1YmxpYw==", Params: map[string]string{
+				"jc": "5", "jmin": "42", "jmax": "105", "s1": "30", "s2": "94",
+				"h1": "1043474670", "h2": "1207032647", "h3": "682630448", "h4": "1230328733",
+			}},
 		},
 		Users: []*store.User{{
 			Name: "alice", UUID: "b831381d-6324-4d53-ad4f-8cda48b30811", Password: "alicepassword",
@@ -55,7 +58,7 @@ func TestGoldenOutput(t *testing.T) {
 	}
 	got := map[string]any{
 		"build":        Build(st, s, now),
-		"links":        Links(st, st.Users[0]),
+		"links":        Links(st, s, st.Users[0]),
 		"subscription": json.RawMessage(sub),
 		"ovpn_udp":     mustOVPN(t, st, store.OpenVPNUDP),
 	}

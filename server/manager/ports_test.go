@@ -90,13 +90,19 @@ func TestHostProtocolPorts(t *testing.T) {
 	on := true
 	m.SetProtocol(store.IKEv2, ProtocolPatch{Enabled: &on})
 	m.SetProtocol(store.SSTP, ProtocolPatch{Enabled: &on})
+	m.SetProtocol(store.AmneziaWGKey, ProtocolPatch{Enabled: &on})
 	rules, _ := m.FirewallPorts()
 	got := ruleSet(rules)
 	// IKEv2: IKE on UDP 500, NAT-T on 4500 over UDP, and IKE/ESP over TCP 4500.
-	for _, want := range []string{"udp/500", "udp/4500", "tcp/4500", "tcp/8448"} {
+	for _, want := range []string{"udp/500", "udp/4500", "tcp/4500", "tcp/8448", "udp/51821"} {
 		if _, ok := got[want]; !ok {
 			t.Errorf("missing %s in %v", want, got)
 		}
+	}
+	// AmneziaWG cannot share WireGuard's UDP port.
+	wgPort := 51821
+	if _, err := m.SetProtocol(store.WireGuardKey, ProtocolPatch{Port: &wgPort}); err == nil {
+		t.Fatal("WireGuard accepted the port AmneziaWG uses")
 	}
 	// A protocol on UDP 500 or TCP 4500 would clash with IKEv2.
 	port := 4500
@@ -110,7 +116,7 @@ func TestHostProtocolPorts(t *testing.T) {
 		if p.Host && p.Enabled {
 			t.Errorf("%s is on by default", p.Key)
 		}
-		if (p.Key == store.SSTP || p.Key == store.IKEv2) && !p.Host {
+		if (p.Key == store.SSTP || p.Key == store.IKEv2 || p.Key == store.AmneziaWGKey) && !p.Host {
 			t.Errorf("%s is not marked as a host protocol", p.Key)
 		}
 	}
