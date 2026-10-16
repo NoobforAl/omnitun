@@ -2,6 +2,7 @@ package protocols
 
 import (
 	"fmt"
+	"maps"
 	"net/netip"
 	"sort"
 	"strings"
@@ -61,9 +62,7 @@ func (a amneziawg) Profile(env Env, port int, u Account) (*profile.Profile, erro
 		return nil, err
 	}
 	params := make(map[string]string, len(env.AWG.Params))
-	for k, v := range env.AWG.Params {
-		params[k] = v
-	}
+	maps.Copy(params, env.AWG.Params)
 	return &profile.Profile{
 		Name: profileName(env, a.Spec()), Protocol: profile.AmneziaWG, Server: env.Host, Port: port,
 		WireGuard: &profile.WG{

@@ -279,8 +279,9 @@ void main() {
     for (final f in forms) {
       for (final field in f.fields) {
         if (formLabel(en, field.label) != field.label) missing.add('label (English) ${field.label}');
-        if (!same.contains(field.label) && formLabel(fa, field.label) == field.label)
+        if (!same.contains(field.label) && formLabel(fa, field.label) == field.label) {
           missing.add('label ${field.label}');
+        }
         if (field.help.isNotEmpty) {
           if (formHelp(en, field.help) != field.help) missing.add('help (English) ${field.help}');
           if (formHelp(fa, field.help) == field.help) missing.add('help ${field.help}');

@@ -204,9 +204,7 @@ func TestSelectionNotOverriddenByCache(t *testing.T) {
 	dead, live, testURL := failoverSetup(t)
 	dir := tempDir(t)
 	e := New(Config{DataDir: dir, SkipHandshake: true})
-	opts := singbox.Options{ListenPort: freePort(t), LogLevel: "error", ProxyPrivate: true, TestURL: testURL}
-
-	opts.Selected = live.ID
+	opts := singbox.Options{ListenPort: freePort(t), LogLevel: "error", ProxyPrivate: true, TestURL: testURL, Selected: live.ID}
 	if err := e.Start([]*profile.Profile{dead, live}, opts); err != nil {
 		t.Fatal(err)
 	}

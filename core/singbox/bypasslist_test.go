@@ -1,6 +1,7 @@
 package singbox
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -75,7 +76,7 @@ func TestParseBypassListReportsBadLinesAndKeepsTheRest(t *testing.T) {
 
 func TestParseBypassListIsBounded(t *testing.T) {
 	var b strings.Builder
-	for i := 0; i < MaxBypassEntries+10; i++ {
+	for i := range MaxBypassEntries + 10 {
 		b.WriteString("h")
 		b.WriteString(strings.Repeat("a", i%7))
 		b.WriteString(strconv.Itoa(i))
@@ -170,10 +171,5 @@ func testProfile(t *testing.T) *profile.Profile {
 }
 
 func contains(list []string, v string) bool {
-	for _, s := range list {
-		if s == v {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(list, v)
 }

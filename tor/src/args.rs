@@ -33,15 +33,23 @@ pub fn parse(mut it: impl Iterator<Item = String>) -> Result<Args, String> {
             "--bridge" => {
                 let line = value()?;
                 // Accept torrc style "Bridge obfs4 ..." too.
-                let line = line.strip_prefix("Bridge ").unwrap_or(&line).trim().to_string();
+                let line = line
+                    .strip_prefix("Bridge ")
+                    .unwrap_or(&line)
+                    .trim()
+                    .to_string();
                 if !line.is_empty() {
                     a.bridges.push(line);
                 }
             }
             "--transport" => {
                 let v = value()?;
-                let (name, addr) = v.split_once('=').ok_or("--transport needs NAME=HOST:PORT")?;
-                let addr = addr.parse().map_err(|e| format!("--transport {name}: {e}"))?;
+                let (name, addr) = v
+                    .split_once('=')
+                    .ok_or("--transport needs NAME=HOST:PORT")?;
+                let addr = addr
+                    .parse()
+                    .map_err(|e| format!("--transport {name}: {e}"))?;
                 a.transports.push((name.to_string(), addr));
             }
             other => return Err(format!("unknown option {other}")),
@@ -64,13 +72,25 @@ mod tests {
     #[test]
     fn parses_everything() {
         let a = args(&[
-            "--data", "d", "--socks-port", "9150", "--bridge", "Bridge obfs4 192.0.2.1:443 AAAA cert=x iat-mode=0",
-            "--transport", "obfs4=127.0.0.1:4000",
+            "--data",
+            "d",
+            "--socks-port",
+            "9150",
+            "--bridge",
+            "Bridge obfs4 192.0.2.1:443 AAAA cert=x iat-mode=0",
+            "--transport",
+            "obfs4=127.0.0.1:4000",
         ])
         .unwrap();
         assert_eq!(a.socks_port, 9150);
-        assert_eq!(a.bridges, vec!["obfs4 192.0.2.1:443 AAAA cert=x iat-mode=0"]);
-        assert_eq!(a.transports, vec![("obfs4".into(), "127.0.0.1:4000".parse().unwrap())]);
+        assert_eq!(
+            a.bridges,
+            vec!["obfs4 192.0.2.1:443 AAAA cert=x iat-mode=0"]
+        );
+        assert_eq!(
+            a.transports,
+            vec![("obfs4".into(), "127.0.0.1:4000".parse().unwrap())]
+        );
     }
 
     #[test]

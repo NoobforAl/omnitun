@@ -151,15 +151,13 @@ func TestConcurrentSaves(t *testing.T) {
 	var wg sync.WaitGroup
 	errs := make(chan error, 40)
 	for range 8 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range 5 {
 				if err := tr.Save(); err != nil {
 					errs <- err
 				}
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	close(errs)

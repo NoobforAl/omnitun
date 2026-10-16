@@ -68,7 +68,7 @@ func main() {
 	}
 	run("ip", "addr", "add", p.WireGuard.Address[0], "dev", *name)
 	run("ip", "link", "set", "dev", *name, "up")
-	for _, r := range strings.Split(*route, ",") {
+	for r := range strings.SplitSeq(*route, ",") {
 		if r = strings.TrimSpace(r); r != "" {
 			run("ip", "route", "add", r, "dev", *name)
 		}

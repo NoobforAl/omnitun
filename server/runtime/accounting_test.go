@@ -3,7 +3,6 @@
 package runtime
 
 import (
-	"context"
 	"io"
 	"net"
 	"net/http"
@@ -80,8 +79,7 @@ func TestUserAccountingAndQuota(t *testing.T) {
 	s, srv := setup(t)
 	st := loadState(t, s)
 	// `run` watches the state file and reloads; do the same here.
-	watchCtx, stopWatch := context.WithCancel(context.Background())
-	defer stopWatch()
+	watchCtx := t.Context()
 	go srv.Watch(watchCtx)
 
 	const payload = 300 << 10

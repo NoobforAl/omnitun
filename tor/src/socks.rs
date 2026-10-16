@@ -67,7 +67,10 @@ pub async fn handshake<S: AsyncRead + AsyncWrite + Unpin>(s: &mut S) -> std::io:
     };
     let mut port = [0u8; 2];
     s.read_exact(&mut port).await?;
-    Ok(Target { host, port: u16::from_be_bytes(port) })
+    Ok(Target {
+        host,
+        port: u16::from_be_bytes(port),
+    })
 }
 
 /// Sends a reply with an all-zero bound address.
@@ -92,7 +95,13 @@ mod tests {
         req.extend_from_slice(&443u16.to_be_bytes());
         client.write_all(&req).await.unwrap();
         let t = task.await.unwrap().unwrap();
-        assert_eq!(t, Target { host: "example.com".into(), port: 443 });
+        assert_eq!(
+            t,
+            Target {
+                host: "example.com".into(),
+                port: 443
+            }
+        );
     }
 
     #[tokio::test]
@@ -102,7 +111,10 @@ mod tests {
         client.write_all(&[5, 1, 0]).await.unwrap();
         let mut resp = [0u8; 2];
         client.read_exact(&mut resp).await.unwrap();
-        client.write_all(&[5, 3, 0, 1, 0, 0, 0, 0, 0, 0]).await.unwrap();
+        client
+            .write_all(&[5, 3, 0, 1, 0, 0, 0, 0, 0, 0])
+            .await
+            .unwrap();
         let mut rep = [0u8; 10];
         client.read_exact(&mut rep).await.unwrap();
         assert_eq!(rep[1], reply::COMMAND_NOT_SUPPORTED);

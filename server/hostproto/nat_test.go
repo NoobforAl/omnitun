@@ -27,7 +27,7 @@ func (f *fakeRunner) Has(name string) bool { return f.have[name] }
 
 func ruleLines(text string) []string {
 	var out []string
-	for _, l := range strings.Split(text, "\n") {
+	for l := range strings.SplitSeq(text, "\n") {
 		out = append(out, strings.TrimSpace(l))
 	}
 	return out

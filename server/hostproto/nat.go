@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -130,8 +131,8 @@ func EnableNAT(r Runner, dir string, pools []string) (undo func(), err error) {
 			}
 			rules := iptablesRules(p, pools)
 			// Insert last-to-first so the first rule ends up on top.
-			for i := len(rules) - 1; i >= 0; i-- {
-				if err := add(append([]string{"-I", "FORWARD", "1"}, rules[i]...), append([]string{"-D", "FORWARD"}, rules[i]...)); err != nil {
+			for _, rule := range slices.Backward(rules) {
+				if err := add(append([]string{"-I", "FORWARD", "1"}, rule...), append([]string{"-D", "FORWARD"}, rule...)); err != nil {
 					undo()
 					return nil, err
 				}
