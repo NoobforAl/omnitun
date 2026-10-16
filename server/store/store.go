@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/gofrs/flock"
+
+	"github.com/NoobforAl/omnitun/core/protocols"
 )
 
 const fileName = "state.json"
@@ -36,8 +38,8 @@ const (
 	OpenVPNTCP   = "openvpn-tcp"
 )
 
-// AllProtocols in display order.
-var AllProtocols = []string{VLESSReality, Shadowsocks, Trojan, Hysteria2, TUIC, AnyTLS, ShadowTLS, Naive, OpenVPNUDP, OpenVPNTCP}
+// AllProtocols in display order (the order of the protocol registry).
+var AllProtocols = protocols.Keys()
 
 // IsOpenVPN reports whether a protocol key is one of the OpenVPN variants.
 func IsOpenVPN(proto string) bool { return proto == OpenVPNUDP || proto == OpenVPNTCP }

@@ -1,123 +1,82 @@
 // Package serverconf turns the server state into a sing-box server config and
-// into per-user share links that the Omnitun client (and other clients) import.
+// into per-user share links and client profiles. The protocols themselves are
+// defined in core/protocols; this package only feeds them the server's keys
+// and users.
 package serverconf
 
 import (
-	"encoding/base64"
 	"fmt"
-	"maps"
 	"net"
-	"net/url"
+	"os"
 	"strconv"
 	"time"
 
+	"github.com/NoobforAl/omnitun/core/links"
+	"github.com/NoobforAl/omnitun/core/profile"
+	"github.com/NoobforAl/omnitun/core/protocols"
 	"github.com/NoobforAl/omnitun/server/store"
 )
 
 type obj = map[string]any
+
+// Env is the server as the protocol registry sees it. s resolves the
+// certificate paths against the data directory; the certificate's content is
+// read for clients that pin it.
+func Env(st *store.State, s *store.Store) protocols.Env {
+	srv := st.Server
+	env := protocols.Env{
+		Name: srv.Name, Host: srv.PublicHost,
+		CertPath: s.Path(srv.CertFile), KeyPath: s.Path(srv.KeyFile),
+		SelfSigned: srv.SelfSigned,
+		Reality: protocols.Reality{
+			PrivateKey: srv.Reality.PrivateKey, PublicKey: srv.Reality.PublicKey,
+			ShortID: srv.Reality.ShortID, Handshake: srv.Reality.Handshake,
+		},
+		SSServerKey: srv.SSServerKey,
+		OpenVPN: protocols.OpenVPN{
+			CA: srv.OpenVPN.CA, ServerCert: srv.OpenVPN.ServerCert,
+			ServerKey: srv.OpenVPN.ServerKey, TLSCrypt: srv.OpenVPN.TLSCrypt,
+		},
+	}
+	if data, err := os.ReadFile(env.CertPath); err == nil {
+		env.CertPEM = string(data)
+	}
+	return env
+}
+
+// Account maps a user to the credentials the protocols use.
+func Account(u *store.User) protocols.Account {
+	return protocols.Account{Name: u.Name, UUID: u.UUID, Password: u.Password, SSKey: u.SSKey}
+}
+
+func accounts(users []*store.User) []protocols.Account {
+	out := make([]protocols.Account, len(users))
+	for i, u := range users {
+		out[i] = Account(u)
+	}
+	return out
+}
 
 // Build returns the sing-box config for the active users. Paths are
 // resolved against s.Dir. Protocols with no active users are left out
 // (sing-box needs at least one user per inbound).
 func Build(st *store.State, s *store.Store, now time.Time) obj {
 	users := st.ActiveUsers(now)
-	srv := st.Server
+	env := Env(st, s)
 	var inbounds, endpoints []any
-	tls := func(extra obj) obj {
-		t := obj{
-			"enabled":          true,
-			"certificate_path": s.Path(srv.CertFile),
-			"key_path":         s.Path(srv.KeyFile),
-		}
-		maps.Copy(t, extra)
-		return t
-	}
-	for _, name := range store.AllProtocols {
-		p := srv.Protocols[name]
-		if p == nil || !p.Enabled || len(users) == 0 {
+	for _, key := range store.AllProtocols {
+		p := st.Server.Protocols[key]
+		proto, ok := protocols.Get(key)
+		if p == nil || !p.Enabled || len(users) == 0 || !ok {
 			continue
 		}
-		if store.IsOpenVPN(name) {
-			endpoints = append(endpoints, openvpnEndpoint(name, p.Port, srv.OpenVPN, users))
-			continue
+		cfg := proto.Inbounds(env, p.Port, accounts(users))
+		for _, in := range cfg.Inbounds {
+			inbounds = append(inbounds, in)
 		}
-		in := obj{"tag": name, "listen": "::", "listen_port": p.Port}
-		switch name {
-		case store.VLESSReality:
-			host, port := splitHostPort(srv.Reality.Handshake, 443)
-			in["type"] = "vless"
-			in["users"] = mapUsers(users, func(u *store.User) obj {
-				return obj{"name": u.Name, "uuid": u.UUID, "flow": "xtls-rprx-vision"}
-			})
-			in["tls"] = obj{
-				"enabled":     true,
-				"server_name": host,
-				"reality": obj{
-					"enabled":     true,
-					"handshake":   obj{"server": host, "server_port": port},
-					"private_key": srv.Reality.PrivateKey,
-					"short_id":    []string{srv.Reality.ShortID},
-				},
-			}
-		case store.Shadowsocks:
-			in["type"] = "shadowsocks"
-			in["method"] = "2022-blake3-aes-128-gcm"
-			in["password"] = srv.SSServerKey
-			in["users"] = mapUsers(users, func(u *store.User) obj {
-				return obj{"name": u.Name, "password": u.SSKey}
-			})
-		case store.Trojan:
-			in["type"] = "trojan"
-			in["users"] = mapUsers(users, func(u *store.User) obj {
-				return obj{"name": u.Name, "password": u.Password}
-			})
-			in["tls"] = tls(nil)
-		case store.Hysteria2:
-			in["type"] = "hysteria2"
-			in["users"] = mapUsers(users, func(u *store.User) obj {
-				return obj{"name": u.Name, "password": u.Password}
-			})
-			in["tls"] = tls(obj{"alpn": []string{"h3"}})
-		case store.AnyTLS:
-			in["type"] = "anytls"
-			in["users"] = mapUsers(users, func(u *store.User) obj {
-				return obj{"name": u.Name, "password": u.Password}
-			})
-			in["tls"] = tls(nil)
-		case store.ShadowTLS:
-			// ShadowTLS v3 borrows the handshake of the Reality site, then
-			// hands the stream to an internal (not listening) Shadowsocks inbound.
-			host, port := splitHostPort(srv.Reality.Handshake, 443)
-			in["type"] = "shadowtls"
-			in["version"] = 3
-			in["users"] = mapUsers(users, func(u *store.User) obj {
-				return obj{"name": u.Name, "password": u.Password}
-			})
-			in["handshake"] = obj{"server": host, "server_port": port}
-			in["detour"] = name + "-ss"
-			inbounds = append(inbounds, obj{
-				"type": "shadowsocks", "tag": name + "-ss", "method": "2022-blake3-aes-128-gcm",
-				"password": srv.SSServerKey,
-				"users": mapUsers(users, func(u *store.User) obj {
-					return obj{"name": u.Name, "password": u.SSKey}
-				}),
-			})
-		case store.Naive:
-			in["type"] = "naive"
-			in["network"] = "tcp"
-			in["users"] = mapUsers(users, func(u *store.User) obj {
-				return obj{"username": u.Name, "password": u.Password}
-			})
-			in["tls"] = tls(nil)
-		case store.TUIC:
-			in["type"] = "tuic"
-			in["congestion_control"] = "bbr"
-			in["users"] = mapUsers(users, func(u *store.User) obj {
-				return obj{"name": u.Name, "uuid": u.UUID, "password": u.Password}
-			})
-			in["tls"] = tls(obj{"alpn": []string{"h3"}})
+		for _, ep := range cfg.Endpoints {
+			endpoints = append(endpoints, ep)
 		}
-		inbounds = append(inbounds, in)
 	}
 	cfg := obj{
 		"log":       obj{"level": "warn", "timestamp": true},
@@ -130,86 +89,46 @@ func Build(st *store.State, s *store.Store, now time.Time) obj {
 	return cfg
 }
 
-// openvpnEndpoint is an OpenVPN server; users sign in with name + password.
-// UDP and TCP get separate client address pools.
-func openvpnEndpoint(name string, port int, o store.OpenVPN, users []*store.User) obj {
-	network, pool := "udp", "10.18.0.1/16"
-	if name == store.OpenVPNTCP {
-		network, pool = "tcp", "10.19.0.1/16"
-	}
-	return obj{
-		"type": "openvpn-server", "tag": name, "listen": "::", "listen_port": port,
-		"network": network, "address": []string{pool},
-		"users": mapUsers(users, func(u *store.User) obj {
-			return obj{"username": u.Name, "password": u.Password}
-		}),
-		"tls": obj{
-			"certificate":               o.ServerCert,
-			"key":                       o.ServerKey,
-			"verify_client_certificate": "none",
-			"control_wrap":              obj{"type": "tls_crypt", "key": o.TLSCrypt},
-		},
-		"push": obj{"redirect_gateway": true, "dns": []string{"1.1.1.1", "8.8.8.8"}},
-	}
-}
-
 // OVPN returns a single-file OpenVPN client config for the user, with the
 // credentials inline (OpenVPN 2.6+, Omnitun). proto is store.OpenVPNUDP or store.OpenVPNTCP.
 func OVPN(st *store.State, u *store.User, proto string) (string, error) {
 	p := st.Server.Protocols[proto]
-	if !store.IsOpenVPN(proto) || p == nil {
+	pr, ok := protocols.Get(proto)
+	if !store.IsOpenVPN(proto) || p == nil || !ok {
 		return "", fmt.Errorf("unknown OpenVPN protocol %q", proto)
 	}
 	if !p.Enabled {
 		return "", fmt.Errorf("%s is disabled (enable it with: proto enable %s)", proto, proto)
 	}
-	network := "udp"
-	if proto == store.OpenVPNTCP {
-		network = "tcp"
+	fp, ok := pr.(protocols.FileProtocol)
+	if !ok {
+		return "", fmt.Errorf("%s has no config file", proto)
 	}
-	o := st.Server.OpenVPN
-	return fmt.Sprintf(`# %s (%s) for %s
-client
-dev tun
-proto %s
-remote %s %d
-nobind
-persist-key
-persist-tun
-resolv-retry infinite
-remote-cert-tls server
-data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305
-verb 3
-auth-user-pass
-<auth-user-pass>
-%s
-%s
-</auth-user-pass>
-<ca>
-%s</ca>
-<tls-crypt>
-%s</tls-crypt>
-`, st.Server.Name, proto, u.Name, network, st.Server.PublicHost, p.Port, u.Name, u.Password, o.CA, o.TLSCrypt), nil
+	_, content, err := fp.File(protocols.Env{
+		Name: st.Server.Name, Host: st.Server.PublicHost,
+		OpenVPN: protocols.OpenVPN{CA: st.Server.OpenVPN.CA, TLSCrypt: st.Server.OpenVPN.TLSCrypt},
+	}, p.Port, Account(u))
+	return content, err
 }
 
-func mapUsers(users []*store.User, f func(*store.User) obj) []any {
-	out := make([]any, 0, len(users))
-	for _, u := range users {
-		out = append(out, f(u))
+// Profiles returns the client profiles of every enabled protocol for the
+// user, in failover order (including OpenVPN, which has no share link).
+func Profiles(st *store.State, s *store.Store, u *store.User) ([]*profile.Profile, error) {
+	env := Env(st, s)
+	var out []*profile.Profile
+	for _, key := range store.AllProtocols {
+		p := st.Server.Protocols[key]
+		proto, ok := protocols.Get(key)
+		if p == nil || !p.Enabled || !ok {
+			continue
+		}
+		prof, err := proto.Profile(env, p.Port, Account(u))
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", key, err)
+		}
+		out = append(out, prof)
 	}
-	return out
-}
-
-func splitHostPort(hp string, defPort int) (string, int) {
-	host, p, err := net.SplitHostPort(hp)
-	if err != nil {
-		return hp, defPort
-	}
-	port, err := strconv.Atoi(p)
-	if err != nil {
-		return host, defPort
-	}
-	return host, port
+	return out, nil
 }
 
 // Link is one share link for a user.
@@ -219,58 +138,32 @@ type Link struct {
 }
 
 // Links returns the user's share links for every enabled protocol, in
-// failover-friendly order (Reality first, UDP protocols last).
+// failover-friendly order (Reality first, UDP protocols last). Protocols
+// without a share link (OpenVPN) are left out; see OVPN and OVPNURL.
 func Links(st *store.State, u *store.User) []Link {
-	srv := st.Server
-	host := srv.PublicHost
-	hostPort := func(port int) string { return net.JoinHostPort(host, strconv.Itoa(port)) }
-	label := func(proto string) string { return url.PathEscape(srv.Name + " " + proto) }
-	insecure := ""
-	if srv.SelfSigned {
-		insecure = "&insecure=1&allowInsecure=1&allow_insecure=1"
+	env := protocols.Env{
+		Name: st.Server.Name, Host: st.Server.PublicHost, SelfSigned: st.Server.SelfSigned,
+		Reality: protocols.Reality{
+			PublicKey: st.Server.Reality.PublicKey, ShortID: st.Server.Reality.ShortID, Handshake: st.Server.Reality.Handshake,
+		},
+		SSServerKey: st.Server.SSServerKey,
 	}
 	var out []Link
-	for _, name := range store.AllProtocols {
-		p := srv.Protocols[name]
-		if p == nil || !p.Enabled || store.IsOpenVPN(name) {
-			continue // OpenVPN has no share link; see OVPN and OVPNURL
+	for _, key := range store.AllProtocols {
+		p := st.Server.Protocols[key]
+		proto, ok := protocols.Get(key)
+		if p == nil || !p.Enabled || !ok || !proto.Spec().ShareLink {
+			continue
 		}
-		var link string
-		switch name {
-		case store.VLESSReality:
-			sni, _ := splitHostPort(srv.Reality.Handshake, 443)
-			link = fmt.Sprintf("vless://%s@%s?type=tcp&security=reality&flow=xtls-rprx-vision&sni=%s&fp=chrome&pbk=%s&sid=%s#%s",
-				u.UUID, hostPort(p.Port), sni, srv.Reality.PublicKey, srv.Reality.ShortID, label("VLESS-Reality"))
-		case store.Shadowsocks:
-			userinfo := base64.RawURLEncoding.EncodeToString([]byte("2022-blake3-aes-128-gcm:" + srv.SSServerKey + ":" + u.SSKey))
-			link = fmt.Sprintf("ss://%s@%s#%s", userinfo, hostPort(p.Port), label("Shadowsocks"))
-		case store.Trojan:
-			link = fmt.Sprintf("trojan://%s@%s?security=tls&sni=%s%s#%s",
-				u.Password, hostPort(p.Port), host, insecure, label("Trojan"))
-		case store.Hysteria2:
-			link = fmt.Sprintf("hysteria2://%s@%s?sni=%s%s#%s",
-				u.Password, hostPort(p.Port), host, insecure, label("Hysteria2"))
-		case store.AnyTLS:
-			link = fmt.Sprintf("anytls://%s@%s/?sni=%s%s#%s",
-				url.PathEscape(u.Password), hostPort(p.Port), host, insecure, label("AnyTLS"))
-		case store.ShadowTLS:
-			sni, _ := splitHostPort(srv.Reality.Handshake, 443)
-			plugin := fmt.Sprintf("shadow-tls;host=%s;password=%s;version=3", sni, u.Password)
-			if srv.SelfSigned {
-				plugin += ";insecure=1"
-			}
-			userinfo := base64.RawURLEncoding.EncodeToString([]byte("2022-blake3-aes-128-gcm:" + srv.SSServerKey + ":" + u.SSKey))
-			link = fmt.Sprintf("ss://%s@%s?plugin=%s#%s", userinfo, hostPort(p.Port), url.QueryEscape(plugin), label("ShadowTLS"))
-		case store.Naive:
-			// Naive verifies certificates like Chrome; with a self-signed
-			// certificate only the sing-box subscription (which pins it) works.
-			link = fmt.Sprintf("naive+https://%s:%s@%s/#%s",
-				url.PathEscape(u.Name), url.PathEscape(u.Password), hostPort(p.Port), label("Naive"))
-		case store.TUIC:
-			link = fmt.Sprintf("tuic://%s:%s@%s?congestion_control=bbr&alpn=h3&sni=%s%s#%s",
-				u.UUID, u.Password, hostPort(p.Port), host, insecure, label("TUIC"))
+		prof, err := proto.Profile(env, p.Port, Account(u))
+		if err != nil {
+			continue
 		}
-		out = append(out, Link{Protocol: name, URL: link})
+		link, err := links.Export(prof)
+		if err != nil {
+			continue
+		}
+		out = append(out, Link{Protocol: key, URL: link})
 	}
 	return out
 }

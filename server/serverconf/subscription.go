@@ -6,12 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/NoobforAl/omnitun/core/importer"
-	"github.com/NoobforAl/omnitun/core/profile"
 	"github.com/NoobforAl/omnitun/core/singbox"
 	"github.com/NoobforAl/omnitun/server/stats"
 	"github.com/NoobforAl/omnitun/server/store"
@@ -31,35 +28,9 @@ func wantsSingBox(r *http.Request) bool {
 // SingBoxSubscription is the user's profiles as a sing-box config (outbounds
 // and endpoints), including OpenVPN, which has no share-link format.
 func SingBoxSubscription(st *store.State, s *store.Store, u *store.User) ([]byte, error) {
-	certPEM := ""
-	if data, err := os.ReadFile(s.Path(st.Server.CertFile)); err == nil {
-		certPEM = string(data)
-	}
-	var profiles []*profile.Profile
-	for _, l := range Links(st, u) {
-		p, err := importer.ParseLink(l.URL)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", l.Protocol, err)
-		}
-		if l.Protocol == store.Naive && st.Server.SelfSigned && certPEM != "" {
-			p.TLS.Certificate = certPEM // pin the self-signed certificate
-		}
-		profiles = append(profiles, p)
-	}
-	for _, proto := range []string{store.OpenVPNUDP, store.OpenVPNTCP} {
-		if p := st.Server.Protocols[proto]; p == nil || !p.Enabled {
-			continue
-		}
-		text, err := OVPN(st, u, proto)
-		if err != nil {
-			return nil, err
-		}
-		p, err := importer.ParseOVPN(text)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", proto, err)
-		}
-		p.Name = st.Server.Name + " OpenVPN " + strings.ToUpper(strings.TrimPrefix(proto, "openvpn-"))
-		profiles = append(profiles, p)
+	profiles, err := Profiles(st, s, u)
+	if err != nil {
+		return nil, err
 	}
 	outbounds, endpoints := []any{}, []any{}
 	for _, p := range profiles {

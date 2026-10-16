@@ -381,7 +381,8 @@ Step 2 — accounting and safety
 - [ ] OpenVPN per-user accounting (read the endpoint's status/management output)
 
 Step 3 — more protocols and setup
-- [ ] **Shared protocol registry** used by both the server and the client: one definition per protocol (name, transports, default port, server options, client profile fields, link format); "create a server" and "connect to a server" use the same schema, so adding a protocol is one place
+- [x] **Shared protocol registry** (`core/protocols`) used by both the server and the client: one definition per protocol with its `Spec` (name, label, transport, default port, options, needs-certificate, share-link), the server side (`Inbounds` as sing-box config) and the client side (`Profile` for a user); `core/links` exports any profile as a share link (and is what the app will use for share/QR). `serverconf` is now only glue; protocol keys, default ports, transports and the API's protocol metadata all come from the registry. A golden test pins the output: the sing-box server config, client profiles and `.ovpn` files are byte-identical to before the refactor, and share links keep their exact strings. **Adding a protocol = one type in `core/protocols/servers.go`** (+ an importer/engine mapping if the client needs new fields)
+- [ ] Registry follow-ups: `Option`s drive the `init` wizard and the app's server-creation form; client-side protocol form schema (profile editor) from the same Specs; WireGuard/AmneziaWG, Tor bridge and IKEv2/SSTP server protocols as registry entries
 - [ ] ACME/Let's Encrypt certificates for a domain (no more `insecure=1`); HTTPS for the subscription endpoint
 - [ ] WireGuard / AmneziaWG server, Tor bridge (obfs4/WebTunnel), IKEv2 / SSTP via system packages
 - [ ] Easy v2ray-style setup: `init` wizard (choose protocols, domain, ports), import an existing v2ray/xray config and its users, one-command install

@@ -6,12 +6,30 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
+
+// tempDir is t.TempDir with a cleanup that retries: on Windows a virus
+// scanner or a just-released file lock can briefly keep a file open, which
+// fails t.TempDir's own cleanup.
+func tempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "omnitun-store-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for i := 0; i < 40 && os.RemoveAll(dir) != nil; i++ {
+			time.Sleep(50 * time.Millisecond)
+		}
+	})
+	return dir
+}
 
 // State files written before OpenVPN existed get keys and disabled OpenVPN
 // protocols on load, and keep them across loads.
 func TestMigrateAddsOpenVPN(t *testing.T) {
-	s := Open(t.TempDir())
+	s := Open(tempDir(t))
 	old := map[string]any{
 		"version": 1,
 		"server": map[string]any{
@@ -48,7 +66,7 @@ func TestMigrateAddsOpenVPN(t *testing.T) {
 
 // Old 10-year self-signed certificates are replaced; fresh ones are kept.
 func TestRenewSelfSignedCert(t *testing.T) {
-	s := Open(t.TempDir())
+	s := Open(tempDir(t))
 	st := &State{Server: Server{SelfSigned: true, CertFile: "tls.crt", KeyFile: "tls.key", PublicHost: "1.2.3.4"}}
 	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
 		t.Fatal(err)
@@ -64,7 +82,7 @@ func TestRenewSelfSignedCert(t *testing.T) {
 // Updates from several goroutines (standing in for the CLI, the API and the
 // running server) must not lose each other's changes.
 func TestConcurrentUpdatesKeepEverything(t *testing.T) {
-	s := Open(t.TempDir())
+	s := Open(tempDir(t))
 	if _, err := Init(s, InitOptions{PublicHost: "203.0.113.7"}); err != nil {
 		t.Fatal(err)
 	}

@@ -14,6 +14,8 @@ import (
 	"net"
 	"os"
 	"time"
+
+	"github.com/NoobforAl/omnitun/core/protocols"
 )
 
 // InitOptions configures a new server.
@@ -27,19 +29,9 @@ type InitOptions struct {
 	SubPort          int
 }
 
-// DefaultPorts per protocol. TCP and UDP protocols may share a number.
-var DefaultPorts = map[string]int{
-	VLESSReality: 443,
-	Shadowsocks:  8388,
-	Trojan:       8443,
-	Hysteria2:    8443, // UDP
-	TUIC:         8444, // UDP
-	AnyTLS:       8445,
-	ShadowTLS:    8446,
-	Naive:        8447,
-	OpenVPNUDP:   1194,
-	OpenVPNTCP:   1194,
-}
+// DefaultPorts per protocol, from the protocol registry. TCP and UDP
+// protocols may share a number.
+var DefaultPorts = protocols.DefaultPorts()
 
 // Init creates a state with fresh keys and a self-signed certificate.
 func Init(s *Store, opts InitOptions) (*State, error) {

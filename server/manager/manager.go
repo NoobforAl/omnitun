@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NoobforAl/omnitun/core/protocols"
 	"github.com/NoobforAl/omnitun/server/serverconf"
 	"github.com/NoobforAl/omnitun/server/stats"
 	"github.com/NoobforAl/omnitun/server/store"
@@ -74,10 +75,17 @@ type Usage struct {
 
 // ProtocolInfo is one protocol's settings.
 type ProtocolInfo struct {
-	Key       string `json:"key" doc:"Protocol key, e.g. vless-reality"`
-	Port      int    `json:"port"`
-	Enabled   bool   `json:"enabled"`
-	Transport string `json:"transport" enum:"tcp,udp,tcp+udp"`
+	Key         string `json:"key" doc:"Protocol key, e.g. vless-reality"`
+	Name        string `json:"name" doc:"Display name"`
+	Description string `json:"description"`
+	Port        int    `json:"port"`
+	DefaultPort int    `json:"default_port"`
+	Enabled     bool   `json:"enabled"`
+	Transport   string `json:"transport" enum:"tcp,udp,tcp+udp"`
+	// NeedsCertificate is true for protocols that use the server's TLS certificate.
+	NeedsCertificate bool `json:"needs_certificate"`
+	// ShareLink is false for protocols that travel as a config file (OpenVPN).
+	ShareLink bool `json:"share_link"`
 }
 
 // UserInfo is one account without its secrets.
@@ -174,19 +182,15 @@ func (m *Manager) Server() (*ServerInfo, error) {
 	return m.serverInfo(st), nil
 }
 
-func transport(key string) string {
-	switch key {
-	case store.Hysteria2, store.TUIC, store.OpenVPNUDP:
-		return "udp"
-	case store.Shadowsocks:
-		return "tcp+udp"
-	}
-	return "tcp"
-}
-
 func protocolInfo(st *store.State, key string) ProtocolInfo {
 	p := st.Server.Protocols[key]
-	return ProtocolInfo{Key: key, Port: p.Port, Enabled: p.Enabled, Transport: transport(key)}
+	info := ProtocolInfo{Key: key, Name: key, Port: p.Port, Enabled: p.Enabled, Transport: "tcp"}
+	if proto, ok := protocols.Get(key); ok {
+		s := proto.Spec()
+		info.Name, info.Description, info.DefaultPort = s.Name, s.Description, s.DefaultPort
+		info.Transport, info.NeedsCertificate, info.ShareLink = s.Transport, s.NeedsCertificate, s.ShareLink
+	}
+	return info
 }
 
 // Protocols lists every protocol in display order.

@@ -160,6 +160,9 @@ func TestProtocolsAndServer(t *testing.T) {
 	if len(protos) != len(store.AllProtocols) {
 		t.Fatalf("protocols = %d", len(protos))
 	}
+	if protos[0].Key != "vless-reality" || protos[0].Name != "VLESS + Reality" || protos[0].Description == "" || protos[0].DefaultPort != 443 || !protos[0].ShareLink {
+		t.Fatalf("protocol metadata missing: %+v", protos[0])
+	}
 	var p manager.ProtocolInfo
 	json.Unmarshal(c.ok("PATCH", "/api/v1/protocols/trojan", map[string]any{"enabled": false, "port": 9443}, 200), &p)
 	if p.Enabled || p.Port != 9443 {
