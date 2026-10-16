@@ -410,7 +410,7 @@ Step 3 — more protocols and setup
 
 ---
 
-**Dependency note:** do not run `go get -u ./...` blindly. Snowflake (via lyrebird) needs `pion/webrtc` v4.2.18 with `pion/transport` v4, and the latest pion releases move to transport v5, which breaks the build. Upgrade selected modules (e.g. `go get github.com/sagernet/sing-box@vX`) and run the tagged tests (`scripts/go.ps1 test ./...`).
+**Dependency note (2026-10-16):** every Go module is at its latest release except the `pion/*` family, which is pinned to the versions Snowflake v2.15.1 builds against (`webrtc` v4.2.18, `ice` v4.4.1, `transport/v4` v4.1.0, …); newer pion releases move to `transport/v5` and break the Snowflake client. Lift the pin when Snowflake releases for it (`go list -m -u all` shows what is held). Do not run a blind `go get -u ./...`; after upgrades run `scripts/go.ps1 test ./...` and an Android vet (`GOOS=android go vet ./core/mobile`).
 
 ## 9. References
 
