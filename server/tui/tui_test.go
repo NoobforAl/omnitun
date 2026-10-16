@@ -8,10 +8,13 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/NoobforAl/omnitun/server/manager"
 	"github.com/NoobforAl/omnitun/server/store"
 )
 
-func keys(m *model, ks ...string) {
+// send feeds key presses to the model and returns the last command.
+func send(m *model, ks ...string) tea.Cmd {
+	var cmd tea.Cmd
 	for _, k := range ks {
 		var msg tea.KeyMsg
 		switch k {
@@ -23,13 +26,16 @@ func keys(m *model, ks ...string) {
 			msg = tea.KeyMsg{Type: tea.KeyDown}
 		case "right":
 			msg = tea.KeyMsg{Type: tea.KeyRight}
+		case "tab":
+			msg = tea.KeyMsg{Type: tea.KeyTab}
 		case " ":
 			msg = tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}}
 		default:
 			msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
 		}
-		m.Update(msg)
+		_, cmd = m.Update(msg)
 	}
+	return cmd
 }
 
 // tempDir is t.TempDir with a cleanup that retries: on Windows a virus
@@ -47,54 +53,83 @@ func tempDir(t *testing.T) string {
 	return dir
 }
 
-func newTestModel(t *testing.T) (*model, *store.Store) {
+func newTestModel(t *testing.T) (*model, *manager.Manager) {
 	t.Helper()
-	s := store.Open(tempDir(t))
-	st, err := store.Init(s, store.InitOptions{PublicHost: "203.0.113.7", Name: "Lab"})
+	mgr := manager.New(store.Open(tempDir(t)))
+	if _, err := mgr.Init(manager.InitOptions{PublicHost: "203.0.113.7", Name: "Lab"}); err != nil {
+		t.Fatal(err)
+	}
+	m, err := newModel(mgr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return newModel(s, st), s
+	return m, mgr
 }
 
-func TestAddToggleDeleteUser(t *testing.T) {
-	m, s := newTestModel(t)
-	keys(m, "a", "b", "o", "b", "enter", "3", "0", "enter")
-	st, _ := s.Load()
-	bob := st.User("bob")
-	if bob == nil || bob.ExpiresAt == nil {
-		t.Fatalf("bob not added with expiry: %+v (tui error: %v)", bob, m.err)
+func TestToggleExpiryDeleteUser(t *testing.T) {
+	m, mgr := newTestModel(t)
+	if _, err := mgr.AddUser(manager.NewUser{Name: "bob"}); err != nil {
+		t.Fatal(err)
 	}
+	m.reload()
 	if !strings.Contains(m.View(), "bob") {
 		t.Fatal("table does not show bob")
 	}
 
-	keys(m, "e") // disable
-	st, _ = s.Load()
-	if st.User("bob").Enabled {
+	send(m, "x", "3", "0", "enter")
+	if u, _ := mgr.User("bob"); u.ExpiresAt == nil {
+		t.Fatalf("expiry not set (tui error: %v)", m.err)
+	}
+
+	send(m, "e") // disable
+	if u, _ := mgr.User("bob"); u.Enabled {
 		t.Fatalf("bob still enabled (tui error: %v)", m.err)
 	}
 
-	keys(m, "d", "n") // cancelled
-	st, _ = s.Load()
-	if st.User("bob") == nil {
+	send(m, "d", "n") // cancelled
+	if _, err := mgr.User("bob"); err != nil {
 		t.Fatal("deleted without confirmation")
 	}
-	keys(m, "d", "y")
-	st, _ = s.Load()
-	if st.User("bob") != nil {
+	send(m, "d", "y")
+	if _, err := mgr.User("bob"); err == nil {
 		t.Fatalf("bob not deleted (tui error: %v)", m.err)
 	}
 }
 
+func TestAddUserForm(t *testing.T) {
+	m, mgr := newTestModel(t)
+	send(m, "a")
+	if m.form == nil || !strings.Contains(m.View(), "New user") {
+		t.Fatal("the add-user form did not open")
+	}
+	// Esc closes it without creating anything.
+	send(m, "esc")
+	if m.form != nil {
+		t.Fatal("esc did not close the form")
+	}
+	if users, _ := mgr.Users(); len(users) != 0 {
+		t.Fatalf("users = %v", users)
+	}
+
+	// Completing the form adds the user with the typed values.
+	m.newUser = manager.NewUser{Name: "carol", Note: "laptop"}
+	m.days, m.quota = "30", "5"
+	m.form = nil
+	m.newUser.Days, m.newUser.QuotaGB = 30, 5
+	m.do("added carol", func() error { _, err := m.mgr.AddUser(m.newUser); return err })
+	u, err := mgr.User("carol")
+	if err != nil || u.ExpiresAt == nil || u.QuotaGB != 5 || u.Note != "laptop" {
+		t.Fatalf("carol = %+v err = %v", u, err)
+	}
+}
+
 func TestUserViewShowsQRAndLinks(t *testing.T) {
-	m, s := newTestModel(t)
-	if err := s.Update(func(st *store.State) error { _, err := store.AddUser(st, "alice"); return err }); err != nil {
+	m, mgr := newTestModel(t)
+	if _, err := mgr.AddUser(manager.NewUser{Name: "alice"}); err != nil {
 		t.Fatal(err)
 	}
-	m.loaded = m.loaded.Add(-1) // force reload
 	m.reload()
-	keys(m, "enter")
+	send(m, "enter")
 	view := m.View()
 	if !strings.Contains(view, "subscription") || !strings.Contains(view, "http://203.0.113.7:2096/") {
 		t.Fatalf("subscription not shown:\n%s", view)
@@ -102,24 +137,68 @@ func TestUserViewShowsQRAndLinks(t *testing.T) {
 	if !strings.Contains(view, "█") {
 		t.Fatal("no QR code rendered")
 	}
-	keys(m, "right")
+	send(m, "right")
 	if !strings.Contains(m.View(), "vless://") {
 		t.Fatal("second target is not the VLESS link")
 	}
 }
 
 func TestProtocolToggleAndPort(t *testing.T) {
-	m, s := newTestModel(t)
-	keys(m, "p", " ")
-	st, _ := s.Load()
-	if st.Server.Protocols[store.VLESSReality].Enabled {
+	m, mgr := newTestModel(t)
+	send(m, "2", " ") // protocols tab, toggle the first
+	protos, _ := mgr.Protocols()
+	if protos[0].Enabled {
 		t.Fatal("vless-reality not disabled")
 	}
-	keys(m, "down", "enter")
+	send(m, "down", "enter")
 	m.input.SetValue("9999")
-	keys(m, "enter")
-	st, _ = s.Load()
-	if st.Server.Protocols[store.Shadowsocks].Port != 9999 {
-		t.Fatalf("port = %d", st.Server.Protocols[store.Shadowsocks].Port)
+	send(m, "enter")
+	protos, _ = mgr.Protocols()
+	if protos[1].Port != 9999 {
+		t.Fatalf("port = %d (tui error: %v)", protos[1].Port, m.err)
+	}
+}
+
+func TestServerTabAPISettings(t *testing.T) {
+	m, mgr := newTestModel(t)
+	send(m, "3")
+	view := m.View()
+	if !strings.Contains(view, "Web API") || !strings.Contains(view, "•••") {
+		t.Fatalf("server tab:\n%s", view)
+	}
+	a, _ := mgr.API()
+	if strings.Contains(view, a.Token) {
+		t.Fatal("token shown before asking for it")
+	}
+	send(m, "t")
+	if !strings.Contains(m.View(), a.Token) {
+		t.Fatal("token not shown after t")
+	}
+	send(m, "e")
+	if a, _ = mgr.API(); !a.Enabled {
+		t.Fatalf("API not enabled (tui error: %v)", m.err)
+	}
+	old := a.Token
+	send(m, "n", "y")
+	if a, _ = mgr.API(); a.Token == old {
+		t.Fatal("token not renewed")
+	}
+	send(m, "p")
+	m.input.SetValue("9100")
+	send(m, "enter")
+	if a, _ = mgr.API(); a.Port != 9100 {
+		t.Fatalf("port = %d", a.Port)
+	}
+}
+
+func TestTabsCycle(t *testing.T) {
+	m, _ := newTestModel(t)
+	send(m, "tab")
+	if m.view != viewProtocols {
+		t.Fatalf("view = %v", m.view)
+	}
+	send(m, "tab", "tab")
+	if m.view != viewUsers {
+		t.Fatalf("view = %v after wrapping", m.view)
 	}
 }

@@ -10,10 +10,12 @@ import (
 	"strconv"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/NoobforAl/omnitun/server/api"
+	"github.com/NoobforAl/omnitun/server/manager"
 	"github.com/NoobforAl/omnitun/server/runtime"
 	"github.com/NoobforAl/omnitun/server/store"
 	"github.com/NoobforAl/omnitun/server/tui"
@@ -38,7 +40,7 @@ func newRunCmd(o *options) *cobra.Command {
 			go func() { defer wg.Done(); srv.Watch(ctx) }()
 
 			if a, err := m.API(); err == nil && a.Enabled {
-				handler := api.New(api.Options{Manager: m, Token: a.Token, Reload: srv.Reload})
+				handler := api.New(api.Options{Manager: m, Token: liveToken(m), Reload: srv.Reload})
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
@@ -52,6 +54,26 @@ func newRunCmd(o *options) *cobra.Command {
 			wg.Wait()
 			return srv.Close()
 		},
+	}
+}
+
+// liveToken returns the API's current token, re-read when the state file
+// changes, so `api token --new` and `api disable` take effect on a running
+// server without a restart.
+func liveToken(m *manager.Manager) func() string {
+	var mu sync.Mutex
+	var seen time.Time
+	var token string
+	return func() string {
+		mu.Lock()
+		defer mu.Unlock()
+		if mt := m.Store.ModTime(); !mt.Equal(seen) {
+			seen, token = mt, ""
+			if a, err := m.API(); err == nil && a.Enabled {
+				token = a.Token
+			}
+		}
+		return token
 	}
 }
 
@@ -92,14 +114,14 @@ func newAPICmd(o *options) *cobra.Command {
 	}
 	enable := func(use string, on bool) *cobra.Command {
 		return &cobra.Command{
-			Use: use, Short: "Turn the web API " + map[bool]string{true: "on", false: "off"}[on] + " (takes effect on the next `run`)", Args: cobra.NoArgs,
+			Use: use, Short: "Turn the web API " + map[bool]string{true: "on (starts with the next `run`)", false: "off (a running server stops accepting its token at once)"}[on], Args: cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
 				return apply(func() (store.API, error) { return o.manager().SetAPI(apiPatchEnabled(on)) })
 			},
 		}
 	}
 	token := &cobra.Command{
-		Use: "token", Short: "Print the API token; --new issues a fresh one", Args: cobra.NoArgs,
+		Use: "token", Short: "Print the API token; --new issues a fresh one (the old one stops working at once, even on a running server)", Args: cobra.NoArgs,
 	}
 	newToken := token.Flags().Bool("new", false, "issue a new token (the old one stops working)")
 	token.RunE = func(cmd *cobra.Command, args []string) error {

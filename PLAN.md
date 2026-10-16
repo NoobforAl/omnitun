@@ -365,11 +365,12 @@ Done so far
 - [x] TUI: users, links + QR, protocol on/off and ports
 
 Step 1 — one service layer for every front end
-- [ ] `server/manager`: every operation (init, protocols, users, links, status, reload) as typed methods with JSON-tagged results; the CLI, the TUI and the web API only call it, so they always behave the same
-- [ ] **CLI on cobra** (help, shell completion, `--json` output, `--data`, consistent errors); same commands as today
-- [ ] **Web API on huma + chi** (OpenAPI 3 generated, validation, `/docs`): `/api/v1/server`, `/protocols`, `/users`, `/users/{name}` (get, patch, delete), `/users/{name}/reset`, `/users/{name}/links`, `/users/{name}/ovpn/{proto}`, `/reload`; bearer token (`omnitun-server api token`), listens on 127.0.0.1 by default, optional TLS; started by `run`
-- [ ] **TUI on Bubble Tea** (+ bubbles, huh forms): same features through the manager, plus server status, per-user traffic, logs, API token view
-- [ ] Tests for the manager, the API (httptest) and the CLI
+- [x] `server/manager`: every operation (init, protocols, users, links, status, reload) as typed methods with JSON-tagged results; the CLI, the TUI and the web API only call it, so they always behave the same
+- [x] **CLI on cobra** (help, shell completion, `--json` output, `--data`, consistent errors); same commands as today
+- [x] **Web API on huma + chi** (OpenAPI 3 generated, validation, `/docs`): `/api/v1/server`, `/protocols`, `/users`, `/users/{name}` (get, patch, delete), `/users/{name}/reset`, `/users/{name}/links`, `/users/{name}/ovpn/{proto}`, `/reload`; bearer token (`omnitun-server api token`), listens on 127.0.0.1 by default, optional TLS; started by `run`
+- [x] **TUI on Bubble Tea** (+ bubbles, huh form for adding users): same features through the manager, tabs for Users / Protocols / Server, API token view; per-user traffic and logs come with Step 2
+- [x] Tests for the manager, the API (httptest, incl. live token rotation) and the TUI; CLI checked by hand (exit codes 2/3/4 for invalid/not found/conflict)
+- [ ] CLI tests (cobra command tree against a temp data dir)
 
 Step 2 — accounting and safety
 - [ ] Per-user traffic accounting and quota **enforcement** (disable the user at the cap, reset monthly), shown in CLI/TUI/API

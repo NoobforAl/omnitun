@@ -27,7 +27,7 @@ func newClient(t *testing.T) *client {
 		t.Fatal(err)
 	}
 	c := &client{t: t}
-	c.srv = httptest.NewServer(New(Options{Manager: m, Token: token, Reload: func() error { c.reload++; return nil }}))
+	c.srv = httptest.NewServer(New(Options{Manager: m, Token: func() string { return token }, Reload: func() error { c.reload++; return nil }}))
 	t.Cleanup(c.srv.Close)
 	return c
 }
@@ -165,5 +165,37 @@ func TestReloadAndDocs(t *testing.T) {
 		if !strings.Contains(spec, want) {
 			t.Errorf("openapi.json lacks %s", want)
 		}
+	}
+}
+
+// A rotated or removed token must stop working on a running server at once.
+func TestTokenIsReadPerRequest(t *testing.T) {
+	m := manager.New(store.Open(t.TempDir()))
+	if _, err := m.Init(manager.InitOptions{PublicHost: "203.0.113.7"}); err != nil {
+		t.Fatal(err)
+	}
+	current := "first"
+	srv := httptest.NewServer(New(Options{Manager: m, Token: func() string { return current }}))
+	defer srv.Close()
+	get := func(tok string) int {
+		req, _ := http.NewRequest("GET", srv.URL+"/api/v1/server", nil)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	if get("first") != 200 {
+		t.Fatal("current token rejected")
+	}
+	current = "second"
+	if get("first") != 401 || get("second") != 200 {
+		t.Fatal("rotating the token did not revoke the old one")
+	}
+	current = ""
+	if get("second") != 401 || get("") != 401 {
+		t.Fatal("an empty token (API disabled) accepted a request")
 	}
 }

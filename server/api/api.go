@@ -21,8 +21,10 @@ import (
 // Options configures the API.
 type Options struct {
 	Manager *manager.Manager
-	// Token is the bearer token every /api/ request must carry.
-	Token string
+	// Token returns the bearer token every /api/ request must carry. It is
+	// called per request, so a rotated token revokes the old one at once;
+	// returning "" rejects every request (API disabled).
+	Token func() string
 	// Reload restarts the VPN core so changes apply at once; the running
 	// server also reloads by itself within seconds. Nil when no server runs
 	// in this process.
@@ -205,13 +207,17 @@ func New(o Options) http.Handler {
 }
 
 // authenticate rejects requests to secured operations without the token.
-func authenticate(a huma.API, token string) func(huma.Context, func(huma.Context)) {
+func authenticate(a huma.API, current func() string) func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		if len(ctx.Operation().Security) == 0 {
 			next(ctx)
 			return
 		}
 		got, ok := strings.CutPrefix(ctx.Header("Authorization"), "Bearer ")
+		token := ""
+		if current != nil {
+			token = current()
+		}
 		if !ok || token == "" || subtle.ConstantTimeCompare([]byte(got), []byte(token)) != 1 {
 			ctx.SetHeader("WWW-Authenticate", "Bearer")
 			huma.WriteErr(a, ctx, http.StatusUnauthorized, "a valid bearer token is required")
