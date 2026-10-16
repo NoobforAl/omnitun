@@ -97,7 +97,7 @@ class CoreEngine implements VpnEngine {
         return engine;
       } catch (e) {
         if (attempt == 2) {
-          _states.add(const EngineState(status: ConnStatus.error, error: 'Lost connection to the core service'));
+          _states.add(const EngineState(status: ConnStatus.error, error: 'Lost connection to the core service', errorCode: 'CORE_LOST'));
         }
         _logs.add('reconnect failed: $e');
       }
@@ -163,6 +163,7 @@ class CoreEngine implements VpnEngine {
           status: ConnStatus.error,
           activeProfileId: profile.id,
           error: 'VPN permission was not granted',
+          errorCode: 'NO_PERMISSION',
           progress: permission,
         ));
         return;

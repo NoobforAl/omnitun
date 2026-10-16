@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../state/providers.dart';
 
 class LogsScreen extends ConsumerWidget {
@@ -12,22 +13,22 @@ class LogsScreen extends ConsumerWidget {
     final logs = ref.watch(logsProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Logs'),
+        title: Text(context.l10n.tooltipLogs),
         actions: [
           IconButton(
-            tooltip: 'Copy all',
+            tooltip: context.l10n.actionCopyAll,
             onPressed: logs.isEmpty ? null : () => Clipboard.setData(ClipboardData(text: logs.join('\n'))),
             icon: const Icon(Icons.copy_all),
           ),
           IconButton(
-            tooltip: 'Clear',
+            tooltip: context.l10n.actionClear,
             onPressed: logs.isEmpty ? null : () => ref.read(logsProvider.notifier).clear(),
             icon: const Icon(Icons.delete_sweep_outlined),
           ),
         ],
       ),
       body: logs.isEmpty
-          ? const Center(child: Text('No log entries yet.'))
+          ? Center(child: Text(context.l10n.logsEmpty))
           : ListView.builder(
               reverse: true,
               padding: const EdgeInsets.all(12),

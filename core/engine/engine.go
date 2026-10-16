@@ -40,10 +40,13 @@ const (
 
 // State is a snapshot reported to the UI.
 type State struct {
-	Status  Status    `json:"status"`
-	Since   time.Time `json:"since,omitzero"`
-	Error   string    `json:"error,omitempty"`
-	Skipped []string  `json:"skipped,omitempty"`
+	Status Status    `json:"status"`
+	Since  time.Time `json:"since,omitzero"`
+	Error  string    `json:"error,omitempty"`
+	// ErrorCode is the kind of failure Error describes (ErrTimeout, ErrAuth, ...),
+	// for apps that word it in their own language; empty for something unusual.
+	ErrorCode string   `json:"error_code,omitempty"`
+	Skipped   []string `json:"skipped,omitempty"`
 	// Selected is the active profile ID, or "auto".
 	Selected  string `json:"selected,omitempty"`
 	UpBps     int64  `json:"up_bps"`
@@ -172,6 +175,10 @@ func (e *Engine) setState(s State) {
 			s.Failover = &f
 		}
 		e.carryFailover = nil
+	}
+	s.ErrorCode = ""
+	if s.Status == StatusError {
+		s.ErrorCode = errorCode(s.Error)
 	}
 	e.state = s
 	if e.cfg.OnState != nil {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../engine/engine.dart';
+import '../../l10n/l10n.dart';
 import '../theme.dart';
 
 /// The calm centre of the home screen: a lock inside a ring. While connecting
@@ -66,7 +67,7 @@ class _ConnectionRingState extends State<ConnectionRing> with SingleTickerProvid
     final inner = widget.size - 28;
 
     return Semantics(
-      label: '${statusLabel(widget.status)}${_showRing ? ', $percent percent' : ''}',
+      label: '${statusLabel(context.l10n, widget.status)}${_showRing ? ', $percent%' : ''}',
       child: SizedBox(
         width: widget.size,
         height: widget.size,

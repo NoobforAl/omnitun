@@ -68,7 +68,7 @@ func (e *Engine) handshake(ctx context.Context, instance *box.Box, order []strin
 	e.logf("error", "%s failed: %v", stageLabel[StageHandshake], firstErr)
 	msg := fmt.Sprintf("%s failed: %s", stageLabel[StageHandshake], plainError(firstErr))
 	if nerr := e.netCheck(ctx, instance); nerr != nil {
-		msg = "No internet connection"
+		msg = msgNoInternet
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -77,7 +77,7 @@ func (e *Engine) handshake(ctx context.Context, instance *box.Box, order []strin
 	}
 	failed := progress(StageHandshake, e.name(selected))
 	e.stopLocked()
-	e.setState(State{Status: StatusError, Error: msg, Progress: failed, NoNetwork: msg == "No internet connection"})
+	e.setState(State{Status: StatusError, Error: msg, Progress: failed, NoNetwork: msg == msgNoInternet})
 }
 
 // updateProgress sets the progress if instance is still running; it reports whether it was.

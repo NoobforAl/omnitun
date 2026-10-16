@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/engine.dart';
+import '../../l10n/l10n.dart';
 import '../../state/countries.dart';
 import '../../state/location.dart';
 import '../../state/providers.dart';
@@ -35,7 +36,7 @@ class HomeScreen extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           duration: const Duration(seconds: 6),
-          content: Text('Switched to ${name(next.to)} — ${name(next.from)} stopped responding'),
+          content: Text(context.l10n.failoverToast(name(next.to), name(next.from))),
         ),
       );
     });
@@ -100,12 +101,12 @@ class _TopBar extends StatelessWidget {
           ),
           const Spacer(),
           IconButton(
-            tooltip: 'Logs',
+            tooltip: context.l10n.tooltipLogs,
             onPressed: () => _open(context, const LogsScreen()),
             icon: const Icon(Icons.receipt_long_outlined),
           ),
           IconButton(
-            tooltip: 'Settings',
+            tooltip: context.l10n.tooltipSettings,
             onPressed: () => _open(context, const SettingsScreen()),
             icon: const Icon(Icons.settings_outlined),
           ),
@@ -168,7 +169,7 @@ class _HeroState extends ConsumerState<_Hero> {
           ConnectionRing(status: s.status, progress: s.progress),
           const SizedBox(height: 28),
           Text(
-            statusLabel(s.status),
+            statusLabel(context.l10n, s.status),
             style: text.titleLarge?.copyWith(color: color, fontWeight: FontWeight.w700),
             textAlign: TextAlign.center,
           ),
@@ -179,7 +180,7 @@ class _HeroState extends ConsumerState<_Hero> {
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
                 child: Text(
-                  [s.progress!.detail ?? stageLabel(s.progress!.stage), ?s.progress!.profile].join(' · '),
+                  [s.progress!.detail ?? stageLabel(context.l10n, s.progress!.stage), ?s.progress!.profile].join(' · '),
                   key: ValueKey('${s.progress!.stage}${s.progress!.profile}${s.progress!.detail}'),
                   style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
                   textAlign: TextAlign.center,
@@ -193,11 +194,16 @@ class _HeroState extends ConsumerState<_Hero> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CountryFlag(code, size: 28, icon: Icons.security),
+                  CountryFlag(
+                    code,
+                    size: 28,
+                    icon: Icons.security,
+                    label: active.protocol == 'tor' ? context.l10n.torNetwork : null,
+                  ),
                   const SizedBox(width: 10),
                   Flexible(
                     child: Text(
-                      active.protocol == 'tor' ? 'Tor network' : countryNames[code] ?? code!,
+                      active.protocol == 'tor' ? context.l10n.torNetwork : countryNames[code] ?? code!,
                       style: text.titleMedium,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -284,12 +290,12 @@ class _BottomPanel extends ConsumerWidget {
     final code = countryOfChoice(choice);
     final specific = profiles.where((p) => p.id == choice).firstOrNull;
     final (flagCode, title, subtitle) = plan == null
-        ? (null, 'No servers', 'Add one to get started')
+        ? (null, context.l10n.noServers, context.l10n.noServersHint)
         : specific != null
-        ? (countryOf(specific), specific.name, specific.address)
+        ? (countryOf(specific), specific.name, profileAddress(context, specific))
         : code != null
-        ? (code, countryNames[code] ?? code, 'Any server in this country')
-        : (null, 'Automatic', 'Fastest server, switches if one stops working');
+        ? (code, countryNames[code] ?? code, context.l10n.anyServerInCountry)
+        : (null, context.l10n.automatic, context.l10n.automaticHint);
     final rowIcon = specific == null ? Icons.bolt : (specific.protocol == 'tor' ? Icons.security : Icons.public);
 
     return Container(
@@ -306,7 +312,7 @@ class _BottomPanel extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 14),
               child: Text(
-                state.error!,
+                localizedError(context.l10n, state) ?? state.error!,
                 style: text.bodyMedium?.copyWith(color: scheme.error),
                 textAlign: TextAlign.center,
               ),
@@ -331,7 +337,7 @@ class _BottomPanel extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Location', style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
+                            Text(context.l10n.locationLabel, style: text.labelSmall?.copyWith(color: scheme.onSurfaceVariant)),
                             Text(title, style: text.titleMedium, overflow: TextOverflow.ellipsis),
                             Text(
                               subtitle,
@@ -366,7 +372,9 @@ class _BottomPanel extends ConsumerWidget {
                         ctrl.toggle();
                       },
                 child: Text(
-                  connected ? 'Disconnect' : (active ? 'Cancel' : 'Connect'),
+                  connected
+                      ? context.l10n.buttonDisconnect
+                      : (active ? context.l10n.buttonCancel : context.l10n.buttonConnect),
                   style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: buttonText),
                 ),
               ),
@@ -387,11 +395,11 @@ class _EmptyHint extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text('No profiles yet', style: Theme.of(context).textTheme.titleMedium),
+        Text(context.l10n.emptyTitle, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 4),
-        const Text('Import a config file, link or subscription to get started.', textAlign: TextAlign.center),
+        Text(context.l10n.emptyHint, textAlign: TextAlign.center),
         const SizedBox(height: 16),
-        FilledButton.icon(onPressed: onImport, icon: const Icon(Icons.add), label: const Text('Import config')),
+        FilledButton.icon(onPressed: onImport, icon: const Icon(Icons.add), label: Text(context.l10n.importConfig)),
       ],
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../state/subscriptions.dart';
 
 /// Adds a subscription (or edits one when [existing] is given).
@@ -15,18 +16,18 @@ class SubscriptionScreen extends ConsumerStatefulWidget {
 }
 
 class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
-  static const _viaChoices = {
-    'direct': 'Directly',
-    'auto': 'Directly, or through the VPN if the provider is blocked',
-    'tunnel': 'Always through the VPN (connect first)',
+  static Map<String, String> _viaChoices(AppLocalizations l) => {
+    'direct': l.subViaDirect,
+    'auto': l.subViaAuto,
+    'tunnel': l.subViaTunnel,
   };
 
-  static const _authTypes = {
-    'none': 'None',
-    'basic': 'Username & password (Basic)',
-    'bearer': 'Bearer token',
-    'header': 'Custom header',
-    'query': 'Token in URL',
+  static Map<String, String> _authTypes(AppLocalizations l) => {
+    'none': l.authNone,
+    'basic': l.authBasic,
+    'bearer': l.authBearer,
+    'header': l.authHeader,
+    'query': l.authQuery,
   };
 
   late final _name = TextEditingController(text: widget.existing?.name ?? '');
@@ -59,21 +60,22 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
         queryKey: _authType == 'query' ? _queryKey.text.trim() : '',
       );
 
-  String? _validate() {
+  String? _validate(AppLocalizations l) {
     final uri = Uri.tryParse(_url.text.trim());
     // nordvpn://<access token>?country=DE gives NordLynx (WireGuard) servers.
     if (uri == null || !(uri.isScheme('http') || uri.isScheme('https') || uri.isScheme('nordvpn')) || uri.host.isEmpty) {
-      return 'Enter an http(s) subscription URL (or nordvpn://<access token>)';
+      return l.subErrUrl;
     }
-    if (_authType == 'header' && _header.text.trim().isEmpty) return 'Enter the header name';
+    if (_authType == 'header' && _header.text.trim().isEmpty) return l.subErrHeader;
     if (const ['bearer', 'header', 'query'].contains(_authType) && _token.text.trim().isEmpty) {
-      return 'Enter the token';
+      return l.subErrToken;
     }
     return null;
   }
 
   Future<void> _save() async {
-    final problem = _validate();
+    final l = context.l10n;
+    final problem = _validate(l);
     if (problem != null) {
       setState(() => _error = problem);
       return;
@@ -94,7 +96,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
       }
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Subscription updated: $count profile(s)')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.subUpdatedToast(count))));
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -107,9 +109,10 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     final secret = _showSecret ? null : '•';
     return Scaffold(
-      appBar: AppBar(title: Text(widget.existing == null ? 'Add subscription' : 'Edit subscription')),
+      appBar: AppBar(title: Text(widget.existing == null ? l.subAddTitle : l.subEditTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -117,27 +120,27 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
             controller: _url,
             keyboardType: TextInputType.url,
             autofocus: widget.existing == null && widget.initialUrl.isEmpty,
-            decoration: const InputDecoration(
-              labelText: 'Subscription URL',
-              hintText: 'https://provider.example/sub/… or nordvpn://<token>',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l.subUrlLabel,
+              hintText: l.subUrlHint,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _name,
-            decoration: const InputDecoration(
-              labelText: 'Name (optional)',
-              helperText: 'Defaults to the provider\'s title or the host name',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l.subNameLabel,
+              helperText: l.subNameHelp,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 20),
           DropdownButtonFormField<String>(
             initialValue: _authType,
-            decoration: const InputDecoration(labelText: 'Authentication', border: OutlineInputBorder()),
+            decoration: InputDecoration(labelText: l.subAuthLabel, border: const OutlineInputBorder()),
             items: [
-              for (final e in _authTypes.entries) DropdownMenuItem(value: e.key, child: Text(e.value)),
+              for (final e in _authTypes(l).entries) DropdownMenuItem(value: e.key, child: Text(e.value)),
             ],
             onChanged: _busy ? null : (v) => setState(() => _authType = v ?? 'none'),
           ),
@@ -145,7 +148,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
           if (_authType == 'basic') ...[
             TextField(
               controller: _username,
-              decoration: const InputDecoration(labelText: 'Username', border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: l.subUsername, border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -153,7 +156,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
               obscureText: !_showSecret,
               obscuringCharacter: secret ?? '•',
               decoration: InputDecoration(
-                labelText: 'Password',
+                labelText: l.subPassword,
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
                   onPressed: () => setState(() => _showSecret = !_showSecret),
@@ -165,10 +168,10 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
           if (_authType == 'header') ...[
             TextField(
               controller: _header,
-              decoration: const InputDecoration(
-                labelText: 'Header name',
+              decoration: InputDecoration(
+                labelText: l.subHeaderName,
                 hintText: 'X-Api-Key',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
@@ -176,7 +179,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
           if (_authType == 'query') ...[
             TextField(
               controller: _queryKey,
-              decoration: const InputDecoration(labelText: 'Parameter name', border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: l.subParamName, border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
           ],
@@ -185,7 +188,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
               controller: _token,
               obscureText: !_showSecret,
               decoration: InputDecoration(
-                labelText: _authType == 'header' ? 'Header value' : 'Token',
+                labelText: _authType == 'header' ? l.subHeaderValue : l.subToken,
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
                   onPressed: () => setState(() => _showSecret = !_showSecret),
@@ -197,14 +200,15 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
           DropdownButtonFormField<String>(
             initialValue: _via,
             isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Download',
-              helperText: 'Some providers are blocked where you are; the VPN can still reach them',
+            decoration: InputDecoration(
+              labelText: l.subDownloadLabel,
+              helperText: l.subDownloadHelp,
               helperMaxLines: 2,
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(),
             ),
             items: [
-              for (final e in _viaChoices.entries) DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis)),
+              for (final e in _viaChoices(l).entries)
+                DropdownMenuItem(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis)),
             ],
             onChanged: _busy ? null : (v) => setState(() => _via = v ?? Subscription.defaultVia),
           ),
@@ -219,7 +223,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
             icon: _busy
                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.cloud_download_outlined),
-            label: Text(widget.existing == null ? 'Add and download' : 'Save and refresh'),
+            label: Text(widget.existing == null ? l.subAddAndDownload : l.subSaveAndRefresh),
           ),
         ],
       ),

@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/engine.dart';
+import '../../l10n/form_text.dart';
+import '../../l10n/l10n.dart';
 import '../../state/countries.dart';
 import '../../state/providers.dart';
 import '../widgets/country_flag.dart';
@@ -18,7 +20,7 @@ class NewServerScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final forms = ref.watch(formsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Add a server')),
+      appBar: AppBar(title: Text(context.l10n.addServerTitle)),
       body: forms.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
@@ -26,9 +28,9 @@ class NewServerScreen extends ConsumerWidget {
         ),
         data: (list) => ListView(
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: Text('Choose the protocol of your server. A share link or QR code is quicker: use Import.'),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+              child: Text(context.l10n.addServerIntro),
             ),
             for (final f in list)
               ListTile(
@@ -94,7 +96,7 @@ class _ProfileEditorScreenState extends ConsumerState<ProfileEditorScreen> {
   Future<void> _load() async {
     try {
       final forms = await ref.read(formsProvider.future);
-      final form = forms.firstWhere((f) => f.protocol == _protocol, orElse: () => throw 'No editor for $_protocol');
+      final form = forms.firstWhere((f) => f.protocol == _protocol, orElse: () => throw _NoEditor());
       final values = _editing
           ? await ref.read(engineProvider).profileValues(widget.profile!)
           : {for (final f in form.fields) f.key: f.defaultValue};
@@ -111,12 +113,13 @@ class _ProfileEditorScreenState extends ConsumerState<ProfileEditorScreen> {
         }
       });
     } catch (e) {
-      if (mounted) setState(() => _loadError = messageOf(e));
+      if (mounted) setState(() => _loadError = e is _NoEditor ? context.l10n.formNoEditor(_protocol) : messageOf(e));
     }
   }
 
   Future<void> _save() async {
     final form = _form;
+    final alreadyInList = context.l10n.alreadyInList;
     if (form == null || _saving) return;
     setState(() {
       _saving = true;
@@ -131,7 +134,7 @@ class _ProfileEditorScreenState extends ConsumerState<ProfileEditorScreen> {
       if (_editing) {
         profiles.replace(widget.profile!.id, built);
       } else if (profiles.addAll([built]) == 0) {
-        throw EngineException('CONFLICT', 'This server is already in the list');
+        throw EngineException('CONFLICT', alreadyInList);
       }
       if (_country != null) {
         ref.read(countryOverridesProvider.notifier).set(built.id, _country!.isEmpty ? null : _country);
@@ -151,12 +154,12 @@ class _ProfileEditorScreenState extends ConsumerState<ProfileEditorScreen> {
   Widget build(BuildContext context) {
     final form = _form;
     final title = _editing
-        ? (_protocol == 'tor' ? 'Tor bridges' : 'Edit server')
-        : 'New ${form?.label ?? ''} server'.replaceAll('  ', ' ');
+        ? (_protocol == 'tor' ? context.l10n.torBridgesTitle : context.l10n.editServerTitle)
+        : context.l10n.newServerTitle(form?.label ?? '');
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
-        actions: [TextButton(onPressed: form == null || _saving ? null : _save, child: const Text('Save'))],
+        actions: [TextButton(onPressed: form == null || _saving ? null : _save, child: Text(context.l10n.actionSave))],
       ),
       body: _loadError != null
           ? Center(
@@ -191,17 +194,17 @@ class _ProfileEditorScreenState extends ConsumerState<ProfileEditorScreen> {
                 child: Text(_saveError!, style: TextStyle(color: scheme.onErrorContainer)),
               ),
             if (profile != null && profile.group != ProfileInfo.defaultGroup)
-              const Padding(
-                padding: EdgeInsets.only(bottom: 12),
-                child: Text('This server comes from a subscription: your changes are replaced when it refreshes.'),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(context.l10n.subscriptionEditNote),
               ),
             for (final f in basic) _field(context, f),
             if (_protocol != 'tor')
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CountryFlag(code),
-                title: const Text('Country'),
-                subtitle: Text(code == null ? 'Worked out from the name and address' : countryNames[code] ?? code),
+                title: Text(context.l10n.countryRow),
+                subtitle: Text(code == null ? context.l10n.countryAuto : countryNames[code] ?? code),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () async {
                   final picked = await pickCountry(context, code);
@@ -211,7 +214,7 @@ class _ProfileEditorScreenState extends ConsumerState<ProfileEditorScreen> {
             if (more.isNotEmpty)
               ExpansionTile(
                 tilePadding: EdgeInsets.zero,
-                title: const Text('More options'),
+                title: Text(context.l10n.moreOptions),
                 childrenPadding: EdgeInsets.zero,
                 children: [for (final f in more) _field(context, f)],
               ),
@@ -222,14 +225,16 @@ class _ProfileEditorScreenState extends ConsumerState<ProfileEditorScreen> {
   }
 
   Widget _field(BuildContext context, FormFieldSpec f) {
-    final label = f.required ? '${f.label} *' : f.label;
-    final helper = f.help.isEmpty ? null : f.help;
+    final l = context.l10n;
+    final fieldLabel = formLabel(l, f.label);
+    final label = f.required ? l.fieldRequired(fieldLabel) : fieldLabel;
+    final helper = f.help.isEmpty ? null : formHelp(l, f.help);
     Widget child;
     switch (f.kind) {
       case 'bool':
         child = SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: Text(f.label),
+          title: Text(fieldLabel),
           subtitle: helper == null ? null : Text(helper),
           value: _values[f.key] == 'true',
           onChanged: (v) => setState(() => _values[f.key] = v ? 'true' : 'false'),
@@ -240,7 +245,7 @@ class _ProfileEditorScreenState extends ConsumerState<ProfileEditorScreen> {
           initialValue: f.choices.contains(current) ? current : null,
           isExpanded: true,
           decoration: InputDecoration(labelText: label, helperText: helper, helperMaxLines: 3),
-          items: [for (final c in f.choices) DropdownMenuItem(value: c, child: Text(_choiceLabel(f, c)))],
+          items: [for (final c in f.choices) DropdownMenuItem(value: c, child: Text(_choiceLabel(l, f, c)))],
           onChanged: (v) => setState(() => _values[f.key] = v ?? ''),
         );
       default:
@@ -264,11 +269,11 @@ class _ProfileEditorScreenState extends ConsumerState<ProfileEditorScreen> {
               },
               decoration: InputDecoration(
                 labelText: label,
-                helperText: helper ?? (f.kind == 'list' ? 'Separate values with commas' : null),
+                helperText: helper ?? (f.kind == 'list' ? l.listHelper : null),
                 helperMaxLines: 3,
                 suffixIcon: secret
                     ? IconButton(
-                        tooltip: _hidden.contains(f.key) ? 'Hide' : 'Show',
+                        tooltip: _hidden.contains(f.key) ? l.tooltipHide : l.tooltipShow,
                         icon: Icon(_hidden.contains(f.key) ? Icons.visibility_off : Icons.visibility),
                         onPressed: () =>
                             setState(() => _hidden.contains(f.key) ? _hidden.remove(f.key) : _hidden.add(f.key)),
@@ -283,16 +288,16 @@ class _ProfileEditorScreenState extends ConsumerState<ProfileEditorScreen> {
     return Padding(padding: const EdgeInsets.only(bottom: 14), child: child);
   }
 
-  static String _choiceLabel(FormFieldSpec f, String c) {
+  static String _choiceLabel(AppLocalizations l, FormFieldSpec f, String c) {
     if (f.key == 'tor.builtin') {
       return switch (c) {
-        '' => 'None (direct, or the lines below)',
-        'snowflake' => 'Snowflake',
-        'obfs4' => 'obfs4 (built-in bridges)',
+        '' => l.torBridgesNone,
+        'snowflake' => l.torBridgesSnowflake,
+        'obfs4' => l.torBridgesObfs4,
         _ => c,
       };
     }
-    return c.isEmpty ? 'Default' : c;
+    return c.isEmpty ? l.choiceDefault : c;
   }
 }
 
@@ -318,21 +323,21 @@ class _FillButtons extends StatelessWidget {
           TextButton.icon(
             onPressed: () async => _add((await Clipboard.getData(Clipboard.kTextPlain))?.text ?? ''),
             icon: const Icon(Icons.content_paste),
-            label: const Text('Paste'),
+            label: Text(context.l10n.fillPaste),
           ),
           TextButton.icon(
             onPressed: () async {
               try {
-                final file = await FilePicker.pickFile(dialogTitle: 'Open a text file');
+                final file = await FilePicker.pickFile(dialogTitle: context.l10n.openTextFile);
                 if (file != null) _add(await file.xFile.readAsString());
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not read the file: $e')));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.couldNotReadFile('$e'))));
                 }
               }
             },
             icon: const Icon(Icons.file_open_outlined),
-            label: const Text('File'),
+            label: Text(context.l10n.fillFile),
           ),
           if (QrScanScreen.supported)
             TextButton.icon(
@@ -342,10 +347,13 @@ class _FillButtons extends StatelessWidget {
                 if (text != null) _add(text);
               },
               icon: const Icon(Icons.qr_code_scanner),
-              label: const Text('Scan QR'),
+              label: Text(context.l10n.fillScanQr),
             ),
         ],
       ),
     );
   }
 }
+
+/// The core has no editor for the profile's protocol.
+class _NoEditor implements Exception {}

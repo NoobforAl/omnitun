@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../state/providers.dart';
 
 /// Shown on the first start (when there are no servers yet): what the app does,
@@ -26,26 +27,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _controller = PageController();
   int _page = 0;
 
-  static final _pages = [
-    const _Page(
-      Icons.lock_outline,
-      'Private and simple',
-      'Omnitun connects you through VPN, proxy and Tor protocols from one calm screen. '
-          'Pick a place, press Connect.',
-    ),
-    const _Page(
-      Icons.dns_outlined,
-      'Add your servers',
-      'Import a share link, a QR code, a config file or a subscription from your provider. '
-          'You can also add a server by hand.',
-    ),
+  static List<_Page> _pagesOf(AppLocalizations l) => [
+    _Page(Icons.lock_outline, l.obTitle1, l.obText1),
+    _Page(Icons.dns_outlined, l.obTitle2, l.obText2),
     _Page(
       Icons.verified_user_outlined,
-      Platform.isAndroid ? 'Android will ask once' : 'Ready when you are',
-      Platform.isAndroid
-          ? 'The first time you connect, Android asks to allow a VPN connection. Omnitun can only protect '
-                'your traffic after you accept. While connected, a notification shows the speed and a Disconnect button.'
-          : 'Omnitun starts in proxy mode, which needs no special rights. Turn on VPN mode in Settings to capture all traffic.',
+      Platform.isAndroid ? l.obTitle3Android : l.obTitle3Desktop,
+      Platform.isAndroid ? l.obText3Android : l.obText3Desktop,
     ),
   ];
 
@@ -65,7 +53,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    final last = _page == _pages.length - 1;
+    final pages = _pagesOf(context.l10n);
+    final last = _page == pages.length - 1;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -75,14 +64,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               children: [
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton(onPressed: _finish, child: const Text('Skip')),
+                  child: TextButton(onPressed: _finish, child: Text(context.l10n.actionSkip)),
                 ),
                 Expanded(
                   child: PageView(
                     controller: _controller,
                     onPageChanged: (i) => setState(() => _page = i),
                     children: [
-                      for (final p in _pages)
+                      for (final p in pages)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 32),
                           child: Column(
@@ -111,7 +100,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    for (var i = 0; i < _pages.length; i++)
+                    for (var i = 0; i < pages.length; i++)
                       Container(
                         margin: const EdgeInsets.all(4),
                         width: 8,
@@ -137,7 +126,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         // The last step ends in the thing to do: add a first server.
                         _finish(addServer: true);
                       },
-                      child: Text(last ? 'Add my first server' : 'Next'),
+                      child: Text(last ? context.l10n.obAddFirst : context.l10n.actionNext),
                     ),
                   ),
                 ),

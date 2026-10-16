@@ -154,6 +154,7 @@ class DaemonEngine implements VpnEngine {
       activeProfileId: selected ?? _state.activeProfileId,
       connectedSince: since == null ? null : DateTime.parse(since).toLocal(),
       error: s['error'] as String?,
+      errorCode: s['error_code'] as String?,
       upBps: (s['up_bps'] as num?)?.toInt() ?? 0,
       downBps: (s['down_bps'] as num?)?.toInt() ?? 0,
       failover: f == null

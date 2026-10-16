@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../state/providers.dart';
 
 class InstalledApp {
@@ -60,16 +61,16 @@ class _SplitTunnelScreenState extends ConsumerState<SplitTunnelScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Split tunneling')),
+      appBar: AppBar(title: Text(context.l10n.splitTitle)),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'off', label: Text('All apps')),
-                ButtonSegment(value: 'include', label: Text('Only selected')),
-                ButtonSegment(value: 'exclude', label: Text('Bypass selected')),
+              segments: [
+                ButtonSegment(value: 'off', label: Text(context.l10n.splitAll)),
+                ButtonSegment(value: 'include', label: Text(context.l10n.splitOnlySelected)),
+                ButtonSegment(value: 'exclude', label: Text(context.l10n.splitBypassSelected)),
               ],
               selected: {s.splitMode},
               onSelectionChanged: (v) => _setMode(v.first),
@@ -80,10 +81,10 @@ class _SplitTunnelScreenState extends ConsumerState<SplitTunnelScreen> {
             child: Text(
               switch (s.splitMode) {
                 'include' => selected.isEmpty
-                    ? 'No apps selected yet — until you pick some, all apps use the VPN.'
-                    : 'Only the ${selected.length} selected app(s) use the VPN.',
-                'exclude' => 'The ${selected.length} selected app(s) connect directly, without the VPN.',
-                _ => 'Every app uses the VPN. Choose a mode to pick apps.',
+                    ? context.l10n.splitHelpOnlyNone
+                    : context.l10n.splitHelpOnly(selected.length),
+                'exclude' => context.l10n.splitHelpBypass(selected.length),
+                _ => context.l10n.splitHelpOffMode,
               },
               style: theme.textTheme.bodySmall,
             ),
@@ -92,10 +93,10 @@ class _SplitTunnelScreenState extends ConsumerState<SplitTunnelScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: TextField(
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search),
-                  hintText: 'Search apps',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: context.l10n.searchApps,
+                  border: const OutlineInputBorder(),
                   isDense: true,
                 ),
                 onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
@@ -103,7 +104,7 @@ class _SplitTunnelScreenState extends ConsumerState<SplitTunnelScreen> {
             ),
             SwitchListTile(
               dense: true,
-              title: const Text('Show system apps'),
+              title: Text(context.l10n.showSystemApps),
               value: _showSystem,
               onChanged: (v) => setState(() => _showSystem = v),
             ),
@@ -111,7 +112,7 @@ class _SplitTunnelScreenState extends ConsumerState<SplitTunnelScreen> {
               child: FutureBuilder<List<InstalledApp>>(
                 future: _apps,
                 builder: (context, snap) {
-                  if (snap.hasError) return Center(child: Text('Could not list apps: ${snap.error}'));
+                  if (snap.hasError) return Center(child: Text(context.l10n.couldNotListApps('${snap.error}')));
                   if (!snap.hasData) return const Center(child: CircularProgressIndicator());
                   final apps = snap.data!.where((a) {
                     if (!_showSystem && a.system && !selected.contains(a.package)) return false;

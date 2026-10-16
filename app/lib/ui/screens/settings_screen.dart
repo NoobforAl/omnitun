@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/l10n.dart';
 import '../../state/providers.dart';
 import 'bypass_screen.dart';
 import 'logs_screen.dart';
@@ -15,93 +16,106 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = context.l10n;
     final s = ref.watch(settingsProvider);
     final ctrl = ref.read(settingsProvider.notifier);
+    final bypassEntries = ref.watch(bypassListsProvider).where((b) => b.enabled).fold<int>(0, (n, b) => n + b.entries);
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(l.settingsTitle)),
       body: ListView(
         children: [
-          const _Header('Servers'),
+          _Header(l.settingsServers),
           ListTile(
             leading: const Icon(Icons.dns_outlined),
-            title: const Text('Manage servers'),
-            subtitle: const Text('Import, subscriptions, order and removal'),
+            title: Text(l.manageServers),
+            subtitle: Text(l.manageServersHint),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ProfilesScreen())),
           ),
-          const _Header('Connection'),
+          _Header(l.settingsConnection),
           SwitchListTile(
-            title: const Text('VPN mode (all traffic)'),
-            subtitle: const Text('Off = proxy only: local SOCKS/HTTP port, no VPN permission needed'),
+            title: Text(l.vpnMode),
+            subtitle: Text(l.vpnModeHint),
             value: s.tunMode,
             onChanged: (v) => ctrl.update((s) => s.copyWith(tunMode: v)),
           ),
           SwitchListTile(
-            title: const Text('Set system proxy'),
-            subtitle: const Text('Proxy mode: point the OS proxy settings at Omnitun while connected'),
+            title: Text(l.systemProxy),
+            subtitle: Text(l.systemProxyHint),
             value: s.systemProxy,
             onChanged: s.tunMode ? null : (v) => ctrl.update((s) => s.copyWith(systemProxy: v)),
           ),
           SwitchListTile(
-            title: const Text('Auto-switch on failure'),
-            subtitle: const Text('Try the next profile in the group when one stops working'),
+            title: Text(l.autoSwitch),
+            subtitle: Text(l.autoSwitchHint),
             value: s.autoFailover,
             onChanged: (v) => ctrl.update((s) => s.copyWith(autoFailover: v)),
           ),
           SwitchListTile(
-            title: const Text('Bypass local network'),
-            subtitle: const Text('LAN devices and local addresses (192.168.x.x, 10.x.x.x, …) are reached directly, not through the VPN'),
+            title: Text(l.bypassLan),
+            subtitle: Text(l.bypassLanHint),
             value: s.bypassLan,
             onChanged: (v) => ctrl.update((s) => s.copyWith(bypassLan: v)),
           ),
           if (Platform.isAndroid)
             ListTile(
-              title: const Text('Always-on VPN and kill switch'),
-              subtitle: const Text(
-                'Android reconnects at boot and can block all traffic while the VPN is down. In the VPN settings '
-                'tap the gear next to Omnitun and turn on "Always-on VPN" and "Block connections without VPN". '
-                'Connect once from this app first.',
-              ),
+              title: Text(l.alwaysOnTitle),
+              subtitle: Text(l.alwaysOnHint),
               trailing: const Icon(Icons.open_in_new),
               onTap: () => _openVpnSettings(context),
             ),
           ListTile(
-            title: const Text('Bypass lists'),
-            subtitle: Text(() {
-              final on = ref.watch(bypassListsProvider).where((l) => l.enabled).fold<int>(0, (n, l) => n + l.entries);
-              return on == 0 ? 'Websites and addresses that skip the VPN' : '$on entr${on == 1 ? 'y' : 'ies'} in use';
-            }()),
+            title: Text(l.bypassTitle),
+            subtitle: Text(bypassEntries == 0 ? l.bypassListsHint : l.bypassListsInUse(bypassEntries)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const BypassScreen())),
           ),
           if (Platform.isAndroid)
             ListTile(
-              title: const Text('Split tunneling'),
+              title: Text(l.splitTunneling),
               subtitle: Text(switch (s.splitMode) {
-                'include' => 'Only ${s.splitApps.length} selected app(s) use the VPN',
-                'exclude' => '${s.splitApps.length} app(s) bypass the VPN',
-                _ => 'All apps use the VPN',
+                'include' => l.splitSummaryOnly(s.splitApps.length),
+                'exclude' => l.splitSummaryBypass(s.splitApps.length),
+                _ => l.splitSummaryOff,
               }),
               trailing: const Icon(Icons.chevron_right),
               enabled: s.tunMode,
               onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SplitTunnelScreen())),
             ),
           ListTile(
-            title: const Text('Remote DNS'),
+            title: Text(l.remoteDns),
             subtitle: Text(s.remoteDns),
             trailing: const Icon(Icons.edit_outlined),
             onTap: () => _editDns(context, ref, s.remoteDns),
           ),
-          const _Header('App'),
+          _Header(l.settingsApp),
           ListTile(
-            title: const Text('Appearance'),
-            subtitle: Text(switch (s.theme) { 'light' => 'Light', 'system' => 'Follow the system', _ => 'Dark' }),
+            title: Text(l.language),
+            subtitle: Text(
+              s.language.isEmpty
+                  ? l.languageSystem
+                  : supportedLanguages.where((e) => e.$1 == s.language).map((e) => e.$2).firstOrNull ?? s.language,
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _pickLanguage(context, ref, s.language),
+          ),
+          ListTile(
+            title: Text(l.appearance),
+            subtitle: Text(switch (s.theme) {
+              'light' => l.themeLight,
+              'system' => l.themeSystem,
+              _ => l.themeDark,
+            }),
             trailing: SegmentedButton<String>(
               showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(value: 'dark', icon: Icon(Icons.dark_mode_outlined), tooltip: 'Dark'),
-                ButtonSegment(value: 'system', icon: Icon(Icons.brightness_auto_outlined), tooltip: 'Follow the system'),
-                ButtonSegment(value: 'light', icon: Icon(Icons.light_mode_outlined), tooltip: 'Light'),
+              segments: [
+                ButtonSegment(value: 'dark', icon: const Icon(Icons.dark_mode_outlined), tooltip: l.themeDark),
+                ButtonSegment(
+                  value: 'system',
+                  icon: const Icon(Icons.brightness_auto_outlined),
+                  tooltip: l.themeSystem,
+                ),
+                ButtonSegment(value: 'light', icon: const Icon(Icons.light_mode_outlined), tooltip: l.themeLight),
               ],
               selected: {s.theme},
               onSelectionChanged: (v) => ctrl.update((s) => s.copyWith(theme: v.first)),
@@ -109,19 +123,19 @@ class SettingsScreen extends ConsumerWidget {
           ),
           ListTile(
             leading: const Icon(Icons.receipt_long_outlined),
-            title: const Text('Logs'),
+            title: Text(l.tooltipLogs),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const LogsScreen())),
           ),
           SwitchListTile(
-            title: const Text('Stop VPN when app is closed'),
+            title: Text(l.stopOnClose),
             value: s.stopOnClose,
             onChanged: (v) => ctrl.update((s) => s.copyWith(stopOnClose: v)),
           ),
           ListTile(
             leading: const Icon(Icons.info_outline),
-            title: const Text('Omnitun'),
-            subtitle: Text('MIT License · engine: ${ref.watch(engineProvider).name}'),
+            title: Text(l.appName),
+            subtitle: Text(l.aboutLine(ref.watch(engineProvider).name)),
           ),
         ],
       ),
@@ -130,12 +144,35 @@ class SettingsScreen extends ConsumerWidget {
 }
 
 Future<void> _openVpnSettings(BuildContext context) async {
+  final l = context.l10n;
   final opened = await const MethodChannel('omnitun/core').invokeMethod<bool>('openVpnSettings') ?? false;
   if (!opened && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Open Android Settings → Network → VPN, then the gear next to Omnitun')),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.openVpnSettingsFallback)));
   }
+}
+
+/// The language of the app: the system's, or one of the translations (each shown in its own language).
+Future<void> _pickLanguage(BuildContext context, WidgetRef ref, String current) async {
+  final l = context.l10n;
+  final picked = await showDialog<String>(
+    context: context,
+    builder: (context) => SimpleDialog(
+      title: Text(l.language),
+      children: [
+        RadioGroup<String>(
+          groupValue: current,
+          onChanged: (v) => Navigator.pop(context, v),
+          child: Column(
+            children: [
+              for (final option in [('', l.languageSystem), ...supportedLanguages])
+                RadioListTile<String>(value: option.$1, title: Text(option.$2)),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+  if (picked != null) ref.read(settingsProvider.notifier).update((s) => s.copyWith(language: picked));
 }
 
 Future<void> _editDns(BuildContext context, WidgetRef ref, String current) async {
@@ -166,25 +203,30 @@ class _DnsDialogState extends State<_DnsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     return AlertDialog(
-      title: const Text('Remote DNS'),
+      title: Text(l.remoteDns),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Resolver used through the tunnel. Examples: https://1.1.1.1/dns-query, '
-              'tls://1.1.1.1, tcp://8.8.8.8, 9.9.9.9'),
+          Text(l.remoteDnsHelp),
           const SizedBox(height: 12),
-          TextField(controller: _controller, autofocus: true, keyboardType: TextInputType.url),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            keyboardType: TextInputType.url,
+            textDirection: TextDirection.ltr, // an address is left to right in every language
+          ),
         ],
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, SettingsState.defaultRemoteDns),
-          child: const Text('Reset'),
+          child: Text(l.actionReset),
         ),
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(context, _controller.text.trim()), child: const Text('Save')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(l.actionCancel)),
+        FilledButton(onPressed: () => Navigator.pop(context, _controller.text.trim()), child: Text(l.actionSave)),
       ],
     );
   }
@@ -199,9 +241,10 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-      child: Text(text, style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            color: Theme.of(context).colorScheme.primary,
-          )),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.primary),
+      ),
     );
   }
 }

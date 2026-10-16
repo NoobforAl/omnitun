@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/engine.dart';
+import '../../l10n/l10n.dart';
 import '../../state/countries.dart';
 import '../../state/location.dart';
 import '../../state/providers.dart';
@@ -93,7 +94,7 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Select location'),
+        title: Text(context.l10n.selectLocation),
         actions: [
           _testing
               ? const Padding(
@@ -101,12 +102,12 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
                   child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
                 )
               : IconButton(
-                  tooltip: 'Test speed of all servers',
+                  tooltip: context.l10n.testSpeedTooltip,
                   onPressed: profiles.isEmpty ? null : _test,
                   icon: const Icon(Icons.speed),
                 ),
           PopupMenuButton<String>(
-            tooltip: 'Add servers',
+            tooltip: context.l10n.addServersTooltip,
             icon: const Icon(Icons.add),
             onSelected: (v) {
               switch (v) {
@@ -120,11 +121,11 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
                   Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ProfilesScreen()));
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'import', child: Text('Import a config, link or QR')),
-              PopupMenuItem(value: 'new', child: Text('Add a server by hand')),
-              PopupMenuItem(value: 'subscription', child: Text('Add a subscription')),
-              PopupMenuItem(value: 'manage', child: Text('Manage servers and subscriptions')),
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'import', child: Text(context.l10n.menuImport)),
+              PopupMenuItem(value: 'new', child: Text(context.l10n.menuNewServer)),
+              PopupMenuItem(value: 'subscription', child: Text(context.l10n.menuSubscription)),
+              PopupMenuItem(value: 'manage', child: Text(context.l10n.menuManage)),
             ],
           ),
         ],
@@ -138,7 +139,7 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
                 controller: _search,
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
-                  hintText: 'Search',
+                  hintText: context.l10n.searchHint,
                   prefixIcon: const Icon(Icons.search),
                   filled: true,
                   fillColor: scheme.surfaceContainer,
@@ -156,9 +157,9 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
                   children: [
                     if (query.isEmpty)
                       _Row(
-                        leading: const CountryFlag(null, icon: Icons.bolt, label: 'Automatic'),
-                        title: 'Automatic',
-                        subtitle: 'Fastest server, switches if one stops working',
+                        leading: CountryFlag(null, icon: Icons.bolt, label: context.l10n.automatic),
+                        title: context.l10n.automatic,
+                        subtitle: context.l10n.automaticHint,
                         selected:
                             choice == null ||
                             (profiles.every((p) => p.id != choice) && countryOfChoice(choice) == null),
@@ -169,14 +170,14 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
                         padding: const EdgeInsets.all(32),
                         child: Column(
                           children: [
-                            Text('No servers yet', style: text.titleMedium),
+                            Text(context.l10n.noServersYet, style: text.titleMedium),
                             const SizedBox(height: 4),
-                            const Text('Import a config file, link or subscription.', textAlign: TextAlign.center),
+                            Text(context.l10n.importHintShort, textAlign: TextAlign.center),
                             const SizedBox(height: 16),
                             FilledButton.icon(
                               onPressed: () => showImportSheet(context, ref),
                               icon: const Icon(Icons.add),
-                              label: const Text('Import config'),
+                              label: Text(context.l10n.importConfig),
                             ),
                           ],
                         ),
@@ -201,7 +202,7 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
     bool Function(CountryGroup, ProfileInfo) matches,
     bool searching,
   ) {
-    final name = g.code == null ? 'Other' : countryNames[g.code] ?? g.code!;
+    final name = g.code == null ? context.l10n.otherGroup : countryNames[g.code] ?? g.code!;
     final expanded = searching || _open.contains(g.code);
     final inCountry = g.code != null && choice == countryChoice(g.code!);
     final count = g.profiles.length;
@@ -209,7 +210,7 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
       _Row(
         leading: CountryFlag(g.code),
         title: name,
-        subtitle: '$count server${count == 1 ? '' : 's'}',
+        subtitle: context.l10n.serversCount(count),
         selected: inCountry,
         dot: g.code == null ? null : g.bestLatency ?? (g.unreachable ? -1 : null),
         // A country picks any of its servers; "Other" only opens.
@@ -217,7 +218,7 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
             ? () => setState(() => _open.contains(g.code) ? _open.remove(g.code) : _open.add(g.code))
             : () => _choose(countryChoice(g.code!)),
         trailing: IconButton(
-          tooltip: expanded ? 'Hide servers' : 'Show servers',
+          tooltip: expanded ? context.l10n.hideServers : context.l10n.showServers,
           onPressed: searching
               ? null
               : () => setState(() => _open.contains(g.code) ? _open.remove(g.code) : _open.add(g.code)),
@@ -231,7 +232,7 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
   }
 
   Iterable<Widget> _torRows(List<ProfileInfo> tor, String? choice) => [
-    const Padding(padding: EdgeInsets.fromLTRB(16, 16, 16, 4), child: Text('Tor')),
+    Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 4), child: Text(context.l10n.torGroup)),
     for (final p in tor) _ServerRow(profile: p, selected: choice == p.id, onTap: () => _choose(p.id), tor: true),
   ];
 }
@@ -297,7 +298,9 @@ class _ServerRow extends ConsumerWidget {
       contentPadding: const EdgeInsetsDirectional.only(start: 40, end: 4),
       title: Text(p.name, overflow: TextOverflow.ellipsis),
       subtitle: Text(
-        p.needsCredentials && !p.hasCredentials ? '${p.address} · needs sign-in' : p.address,
+        p.needsCredentials && !p.hasCredentials
+            ? context.l10n.needsSignIn(profileAddress(context, p))
+            : profileAddress(context, p),
         overflow: TextOverflow.ellipsis,
       ),
       selected: selected,
@@ -310,7 +313,7 @@ class _ServerRow extends ConsumerWidget {
           Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: LatencyDot(p.latencyMs)),
           ProtocolBadge(p.protocol),
           PopupMenuButton<String>(
-            tooltip: 'More',
+            tooltip: context.l10n.tooltipMore,
             onSelected: (v) async {
               switch (v) {
                 case 'edit':
@@ -327,11 +330,15 @@ class _ServerRow extends ConsumerWidget {
               }
             },
             itemBuilder: (_) => [
-              if (editable) PopupMenuItem(value: 'edit', child: Text(tor ? 'Bridge settings' : 'Edit')),
-              const PopupMenuItem(value: 'share', child: Text('Share link or QR')),
-              if (!tor) const PopupMenuItem(value: 'country', child: Text('Set country')),
-              if (p.needsCredentials) const PopupMenuItem(value: 'credentials', child: Text('Username and password')),
-              const PopupMenuItem(value: 'delete', child: Text('Delete')),
+              if (editable)
+                PopupMenuItem(
+                  value: 'edit',
+                  child: Text(tor ? context.l10n.menuBridgeSettings : context.l10n.menuEditServer),
+                ),
+              PopupMenuItem(value: 'share', child: Text(context.l10n.menuShare)),
+              if (!tor) PopupMenuItem(value: 'country', child: Text(context.l10n.menuSetCountry)),
+              if (p.needsCredentials) PopupMenuItem(value: 'credentials', child: Text(context.l10n.menuCredentials)),
+              PopupMenuItem(value: 'delete', child: Text(context.l10n.actionDelete)),
             ],
           ),
         ],
@@ -373,7 +380,7 @@ class _CountryDialogState extends State<_CountryDialog> {
             .toList()
           ..sort((a, b) => a.value.compareTo(b.value));
     return AlertDialog(
-      title: const Text('Country of this server'),
+      title: Text(context.l10n.countryOfServer),
       contentPadding: const EdgeInsets.only(top: 12),
       content: SizedBox(
         width: 360,
@@ -386,7 +393,7 @@ class _CountryDialogState extends State<_CountryDialog> {
                 controller: _query,
                 autofocus: true,
                 onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(hintText: 'Search', prefixIcon: Icon(Icons.search)),
+                decoration: InputDecoration(hintText: context.l10n.searchHint, prefixIcon: const Icon(Icons.search)),
               ),
             ),
             Expanded(
@@ -395,7 +402,7 @@ class _CountryDialogState extends State<_CountryDialog> {
                   if (q.isEmpty)
                     ListTile(
                       leading: const CountryFlag(null),
-                      title: const Text('Work it out from the name'),
+                      title: Text(context.l10n.guessFromName),
                       onTap: () => Navigator.pop(context, ''),
                     ),
                   for (final e in entries)
@@ -411,7 +418,7 @@ class _CountryDialogState extends State<_CountryDialog> {
           ],
         ),
       ),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel'))],
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.actionCancel))],
     );
   }
 }

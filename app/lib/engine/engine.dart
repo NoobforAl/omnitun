@@ -196,6 +196,7 @@ class EngineState {
     this.activeProfileId,
     this.connectedSince,
     this.error,
+    this.errorCode,
     this.upBps = 0,
     this.downBps = 0,
     this.failover,
@@ -206,6 +207,10 @@ class EngineState {
   final String? activeProfileId;
   final DateTime? connectedSince;
   final String? error;
+
+  /// The kind of failure [error] describes (TIMEOUT, AUTH_FAILED, ...), for wording it
+  /// in the user's language; null for something unusual.
+  final String? errorCode;
   final int upBps;
   final int downBps;
 
@@ -220,6 +225,7 @@ class EngineState {
     String? activeProfileId,
     DateTime? connectedSince,
     String? error,
+    String? errorCode,
     int? upBps,
     int? downBps,
   }) =>
@@ -228,6 +234,7 @@ class EngineState {
         activeProfileId: activeProfileId ?? this.activeProfileId,
         connectedSince: connectedSince ?? this.connectedSince,
         error: error ?? this.error,
+        errorCode: errorCode ?? this.errorCode,
         upBps: upBps ?? this.upBps,
         downBps: downBps ?? this.downBps,
         failover: failover,

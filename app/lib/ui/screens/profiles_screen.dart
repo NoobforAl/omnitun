@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/engine.dart';
+import '../../l10n/l10n.dart';
 import '../../state/providers.dart';
 import '../../state/subscriptions.dart';
 import '../widgets/protocol_badge.dart';
@@ -27,15 +28,15 @@ class ProfilesScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Manage servers'),
+        title: Text(context.l10n.profilesTitle),
         actions: [
           IconButton(
-            tooltip: 'Add subscription',
+            tooltip: context.l10n.addSubscriptionTooltip,
             onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SubscriptionScreen())),
             icon: const Icon(Icons.add_link),
           ),
           IconButton(
-            tooltip: 'Test latency',
+            tooltip: context.l10n.testLatencyTooltip,
             onPressed: profiles.isEmpty ? null : () => testAllLatencies(ref),
             icon: const Icon(Icons.speed),
           ),
@@ -44,24 +45,23 @@ class ProfilesScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showImportSheet(context, ref),
         icon: const Icon(Icons.add),
-        label: const Text('Import'),
+        label: Text(context.l10n.actionImport),
       ),
       body: profiles.isEmpty && subs.isEmpty
-          ? const Center(child: Text('No profiles. Tap Import to add one.'))
+          ? Center(child: Text(context.l10n.profilesEmptyHint))
           : CustomScrollView(
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                     child: Text(
-                      'Long-press and drag to reorder. With auto-switch on, the rest of the '
-                      'group is tried next, in this order.',
+                      context.l10n.profilesDragHint,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
                 ),
                 if (manual.isNotEmpty) ...[
-                  const SliverToBoxAdapter(child: _GroupTitle('My profiles')),
+                  SliverToBoxAdapter(child: _GroupTitle(context.l10n.myProfiles)),
                   _GroupList(group: ProfileInfo.defaultGroup, profiles: manual, selectedId: selected),
                 ],
                 for (final sub in subs) ...[
@@ -116,7 +116,9 @@ class _GroupList extends ConsumerWidget {
               leading: Icon(p.id == selectedId ? Icons.radio_button_checked : Icons.radio_button_off),
               title: Text(p.name, overflow: TextOverflow.ellipsis),
               subtitle: Text(
-                p.needsCredentials && !p.hasCredentials ? '${p.address} · needs sign-in' : p.address,
+                p.needsCredentials && !p.hasCredentials
+                    ? context.l10n.needsSignIn(profileAddress(context, p))
+                    : profileAddress(context, p),
                 overflow: TextOverflow.ellipsis,
               ),
               trailing: Row(
@@ -126,6 +128,7 @@ class _GroupList extends ConsumerWidget {
                   const SizedBox(width: 8),
                   ProtocolBadge(p.protocol),
                   PopupMenuButton<String>(
+                    tooltip: context.l10n.tooltipMore,
                     onSelected: (v) {
                       if (v == 'edit') {
                         Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ProfileEditorScreen(profile: p)));
@@ -138,11 +141,14 @@ class _GroupList extends ConsumerWidget {
                     },
                     itemBuilder: (_) => [
                       if (ref.read(formsProvider).value?.any((f) => f.protocol == p.protocol) ?? false)
-                        PopupMenuItem(value: 'edit', child: Text(p.protocol == 'tor' ? 'Bridge settings' : 'Edit')),
-                      const PopupMenuItem(value: 'share', child: Text('Share link or QR')),
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Text(p.protocol == 'tor' ? context.l10n.menuBridgeSettings : context.l10n.menuEditServer),
+                        ),
+                      PopupMenuItem(value: 'share', child: Text(context.l10n.menuShare)),
                       if (p.needsCredentials)
-                        const PopupMenuItem(value: 'credentials', child: Text('Username and password')),
-                      const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                        PopupMenuItem(value: 'credentials', child: Text(context.l10n.menuCredentials)),
+                      PopupMenuItem(value: 'delete', child: Text(context.l10n.actionDelete)),
                     ],
                   ),
                 ],
@@ -164,9 +170,10 @@ class _SubscriptionHeader extends ConsumerWidget {
 
   Future<void> _refresh(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l = context.l10n;
     try {
       final n = await ref.read(subscriptionsProvider.notifier).refresh(sub.id);
-      messenger.showSnackBar(SnackBar(content: Text('${sub.name}: $n profile(s)')));
+      messenger.showSnackBar(SnackBar(content: Text(l.subRefreshed(sub.name, n))));
     } catch (_) {
       // The error is shown in the header.
     }
@@ -178,11 +185,12 @@ class _SubscriptionHeader extends ConsumerWidget {
     final refreshing = ref.read(subscriptionsProvider.notifier).isRefreshing(sub.id);
     final theme = Theme.of(context);
     final info = sub.info;
+    final l = context.l10n;
     final details = <String>[
-      if (info.total > 0) '${formatBytes(info.used)} of ${formatBytes(info.total)}'
-      else if (info.used > 0) '${formatBytes(info.used)} used',
-      if (info.expire != null) _expiry(info.expire!),
-      if (sub.updatedAt != null) 'updated ${_ago(sub.updatedAt!)}',
+      if (info.total > 0) l.subUsageOf(formatBytes(info.used), formatBytes(info.total))
+      else if (info.used > 0) l.subUsed(formatBytes(info.used)),
+      if (info.expire != null) _expiry(l, info.expire!),
+      if (sub.updatedAt != null) l.subUpdated(_ago(l, sub.updatedAt!)),
     ];
 
     return Padding(
@@ -201,7 +209,7 @@ class _SubscriptionHeader extends ConsumerWidget {
                       child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
                     )
                   : IconButton(
-                      tooltip: 'Refresh',
+                      tooltip: l.refreshTooltip,
                       onPressed: () => _refresh(context, ref),
                       icon: const Icon(Icons.refresh),
                     ),
@@ -213,9 +221,9 @@ class _SubscriptionHeader extends ConsumerWidget {
                     ref.read(subscriptionsProvider.notifier).remove(sub.id);
                   }
                 },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'edit', child: Text('Edit')),
-                  PopupMenuItem(value: 'delete', child: Text('Delete subscription and its profiles')),
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: 'edit', child: Text(l.actionEdit)),
+                  PopupMenuItem(value: 'delete', child: Text(l.subDeleteWithProfiles)),
                 ],
               ),
             ],
@@ -232,7 +240,7 @@ class _SubscriptionHeader extends ConsumerWidget {
           if (sub.lastError != null)
             Padding(
               padding: const EdgeInsets.only(top: 2, right: 12),
-              child: Text('Last refresh failed: ${sub.lastError}',
+              child: Text(l.subRefreshFailed('${sub.lastError}'),
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error)),
             ),
         ],
@@ -240,19 +248,19 @@ class _SubscriptionHeader extends ConsumerWidget {
     );
   }
 
-  static String _expiry(DateTime at) {
+  static String _expiry(AppLocalizations l, DateTime at) {
     final days = at.difference(DateTime.now()).inDays;
-    if (at.isBefore(DateTime.now())) return 'expired';
-    if (days == 0) return 'expires today';
-    return 'expires in $days day${days == 1 ? '' : 's'}';
+    if (at.isBefore(DateTime.now())) return l.subExpired;
+    if (days == 0) return l.subExpiresToday;
+    return l.subExpiresIn(days);
   }
 
-  static String _ago(DateTime t) {
+  static String _ago(AppLocalizations l, DateTime t) {
     final d = DateTime.now().difference(t);
-    if (d.inMinutes < 1) return 'just now';
-    if (d.inHours < 1) return '${d.inMinutes} min ago';
-    if (d.inDays < 1) return '${d.inHours} h ago';
-    return '${d.inDays} d ago';
+    if (d.inMinutes < 1) return l.agoJustNow;
+    if (d.inHours < 1) return l.agoMinutes(d.inMinutes);
+    if (d.inDays < 1) return l.agoHours(d.inHours);
+    return l.agoDays(d.inDays);
   }
 }
 
@@ -290,12 +298,12 @@ class _ImportSheetState extends ConsumerState<_ImportSheet> {
 
   Future<void> _openFile() async {
     try {
-      final file = await FilePicker.pickFile(dialogTitle: 'Open config file');
+      final file = await FilePicker.pickFile(dialogTitle: context.l10n.openTextFile);
       if (file == null) return;
       _controller.text = await file.xFile.readAsString();
       await _import();
     } catch (e) {
-      if (mounted) setState(() => _message = 'Could not read file: $e');
+      if (mounted) setState(() => _message = context.l10n.couldNotReadFile('$e'));
     }
   }
 
@@ -331,15 +339,15 @@ class _ImportSheetState extends ConsumerState<_ImportSheet> {
       Navigator.of(context).pop();
       final dupes = result.profiles.length - added;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Imported $added profile(s)${dupes > 0 ? ', $dupes already present' : ''}'),
+        content: Text(context.l10n.importedProfiles(added, dupes)),
       ));
       return;
     }
     setState(() {
       _busy = false;
       _message = result.profiles.isEmpty && result.errors.isNotEmpty
-          ? 'Nothing imported: ${result.errors.first}'
-          : 'Imported $added, failed ${result.errors.length}';
+          ? context.l10n.importNothing(result.errors.first)
+          : context.l10n.importPartial(added, result.errors.length);
     });
   }
 
@@ -351,10 +359,9 @@ class _ImportSheetState extends ConsumerState<_ImportSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Import config', style: Theme.of(context).textTheme.titleLarge),
+          Text(context.l10n.importTitle, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 4),
-          const Text('Paste share links (vless://, trojan://, ss://, hy2://, anytls://, ssh://, sstp://, ikev2://, …), a Clash or sing-box config, a subscription, '
-              'a WireGuard .conf, an OpenVPN .ovpn or Tor bridge lines — or open a file or scan a QR code.'),
+          Text(context.l10n.importDescription),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -364,40 +371,40 @@ class _ImportSheetState extends ConsumerState<_ImportSheet> {
                 FilledButton.tonalIcon(
                   onPressed: _busy ? null : _scanQr,
                   icon: const Icon(Icons.qr_code_scanner),
-                  label: const Text('Scan QR'),
+                  label: Text(context.l10n.importScanQr),
                 ),
               FilledButton.tonalIcon(
                 onPressed: _busy ? null : _openFile,
                 icon: const Icon(Icons.file_open_outlined),
-                label: const Text('Open file'),
+                label: Text(context.l10n.importOpenFile),
               ),
               FilledButton.tonalIcon(
                 onPressed: _busy ? null : _paste,
                 icon: const Icon(Icons.content_paste),
-                label: const Text('Paste'),
+                label: Text(context.l10n.importPaste),
               ),
               FilledButton.tonalIcon(
                 onPressed: _busy ? null : _openSubscription,
                 icon: const Icon(Icons.add_link),
-                label: const Text('Subscription'),
+                label: Text(context.l10n.importSubscription),
               ),
               PopupMenuButton<String>(
                 enabled: !_busy,
-                tooltip: 'Add Tor',
+                tooltip: context.l10n.importAddTor,
                 onSelected: (kind) {
                   _controller.text = 'tor://$kind';
                   _import();
                 },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: '', child: Text('Tor (direct)')),
-                  PopupMenuItem(value: 'snowflake', child: Text('Tor + Snowflake bridge')),
-                  PopupMenuItem(value: 'obfs4', child: Text('Tor + obfs4 bridges')),
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: '', child: Text(context.l10n.importTorDirect)),
+                  PopupMenuItem(value: 'snowflake', child: Text(context.l10n.importTorSnowflake)),
+                  PopupMenuItem(value: 'obfs4', child: Text(context.l10n.importTorObfs4)),
                 ],
                 child: IgnorePointer(
                   child: FilledButton.tonalIcon(
                     onPressed: () {},
                     icon: const Icon(Icons.security),
-                    label: const Text('Tor'),
+                    label: Text(context.l10n.importTor),
                   ),
                 ),
               ),
@@ -414,7 +421,7 @@ class _ImportSheetState extends ConsumerState<_ImportSheet> {
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerRight,
-            child: FilledButton(onPressed: _busy ? null : _import, child: const Text('Import')),
+            child: FilledButton(onPressed: _busy ? null : _import, child: Text(context.l10n.actionImport)),
           ),
         ],
       ),

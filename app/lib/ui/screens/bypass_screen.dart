@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/engine.dart';
+import '../../l10n/l10n.dart';
 import '../../state/providers.dart';
 
 /// Lists of domains, addresses and ranges that go around the VPN (or, in
@@ -27,22 +28,22 @@ class BypassScreen extends ConsumerWidget {
     final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text ?? '';
     if (!context.mounted) return;
     if (text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('The clipboard is empty')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.bypassClipboardEmpty)));
       return;
     }
-    _edit(context, text: text, name: 'Pasted list');
+    _edit(context, text: text, name: context.l10n.bypassPastedName);
   }
 
   Future<void> _fromFile(BuildContext context) async {
     try {
-      final file = await FilePicker.pickFile(dialogTitle: 'Open a bypass list (.txt)');
+      final file = await FilePicker.pickFile(dialogTitle: context.l10n.bypassPickFile);
       if (file == null || !context.mounted) return;
       final text = await file.xFile.readAsString();
       if (!context.mounted) return;
       _edit(context, text: text, name: file.name.replaceFirst(RegExp(r'\.[A-Za-z0-9]+$'), ''));
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not read the file: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.couldNotReadFile('$e'))));
       }
     }
   }
@@ -51,12 +52,13 @@ class BypassScreen extends ConsumerWidget {
     final url = await showDialog<String>(context: context, builder: (_) => const _UrlDialog());
     if (url == null || !context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    final l = context.l10n;
     try {
-      final text = await downloadList(url);
+      final text = await downloadList(l, url);
       if (!context.mounted) return;
       _edit(context, text: text, name: Uri.parse(url).host);
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Could not download the list: $e')));
+      messenger.showSnackBar(SnackBar(content: Text(l.bypassDownloadFailed('$e'))));
     }
   }
 
@@ -68,10 +70,10 @@ class BypassScreen extends ConsumerWidget {
     final enabled = lists.where((l) => l.enabled).fold<int>(0, (n, l) => n + l.entries);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bypass lists'),
+        title: Text(context.l10n.bypassTitle),
         actions: [
           PopupMenuButton<String>(
-            tooltip: 'Add a list',
+            tooltip: context.l10n.bypassAddTooltip,
             icon: const Icon(Icons.add),
             onSelected: (v) {
               switch (v) {
@@ -82,14 +84,14 @@ class BypassScreen extends ConsumerWidget {
                 case 'url':
                   _fromUrl(context);
                 case 'type':
-                  _edit(context, name: 'My list');
+                  _edit(context, name: context.l10n.bypassDefaultName);
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'paste', child: Text('Paste from the clipboard')),
-              PopupMenuItem(value: 'file', child: Text('Open a .txt file')),
-              PopupMenuItem(value: 'url', child: Text('Download from a link')),
-              PopupMenuItem(value: 'type', child: Text('Type it')),
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'paste', child: Text(context.l10n.bypassFromClipboard)),
+              PopupMenuItem(value: 'file', child: Text(context.l10n.bypassFromFile)),
+              PopupMenuItem(value: 'url', child: Text(context.l10n.bypassFromUrl)),
+              PopupMenuItem(value: 'type', child: Text(context.l10n.bypassType)),
             ],
           ),
         ],
@@ -100,29 +102,25 @@ class BypassScreen extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.only(bottom: 32),
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
-                child: Text(
-                  'Websites and addresses that should not use the VPN, for example your bank or local services. '
-                  'One entry per line: example.com (and its subdomains), full:www.example.com, keyword:bank, '
-                  'regexp:…, 203.0.113.7 or 10.0.0.0/8. Lines starting with # are ignored.',
-                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                child: Text(context.l10n.bypassIntro),
               ),
               if (lists.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
-                      const Text('No lists yet.'),
+                      Text(context.l10n.bypassNoLists),
                       const SizedBox(height: 12),
                       FilledButton.icon(
                         onPressed: () => _fromFile(context),
                         icon: const Icon(Icons.file_open_outlined),
-                        label: const Text('Open a .txt file'),
+                        label: Text(context.l10n.bypassFromFile),
                       ),
                       TextButton(
-                        onPressed: () => _edit(context, name: 'My list'),
-                        child: const Text('Type a list'),
+                        onPressed: () => _edit(context, name: context.l10n.bypassDefaultName),
+                        child: Text(context.l10n.bypassTypeList),
                       ),
                     ],
                   ),
@@ -130,28 +128,26 @@ class BypassScreen extends ConsumerWidget {
               for (final l in lists)
                 SwitchListTile(
                   title: Text(l.name, overflow: TextOverflow.ellipsis),
-                  subtitle: Text('${l.entries} entr${l.entries == 1 ? 'y' : 'ies'}'),
+                  subtitle: Text(context.l10n.entriesCount(l.entries)),
                   value: l.enabled,
                   secondary: PopupMenuButton<String>(
-                    tooltip: 'More',
+                    tooltip: context.l10n.tooltipMore,
                     onSelected: (v) {
                       if (v == 'edit') _edit(context, list: l);
                       if (v == 'delete') ref.read(bypassListsProvider.notifier).remove(l.id);
                     },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      PopupMenuItem(value: 'delete', child: Text('Delete')),
+                    itemBuilder: (_) => [
+                      PopupMenuItem(value: 'edit', child: Text(context.l10n.actionEdit)),
+                      PopupMenuItem(value: 'delete', child: Text(context.l10n.actionDelete)),
                     ],
                   ),
                   onChanged: (v) => ref.read(bypassListsProvider.notifier).update(l.copyWith(enabled: v)),
                 ),
               const Divider(height: 32),
               SwitchListTile(
-                title: const Text('Only the listed destinations use the VPN'),
+                title: Text(context.l10n.bypassOnlyTitle),
                 subtitle: Text(
-                  settings.bypassOnly
-                      ? 'Everything else goes direct, outside the VPN.'
-                      : 'Off: the listed destinations go direct and everything else uses the VPN.',
+                  settings.bypassOnly ? context.l10n.bypassOnlyOn : context.l10n.bypassOnlyOff,
                 ),
                 value: settings.bypassOnly,
                 onChanged: (v) => ref.read(settingsProvider.notifier).update((s) => s.copyWith(bypassOnly: v)),
@@ -159,9 +155,7 @@ class BypassScreen extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                 child: Text(
-                  enabled == 0
-                      ? 'Nothing is bypassed until a list is on.'
-                      : '$enabled entr${enabled == 1 ? 'y is' : 'ies are'} in use. Changes apply the next time you connect.',
+                  enabled == 0 ? context.l10n.bypassNothing : context.l10n.bypassInUse(enabled),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                 ),
               ),
@@ -174,20 +168,20 @@ class BypassScreen extends ConsumerWidget {
 }
 
 /// Downloads a list from a link (plain text, up to 5 MB).
-Future<String> downloadList(String url) async {
+Future<String> downloadList(AppLocalizations l, String url) async {
   final uri = Uri.parse(url.trim());
   if (!(uri.isScheme('http') || uri.isScheme('https')) || uri.host.isEmpty) {
-    throw 'Enter an http(s) link';
+    throw l.bypassHttpLink;
   }
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
   try {
     final request = await client.getUrl(uri).timeout(const Duration(seconds: 20));
     final response = await request.close().timeout(const Duration(seconds: 20));
-    if (response.statusCode != 200) throw 'the server answered ${response.statusCode}';
+    if (response.statusCode != 200) throw l.bypassServerAnswered(response.statusCode);
     final bytes = <int>[];
     await for (final chunk in response) {
       bytes.addAll(chunk);
-      if (bytes.length > 5 << 20) throw 'the list is larger than 5 MB';
+      if (bytes.length > 5 << 20) throw l.bypassTooLarge;
     }
     return utf8.decode(bytes, allowMalformed: true);
   } finally {
@@ -214,7 +208,7 @@ class _UrlDialogState extends State<_UrlDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Download a list'),
+      title: Text(context.l10n.bypassDownloadTitle),
       content: TextField(
         controller: _controller,
         autofocus: true,
@@ -222,8 +216,8 @@ class _UrlDialogState extends State<_UrlDialog> {
         decoration: const InputDecoration(hintText: 'https://example.com/bypass.txt'),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        FilledButton(onPressed: () => Navigator.pop(context, _controller.text.trim()), child: const Text('Download')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(context.l10n.actionCancel)),
+        FilledButton(onPressed: () => Navigator.pop(context, _controller.text.trim()), child: Text(context.l10n.actionDownload)),
       ],
     );
   }
@@ -285,10 +279,11 @@ class _BypassEditScreenState extends ConsumerState<BypassEditScreen> {
   }
 
   Future<void> _save() async {
+    final defaultName = context.l10n.bypassDefaultName;
     await _checkNow();
     final report = _report;
     if (report == null || report.entries == 0) return;
-    final name = _name.text.trim().isEmpty ? 'My list' : _name.text.trim();
+    final name = _name.text.trim().isEmpty ? defaultName : _name.text.trim();
     final lists = ref.read(bypassListsProvider.notifier);
     final existing = widget.existing;
     if (existing == null) {
@@ -299,7 +294,7 @@ class _BypassEditScreenState extends ConsumerState<BypassEditScreen> {
     if (!mounted) return;
     Navigator.of(context).pop();
     if (ref.read(connectionProvider.notifier).isActive) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Reconnect to use the new list')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.bypassReconnect)));
     }
   }
 
@@ -309,9 +304,9 @@ class _BypassEditScreenState extends ConsumerState<BypassEditScreen> {
     final report = _report;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.existing == null ? 'New list' : 'Edit list'),
+        title: Text(widget.existing == null ? context.l10n.bypassNewList : context.l10n.bypassEditList),
         actions: [
-          TextButton(onPressed: report == null || report.entries == 0 ? null : _save, child: const Text('Save')),
+          TextButton(onPressed: report == null || report.entries == 0 ? null : _save, child: Text(context.l10n.actionSave)),
         ],
       ),
       body: Center(
@@ -322,7 +317,7 @@ class _BypassEditScreenState extends ConsumerState<BypassEditScreen> {
             children: [
               TextField(
                 controller: _name,
-                decoration: const InputDecoration(labelText: 'Name'),
+                decoration: InputDecoration(labelText: context.l10n.bypassName),
               ),
               const SizedBox(height: 16),
               TextField(
@@ -334,9 +329,9 @@ class _BypassEditScreenState extends ConsumerState<BypassEditScreen> {
                 enableSuggestions: false,
                 keyboardType: TextInputType.multiline,
                 style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   alignLabelWithHint: true,
-                  labelText: 'Entries, one per line',
+                  labelText: context.l10n.bypassEntriesLabel,
                   hintText: 'example.com\nfull:www.example.org\nkeyword:bank\n203.0.113.0/24',
                   border: OutlineInputBorder(),
                 ),
@@ -347,20 +342,22 @@ class _BypassEditScreenState extends ConsumerState<BypassEditScreen> {
               else if (report != null) ...[
                 Text(
                   report.entries == 0
-                      ? 'No usable entries yet.'
-                      : '${report.entries} entr${report.entries == 1 ? 'y' : 'ies'}: '
-                            '${report.domains} name${report.domains == 1 ? '' : 's'}, '
-                            '${report.ranges} address${report.ranges == 1 ? '' : 'es'} or range${report.ranges == 1 ? '' : 's'}.',
+                      ? context.l10n.bypassNoUsable
+                      : context.l10n.bypassSummary(
+                          context.l10n.entriesCount(report.entries),
+                          context.l10n.bypassNames(report.domains),
+                          context.l10n.bypassRanges(report.ranges),
+                        ),
                 ),
                 if (report.issues.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
-                    '${report.issues.length} line${report.issues.length == 1 ? '' : 's'} will be ignored:',
+                    context.l10n.bypassIgnored(report.issues.length),
                     style: TextStyle(color: scheme.error),
                   ),
                   for (final i in report.issues.take(8))
                     Text('  ${i.line}: ${i.text} — ${i.message}', style: Theme.of(context).textTheme.bodySmall),
-                  if (report.issues.length > 8) Text('  … and ${report.issues.length - 8} more'),
+                  if (report.issues.length > 8) Text('  ${context.l10n.bypassMoreIssues(report.issues.length - 8)}'),
                 ],
               ],
             ],

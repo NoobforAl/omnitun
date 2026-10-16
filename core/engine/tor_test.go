@@ -81,3 +81,53 @@ func TestTorDoesNotFailOverToOtherProfiles(t *testing.T) {
 		t.Fatalf("state = %+v", st)
 	}
 }
+
+// Every sentence the user can get has a code, and the code survives the
+// "<stage> failed: <sentence>" wording of a state's message.
+func TestErrorCodes(t *testing.T) {
+	for _, k := range errorKinds {
+		for _, msg := range []string{k.text, stageLabel[StageHandshake] + " failed: " + k.text} {
+			if got := errorCode(msg); got != k.code {
+				t.Errorf("errorCode(%q) = %q, want %q", msg, got, k.code)
+			}
+		}
+		if got := errorCode(plainError(errString("dial: " + k.match))); got != k.code {
+			t.Errorf("plainError then errorCode for %q = %q, want %q", k.match, got, k.code)
+		}
+	}
+	for msg, want := range map[string]string{
+		msgNoInternet:                           ErrNoNetwork,
+		msgTorTimeout:                           ErrTorTimeout,
+		msgTorTimeoutBridge:                     ErrTorBridgeTimeout,
+		msgTorBadBridge:                         ErrTorBadBridge,
+		msgTorClientNotBuilt:                    ErrTorMissing,
+		"Starting engine failed: something odd": "",
+		"":                                      "",
+	} {
+		if got := errorCode(msg); got != want {
+			t.Errorf("errorCode(%q) = %q, want %q", msg, got, want)
+		}
+	}
+	if got := errorCode(torErrorText(context.DeadlineExceeded, false)); got != ErrTorTimeout {
+		t.Errorf("tor timeout = %q", got)
+	}
+	if got := errorCode(torErrorText(context.DeadlineExceeded, true)); got != ErrTorBridgeTimeout {
+		t.Errorf("tor bridge timeout = %q", got)
+	}
+}
+
+// A failed state carries the code next to the sentence; other states carry none.
+func TestStateReportsErrorCode(t *testing.T) {
+	var last State
+	e := New(Config{DataDir: tempDir(t), OnState: func(s State) { last = s }})
+	e.FailAt(StageHandshake, errString("dial tcp: connection refused"))
+	if last.Status != StatusError || last.ErrorCode != ErrRefused {
+		t.Fatalf("state: %+v", last)
+	}
+	e.mu.Lock()
+	e.setState(State{Status: StatusStopped})
+	e.mu.Unlock()
+	if last.ErrorCode != "" {
+		t.Fatalf("a stopped state has a code: %+v", last)
+	}
+}

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../engine/engine.dart';
+import '../l10n/app_localizations.dart';
 
 const _seed = Color(0xFF0E7C86);
 
@@ -68,27 +69,27 @@ IconData statusIcon(ConnStatus status) {
   };
 }
 
-String statusLabel(ConnStatus status) {
+String statusLabel(AppLocalizations l, ConnStatus status) {
   return switch (status) {
-    ConnStatus.connected => 'Connected',
-    ConnStatus.connecting => 'Connecting…',
-    ConnStatus.disconnecting => 'Disconnecting…',
-    ConnStatus.error => 'Connection failed',
-    ConnStatus.noInternet => 'No internet connection',
-    ConnStatus.disconnected => 'Not connected',
+    ConnStatus.connected => l.statusConnected,
+    ConnStatus.connecting => l.statusConnecting,
+    ConnStatus.disconnecting => l.statusDisconnecting,
+    ConnStatus.error => l.statusError,
+    ConnStatus.noInternet => l.statusNoInternet,
+    ConnStatus.disconnected => l.statusDisconnected,
   };
 }
 
 /// Human label for a connection stage reported by the core (PLAN.md 3.3 #6).
-String stageLabel(String stage) {
+String stageLabel(AppLocalizations l, String stage) {
   return switch (stage) {
-    'permission' => 'Waiting for VPN permission',
-    'network_check' => 'Checking internet connection',
-    'prepare' => 'Preparing configuration',
-    'engine_start' => 'Starting engine',
-    'tunnel_up' => 'Opening tunnel',
-    'handshake' => 'Contacting server',
-    'connected' => 'Connected',
+    'permission' => l.stagePermission,
+    'network_check' => l.stageNetworkCheck,
+    'prepare' => l.stagePrepare,
+    'engine_start' => l.stageEngineStart,
+    'tunnel_up' => l.stageTunnelUp,
+    'handshake' => l.stageHandshake,
+    'connected' => l.stageConnected,
     _ => stage,
   };
 }

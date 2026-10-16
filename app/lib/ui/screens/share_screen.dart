@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../engine/engine.dart';
+import '../../l10n/l10n.dart';
 import '../../state/providers.dart';
 import 'profile_editor_screen.dart';
 
@@ -37,7 +38,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'This server cannot be shared as a link: ${messageOf(snap.error!)}',
+                  context.l10n.shareFailed(messageOf(snap.error!)),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -58,11 +59,11 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                         data: link,
                         size: 260,
                         backgroundColor: Colors.white,
-                        errorStateBuilder: (_, _) => const SizedBox(
+                        errorStateBuilder: (_, _) => SizedBox(
                           width: 260,
                           height: 260,
                           child: Center(
-                            child: Text('Too long for a QR code: copy the link', textAlign: TextAlign.center),
+                            child: Text(context.l10n.shareTooLong, textAlign: TextAlign.center),
                           ),
                         ),
                       ),
@@ -70,7 +71,7 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Scan it with Omnitun on another device, or copy the link.',
+                    context.l10n.shareScanHint,
                     style: text.bodyMedium,
                     textAlign: TextAlign.center,
                   ),
@@ -89,15 +90,15 @@ class _ShareScreenState extends ConsumerState<ShareScreen> {
                     onPressed: () async {
                       await Clipboard.setData(ClipboardData(text: link));
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied')));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.shareCopied)));
                       }
                     },
                     icon: const Icon(Icons.copy),
-                    label: const Text('Copy link'),
+                    label: Text(context.l10n.shareCopy),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'The link contains this server\'s password or key: only share it with people who may use the server.',
+                    context.l10n.shareWarning,
                     style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                     textAlign: TextAlign.center,
                   ),

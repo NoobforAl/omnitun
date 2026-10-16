@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import '../theme.dart';
 
 class ProtocolBadge extends StatelessWidget {
@@ -38,10 +39,10 @@ class LatencyText extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final (text, color) = switch (ms) {
       null => ('—', scheme.outline),
-      -1 => ('timeout', scheme.error),
-      final v when v < 150 => ('$v ms', const Color(0xFF1FA67A)),
-      final v when v < 400 => ('$v ms', const Color(0xFFE0A100)),
-      final v => ('$v ms', scheme.error),
+      -1 => (context.l10n.latencyTimeout, scheme.error),
+      final v when v < 150 => (context.l10n.latencyMs(v), const Color(0xFF1FA67A)),
+      final v when v < 400 => (context.l10n.latencyMs(v), const Color(0xFFE0A100)),
+      final v => (context.l10n.latencyMs(v), scheme.error),
     };
     return Text(text, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color));
   }

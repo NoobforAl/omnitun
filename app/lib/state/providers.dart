@@ -359,6 +359,7 @@ class SettingsState {
     this.splitMode = 'off',
     this.splitApps = const [],
     this.theme = 'dark',
+    this.language = '',
   });
 
   static const defaultRemoteDns = 'https://1.1.1.1/dns-query';
@@ -388,6 +389,9 @@ class SettingsState {
   /// 'dark' (default), 'light' or 'system'.
   final String theme;
 
+  /// The app's language: a code from l10n.dart's supportedLanguages, or '' for the system's.
+  final String language;
+
   SettingsState copyWith({
     bool? tunMode,
     bool? systemProxy,
@@ -399,6 +403,7 @@ class SettingsState {
     String? splitMode,
     List<String>? splitApps,
     String? theme,
+    String? language,
   }) =>
       SettingsState(
         tunMode: tunMode ?? this.tunMode,
@@ -411,6 +416,7 @@ class SettingsState {
         splitMode: splitMode ?? this.splitMode,
         splitApps: splitApps ?? this.splitApps,
         theme: theme ?? this.theme,
+        language: language ?? this.language,
       );
 
   Map<String, dynamic> toJson() => {
@@ -424,6 +430,7 @@ class SettingsState {
         'split_mode': splitMode,
         'split_apps': splitApps,
         'theme': theme,
+        'language': language,
       };
 
   /// Missing keys keep the values from [defaults].
@@ -438,6 +445,7 @@ class SettingsState {
         splitMode: j['split_mode'] as String? ?? defaults.splitMode,
         splitApps: [for (final a in (j['split_apps'] as List? ?? const [])) a as String],
         theme: j['theme'] as String? ?? defaults.theme,
+        language: j['language'] as String? ?? defaults.language,
       );
 }
 

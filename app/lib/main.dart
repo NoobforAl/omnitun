@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'l10n/l10n.dart';
 import 'state/providers.dart';
 import 'state/store.dart';
 import 'state/subscriptions.dart';
@@ -56,6 +57,7 @@ class _OmnitunAppState extends ConsumerState<OmnitunApp> {
     // Collect core logs from startup, not only once the Logs tab is opened.
     ref.listen(logsProvider, (_, _) {});
     final theme = ref.watch(settingsProvider.select((s) => s.theme));
+    final language = ref.watch(settingsProvider.select((s) => s.language));
     return MaterialApp(
       navigatorKey: _navigator,
       title: 'Omnitun',
@@ -63,6 +65,10 @@ class _OmnitunAppState extends ConsumerState<OmnitunApp> {
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
       themeMode: themeModeOf(theme),
+      locale: language.isEmpty ? null : Locale(language),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      onGenerateTitle: (context) => context.l10n.appName,
       home: const HomeScreen(),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
 import '../../state/countries.dart';
 import '../theme.dart';
 
@@ -25,7 +26,7 @@ class CountryFlag extends StatelessWidget {
     final c = code;
     final emoji = c != null && defaultTargetPlatform != TargetPlatform.windows;
     return Semantics(
-      label: label ?? (c == null ? 'Unknown country' : (countryNames[c] ?? c)),
+      label: label ?? (c == null ? context.l10n.unknownCountry : (countryNames[c] ?? c)),
       excludeSemantics: true,
       child: Container(
         width: size,
@@ -69,9 +70,9 @@ class LatencyDot extends StatelessWidget {
     };
     return Tooltip(
       message: switch (ms) {
-        null => 'Not tested',
-        < 0 => 'Unreachable',
-        final v => '$v ms',
+        null => context.l10n.latencyNotTested,
+        < 0 => context.l10n.latencyUnreachable,
+        final v => context.l10n.latencyMs(v),
       },
       child: Container(
         width: size,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../engine/engine.dart';
+import '../../l10n/l10n.dart';
 import '../../state/providers.dart';
 
 /// Asks for the username and password of [profile] and saves them.
@@ -14,24 +15,24 @@ Future<bool> askCredentials(BuildContext context, WidgetRef ref, ProfileInfo pro
     context: context,
     builder: (context) => StatefulBuilder(
       builder: (context, setState) => AlertDialog(
-        title: const Text('Sign in'),
+        title: Text(context.l10n.credTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('${profile.name} needs a username and password.'),
+            Text(context.l10n.credNeeds(profile.name)),
             const SizedBox(height: 12),
             TextField(
               controller: user,
               autofocus: true,
               autocorrect: false,
-              decoration: const InputDecoration(labelText: 'Username'),
+              decoration: InputDecoration(labelText: context.l10n.credUsername),
             ),
             TextField(
               controller: pass,
               obscureText: obscure,
               autocorrect: false,
               decoration: InputDecoration(
-                labelText: 'Password',
+                labelText: context.l10n.credPassword,
                 suffixIcon: IconButton(
                   icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
                   onPressed: () => setState(() => obscure = !obscure),
@@ -41,13 +42,13 @@ Future<bool> askCredentials(BuildContext context, WidgetRef ref, ProfileInfo pro
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(context.l10n.actionCancel)),
           FilledButton(
             onPressed: () {
               if (user.text.trim().isEmpty || pass.text.isEmpty) return;
               Navigator.pop(context, true);
             },
-            child: const Text('Save'),
+            child: Text(context.l10n.actionSave),
           ),
         ],
       ),

@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../l10n/l10n.dart';
+
 /// Scans a QR code and pops with its text (a share link or subscription URL).
 class QrScanScreen extends StatefulWidget {
   const QrScanScreen({super.key});
@@ -40,10 +42,10 @@ class _QrScanScreenState extends State<QrScanScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scan QR code'),
+        title: Text(context.l10n.scanTitle),
         actions: [
           IconButton(
-            tooltip: 'Torch',
+            tooltip: context.l10n.scanTorch,
             onPressed: _controller.toggleTorch,
             icon: const Icon(Icons.flashlight_on_outlined),
           ),
@@ -58,7 +60,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
             errorBuilder: (context, error) => Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text('Camera unavailable: ${error.errorCode.name}', textAlign: TextAlign.center),
+                child: Text(context.l10n.scanCameraUnavailable(error.errorCode.name), textAlign: TextAlign.center),
               ),
             ),
           ),
@@ -74,14 +76,14 @@ class _QrScanScreenState extends State<QrScanScreen> {
               ),
             ),
           ),
-          const Positioned(
+          Positioned(
             left: 24,
             right: 24,
             bottom: 48,
             child: Text(
-              'Point the camera at a config QR code',
+              context.l10n.scanPoint,
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white, fontSize: 16, shadows: [Shadow(blurRadius: 4)]),
+              style: const TextStyle(color: Colors.white, fontSize: 16, shadows: [Shadow(blurRadius: 4)]),
             ),
           ),
         ],

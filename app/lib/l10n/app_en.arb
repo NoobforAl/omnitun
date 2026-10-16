@@ -1,0 +1,669 @@
+{
+  "@@locale": "en",
+  "appName": "Omnitun",
+  "actionSave": "Save",
+  "actionCancel": "Cancel",
+  "actionDelete": "Delete",
+  "actionEdit": "Edit",
+  "actionReset": "Reset",
+  "actionSkip": "Skip",
+  "actionNext": "Next",
+  "actionImport": "Import",
+  "actionDownload": "Download",
+  "actionCopyAll": "Copy all",
+  "actionClear": "Clear",
+  "tooltipMore": "More",
+  "tooltipShow": "Show",
+  "tooltipHide": "Hide",
+  "searchHint": "Search",
+  "tooltipLogs": "Logs",
+  "tooltipSettings": "Settings",
+  "statusConnected": "Connected",
+  "statusConnecting": "Connecting…",
+  "statusDisconnecting": "Disconnecting…",
+  "statusError": "Connection failed",
+  "statusNoInternet": "No internet connection",
+  "statusDisconnected": "Not connected",
+  "stagePermission": "Waiting for VPN permission",
+  "stageNetworkCheck": "Checking internet connection",
+  "stagePrepare": "Preparing configuration",
+  "stageEngineStart": "Starting engine",
+  "stageTunnelUp": "Opening tunnel",
+  "stageHandshake": "Contacting server",
+  "stageConnected": "Connected",
+  "buttonConnect": "Connect",
+  "buttonDisconnect": "Disconnect",
+  "buttonCancel": "Cancel",
+  "locationLabel": "Location",
+  "noServers": "No servers",
+  "noServersHint": "Add one to get started",
+  "automatic": "Automatic",
+  "automaticHint": "Fastest server, switches if one stops working",
+  "anyServerInCountry": "Any server in this country",
+  "torNetwork": "Tor network",
+  "emptyTitle": "No profiles yet",
+  "emptyHint": "Import a config file, link or subscription to get started.",
+  "importConfig": "Import config",
+  "failoverToast": "Switched to {to} — {from} stopped responding",
+  "@failoverToast": {
+    "placeholders": {
+      "to": {
+        "type": "String"
+      },
+      "from": {
+        "type": "String"
+      }
+    }
+  },
+  "unknownLocation": "Unknown location",
+  "errorFailed": "{stage} failed: {reason}",
+  "@errorFailed": {
+    "placeholders": {
+      "stage": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "errTimeout": "the server did not answer in time",
+  "errRefused": "the server refused the connection",
+  "errReset": "the connection was reset by the network",
+  "errNoRoute": "the server cannot be reached from this network",
+  "errNetworkUnreachable": "the network is unreachable",
+  "errDns": "the server name could not be resolved",
+  "errTls": "the server's security certificate was rejected",
+  "errAuth": "the username or password was rejected",
+  "errClosed": "the server closed the connection",
+  "errTorTimeout": "Tor did not finish connecting in time. This network may block Tor; use a bridge (Snowflake or obfs4)",
+  "errTorBridgeTimeout": "Tor did not finish connecting in time. The bridge may be blocked or overloaded; try another bridge type (Snowflake or obfs4)",
+  "errTorBadBridge": "a Tor bridge line is not valid (it needs a transport, address and fingerprint)",
+  "errTorMissing": "this build does not include the Tor client",
+  "errPermission": "VPN permission was not granted",
+  "errCoreLost": "Lost connection to the core service",
+  "selectLocation": "Select location",
+  "testSpeedTooltip": "Test speed of all servers",
+  "addServersTooltip": "Add servers",
+  "menuImport": "Import a config, link or QR",
+  "menuNewServer": "Add a server by hand",
+  "menuSubscription": "Add a subscription",
+  "menuManage": "Manage servers and subscriptions",
+  "serversCount": "{count, plural, =1{1 server} other{{count} servers}}",
+  "@serversCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "otherGroup": "Other",
+  "torGroup": "Tor",
+  "noServersYet": "No servers yet",
+  "importHintShort": "Import a config file, link or subscription.",
+  "showServers": "Show servers",
+  "hideServers": "Hide servers",
+  "menuEditServer": "Edit",
+  "menuBridgeSettings": "Bridge settings",
+  "menuShare": "Share link or QR",
+  "menuSetCountry": "Set country",
+  "menuCredentials": "Username and password",
+  "needsSignIn": "{address} · needs sign-in",
+  "@needsSignIn": {
+    "placeholders": {
+      "address": {
+        "type": "String"
+      }
+    }
+  },
+  "countryOfServer": "Country of this server",
+  "guessFromName": "Work it out from the name",
+  "latencyNotTested": "Not tested",
+  "latencyUnreachable": "Unreachable",
+  "latencyTimeout": "timeout",
+  "latencyMs": "{ms} ms",
+  "@latencyMs": {
+    "placeholders": {
+      "ms": {
+        "type": "int"
+      }
+    }
+  },
+  "unknownCountry": "Unknown country",
+  "addServerTitle": "Add a server",
+  "addServerIntro": "Choose the protocol of your server. A share link or QR code is quicker: use Import.",
+  "newServerTitle": "New {label} server",
+  "@newServerTitle": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "editServerTitle": "Edit server",
+  "torBridgesTitle": "Tor bridges",
+  "subscriptionEditNote": "This server comes from a subscription: your changes are replaced when it refreshes.",
+  "moreOptions": "More options",
+  "countryRow": "Country",
+  "countryAuto": "Worked out from the name and address",
+  "alreadyInList": "This server is already in the list",
+  "choiceDefault": "Default",
+  "torBridgesNone": "None (direct, or the lines below)",
+  "torBridgesSnowflake": "Snowflake",
+  "torBridgesObfs4": "obfs4 (built-in bridges)",
+  "listHelper": "Separate values with commas",
+  "fillPaste": "Paste",
+  "fillFile": "File",
+  "fillScanQr": "Scan QR",
+  "openTextFile": "Open a text file",
+  "couldNotReadFile": "Could not read the file: {error}",
+  "@couldNotReadFile": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldRequired": "{label} *",
+  "@fieldRequired": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "formNoEditor": "No editor for {protocol}",
+  "@formNoEditor": {
+    "placeholders": {
+      "protocol": {
+        "type": "String"
+      }
+    }
+  },
+  "shareScanHint": "Scan it with Omnitun on another device, or copy the link.",
+  "shareCopy": "Copy link",
+  "shareCopied": "Link copied",
+  "shareWarning": "The link contains this server's password or key: only share it with people who may use the server.",
+  "shareFailed": "This server cannot be shared as a link: {reason}",
+  "@shareFailed": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "shareTooLong": "Too long for a QR code: copy the link",
+  "obTitle1": "Private and simple",
+  "obText1": "Omnitun connects you through VPN, proxy and Tor protocols from one calm screen. Pick a place, press Connect.",
+  "obTitle2": "Add your servers",
+  "obText2": "Import a share link, a QR code, a config file or a subscription from your provider. You can also add a server by hand.",
+  "obTitle3Android": "Android will ask once",
+  "obText3Android": "The first time you connect, Android asks to allow a VPN connection. Omnitun can only protect your traffic after you accept. While connected, a notification shows the speed and a Disconnect button.",
+  "obTitle3Desktop": "Ready when you are",
+  "obText3Desktop": "Omnitun starts in proxy mode, which needs no special rights. Turn on VPN mode in Settings to capture all traffic.",
+  "obAddFirst": "Add my first server",
+  "bypassTitle": "Bypass lists",
+  "bypassAddTooltip": "Add a list",
+  "bypassFromClipboard": "Paste from the clipboard",
+  "bypassFromFile": "Open a .txt file",
+  "bypassFromUrl": "Download from a link",
+  "bypassType": "Type it",
+  "bypassClipboardEmpty": "The clipboard is empty",
+  "bypassPickFile": "Open a bypass list (.txt)",
+  "bypassDownloadFailed": "Could not download the list: {error}",
+  "@bypassDownloadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "bypassIntro": "Websites and addresses that should not use the VPN, for example your bank or local services. One entry per line: example.com (and its subdomains), full:www.example.com, keyword:bank, regexp:…, 203.0.113.7 or 10.0.0.0/8. Lines starting with # are ignored.",
+  "bypassNoLists": "No lists yet.",
+  "bypassTypeList": "Type a list",
+  "entriesCount": "{count, plural, =1{1 entry} other{{count} entries}}",
+  "@entriesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bypassOnlyTitle": "Only the listed destinations use the VPN",
+  "bypassOnlyOn": "Everything else goes direct, outside the VPN.",
+  "bypassOnlyOff": "Off: the listed destinations go direct and everything else uses the VPN.",
+  "bypassNothing": "Nothing is bypassed until a list is on.",
+  "bypassInUse": "{count, plural, =1{1 entry is in use} other{{count} entries are in use}}. Changes apply the next time you connect.",
+  "@bypassInUse": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bypassHttpLink": "Enter an http(s) link",
+  "bypassServerAnswered": "the server answered {code}",
+  "@bypassServerAnswered": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "bypassTooLarge": "the list is larger than 5 MB",
+  "bypassDownloadTitle": "Download a list",
+  "bypassNewList": "New list",
+  "bypassEditList": "Edit list",
+  "bypassName": "Name",
+  "bypassEntriesLabel": "Entries, one per line",
+  "bypassNoUsable": "No usable entries yet.",
+  "bypassSummary": "{entries} · {names}, {ranges}.",
+  "@bypassSummary": {
+    "placeholders": {
+      "entries": {
+        "type": "String"
+      },
+      "names": {
+        "type": "String"
+      },
+      "ranges": {
+        "type": "String"
+      }
+    }
+  },
+  "bypassNames": "{count, plural, =1{1 name} other{{count} names}}",
+  "@bypassNames": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bypassRanges": "{count, plural, =1{1 address or range} other{{count} addresses or ranges}}",
+  "@bypassRanges": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bypassIgnored": "{count, plural, =1{1 line will be ignored:} other{{count} lines will be ignored:}}",
+  "@bypassIgnored": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bypassMoreIssues": "… and {count} more",
+  "@bypassMoreIssues": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "bypassReconnect": "Reconnect to use the new list",
+  "bypassDefaultName": "My list",
+  "bypassPastedName": "Pasted list",
+  "settingsTitle": "Settings",
+  "settingsServers": "Servers",
+  "manageServers": "Manage servers",
+  "manageServersHint": "Import, subscriptions, order and removal",
+  "settingsConnection": "Connection",
+  "vpnMode": "VPN mode (all traffic)",
+  "vpnModeHint": "Off = proxy only: local SOCKS/HTTP port, no VPN permission needed",
+  "systemProxy": "Set system proxy",
+  "systemProxyHint": "Proxy mode: point the OS proxy settings at Omnitun while connected",
+  "autoSwitch": "Auto-switch on failure",
+  "autoSwitchHint": "Try the next profile in the group when one stops working",
+  "bypassLan": "Bypass local network",
+  "bypassLanHint": "LAN devices and local addresses (192.168.x.x, 10.x.x.x, …) are reached directly, not through the VPN",
+  "bypassListsHint": "Websites and addresses that skip the VPN",
+  "bypassListsInUse": "{count, plural, =1{1 entry in use} other{{count} entries in use}}",
+  "@bypassListsInUse": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "alwaysOnTitle": "Always-on VPN and kill switch",
+  "alwaysOnHint": "Android reconnects at boot and can block all traffic while the VPN is down. In the VPN settings tap the gear next to Omnitun and turn on \"Always-on VPN\" and \"Block connections without VPN\". Connect once from this app first.",
+  "openVpnSettingsFallback": "Open Android Settings → Network → VPN, then the gear next to Omnitun",
+  "splitTunneling": "Split tunneling",
+  "splitSummaryOnly": "{count, plural, =1{Only 1 selected app uses the VPN} other{Only {count} selected apps use the VPN}}",
+  "@splitSummaryOnly": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "splitSummaryBypass": "{count, plural, =1{1 app bypasses the VPN} other{{count} apps bypass the VPN}}",
+  "@splitSummaryBypass": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "splitSummaryOff": "All apps use the VPN",
+  "remoteDns": "Remote DNS",
+  "remoteDnsHelp": "Resolver used through the tunnel. Examples: https://1.1.1.1/dns-query, tls://1.1.1.1, tcp://8.8.8.8, 9.9.9.9",
+  "settingsApp": "App",
+  "appearance": "Appearance",
+  "themeDark": "Dark",
+  "themeLight": "Light",
+  "themeSystem": "Follow the system",
+  "language": "Language",
+  "languageSystem": "System default",
+  "stopOnClose": "Stop VPN when app is closed",
+  "aboutLine": "MIT License · engine: {engine}",
+  "@aboutLine": {
+    "placeholders": {
+      "engine": {
+        "type": "String"
+      }
+    }
+  },
+  "splitTitle": "Split tunneling",
+  "splitAll": "All apps",
+  "splitOnlySelected": "Only selected",
+  "splitBypassSelected": "Bypass selected",
+  "splitHelpOffMode": "Every app uses the VPN. Choose a mode to pick apps.",
+  "splitHelpOnlyNone": "No apps selected yet — until you pick some, all apps use the VPN.",
+  "splitHelpOnly": "{count, plural, =1{Only the selected app uses the VPN.} other{Only the {count} selected apps use the VPN.}}",
+  "@splitHelpOnly": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "splitHelpBypass": "{count, plural, =1{The selected app connects directly, without the VPN.} other{The {count} selected apps connect directly, without the VPN.}}",
+  "@splitHelpBypass": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "searchApps": "Search apps",
+  "showSystemApps": "Show system apps",
+  "couldNotListApps": "Could not list apps: {error}",
+  "@couldNotListApps": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "scanTitle": "Scan QR code",
+  "scanTorch": "Torch",
+  "scanCameraUnavailable": "Camera unavailable: {code}",
+  "@scanCameraUnavailable": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "scanPoint": "Point the camera at a config QR code",
+  "credTitle": "Sign in",
+  "credNeeds": "{name} needs a username and password.",
+  "@credNeeds": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "credUsername": "Username",
+  "credPassword": "Password",
+  "logsEmpty": "No log entries yet.",
+  "profilesTitle": "Manage servers",
+  "addSubscriptionTooltip": "Add subscription",
+  "testLatencyTooltip": "Test latency",
+  "profilesEmptyHint": "No profiles. Tap Import to add one.",
+  "profilesDragHint": "Long-press and drag to reorder. With auto-switch on, the rest of the group is tried next, in this order.",
+  "myProfiles": "My profiles",
+  "subRefreshed": "{name}: {count, plural, =1{1 profile} other{{count} profiles}}",
+  "@subRefreshed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "refreshTooltip": "Refresh",
+  "subDeleteWithProfiles": "Delete subscription and its profiles",
+  "subUsageOf": "{used} of {total}",
+  "@subUsageOf": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "subUsed": "{used} used",
+  "@subUsed": {
+    "placeholders": {
+      "used": {
+        "type": "String"
+      }
+    }
+  },
+  "subExpired": "expired",
+  "subExpiresToday": "expires today",
+  "subExpiresIn": "{days, plural, =1{expires in 1 day} other{expires in {days} days}}",
+  "@subExpiresIn": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "subUpdated": "updated {ago}",
+  "@subUpdated": {
+    "placeholders": {
+      "ago": {
+        "type": "String"
+      }
+    }
+  },
+  "agoJustNow": "just now",
+  "agoMinutes": "{count} min ago",
+  "@agoMinutes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agoHours": "{count} h ago",
+  "@agoHours": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agoDays": "{count} d ago",
+  "@agoDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "subRefreshFailed": "Last refresh failed: {error}",
+  "@subRefreshFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "importTitle": "Import config",
+  "importDescription": "Paste share links (vless://, trojan://, ss://, hy2://, anytls://, ssh://, sstp://, ikev2://, …), a Clash or sing-box config, a subscription, a WireGuard .conf, an OpenVPN .ovpn or Tor bridge lines — or open a file or scan a QR code.",
+  "importScanQr": "Scan QR",
+  "importOpenFile": "Open file",
+  "importPaste": "Paste",
+  "importSubscription": "Subscription",
+  "importTor": "Tor",
+  "importAddTor": "Add Tor",
+  "importTorDirect": "Tor (direct)",
+  "importTorSnowflake": "Tor + Snowflake bridge",
+  "importTorObfs4": "Tor + obfs4 bridges",
+  "importedProfiles": "{added, plural, =1{Imported 1 profile} other{Imported {added} profiles}}{dupes, plural, =0{} other{, {dupes} already present}}",
+  "@importedProfiles": {
+    "placeholders": {
+      "added": {
+        "type": "int"
+      },
+      "dupes": {
+        "type": "int"
+      }
+    }
+  },
+  "importNothing": "Nothing imported: {reason}",
+  "@importNothing": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "importPartial": "Imported {added}, failed {failed}",
+  "@importPartial": {
+    "placeholders": {
+      "added": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "subAddTitle": "Add subscription",
+  "subEditTitle": "Edit subscription",
+  "subUrlLabel": "Subscription URL",
+  "subUrlHint": "https://provider.example/sub/… or nordvpn://<token>",
+  "subNameLabel": "Name (optional)",
+  "subNameHelp": "Defaults to the provider's title or the host name",
+  "subAuthLabel": "Authentication",
+  "authNone": "None",
+  "authBasic": "Username & password (Basic)",
+  "authBearer": "Bearer token",
+  "authHeader": "Custom header",
+  "authQuery": "Token in URL",
+  "subUsername": "Username",
+  "subPassword": "Password",
+  "subHeaderName": "Header name",
+  "subHeaderValue": "Header value",
+  "subParamName": "Parameter name",
+  "subToken": "Token",
+  "subDownloadLabel": "Download",
+  "subDownloadHelp": "Some providers are blocked where you are; the VPN can still reach them",
+  "subViaDirect": "Directly",
+  "subViaAuto": "Directly, or through the VPN if the provider is blocked",
+  "subViaTunnel": "Always through the VPN (connect first)",
+  "subErrUrl": "Enter an http(s) subscription URL (or nordvpn://<access token>)",
+  "subErrHeader": "Enter the header name",
+  "subErrToken": "Enter the token",
+  "subAddAndDownload": "Add and download",
+  "subSaveAndRefresh": "Save and refresh",
+  "subUpdatedToast": "Subscription updated: {count, plural, =1{1 profile} other{{count} profiles}}",
+  "@subUpdatedToast": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "flName": "Name",
+  "flServer": "Server",
+  "flPort": "Port",
+  "flPassword": "Password",
+  "flUsername": "Username",
+  "flUuid": "UUID",
+  "flSecurity": "Security",
+  "flFlow": "Flow",
+  "flCipher": "Cipher",
+  "flEncryption": "Encryption",
+  "flAlterId": "Alter id",
+  "flTlsServerName": "TLS server name (SNI)",
+  "flTlsFingerprint": "TLS fingerprint",
+  "flAlpn": "ALPN",
+  "flSkipCertCheck": "Skip certificate check",
+  "flPinnedCert": "Pinned certificate (PEM)",
+  "flRealityPublicKey": "Reality public key",
+  "flRealityShortId": "Reality short id",
+  "flTransport": "Transport",
+  "flHostHeader": "Host header",
+  "flPath": "Path",
+  "flGrpcService": "gRPC service name",
+  "flPlugin": "Plugin",
+  "flPluginOptions": "Plugin options",
+  "flObfuscation": "Obfuscation",
+  "flObfsPassword": "Obfuscation password",
+  "flUploadMbps": "Upload (Mbps)",
+  "flDownloadMbps": "Download (Mbps)",
+  "flCongestion": "Congestion control",
+  "flUdpRelay": "UDP relay mode",
+  "flUseQuic": "Use HTTP/3 (QUIC)",
+  "flTunnelAddress": "Your tunnel address",
+  "flRoutedNetworks": "Routed networks",
+  "flDnsServers": "DNS servers",
+  "flMtu": "MTU",
+  "flKeepalive": "Keepalive (seconds)",
+  "flPrivateKey": "Private key",
+  "flServerPublicKey": "Server public key",
+  "flPresharedKey": "Pre-shared key",
+  "flReservedBytes": "Reserved bytes",
+  "flAuthentication": "Authentication",
+  "flAuthDigest": "Auth digest",
+  "flCaCert": "CA certificate (PEM)",
+  "flClientCert": "Client certificate (PEM)",
+  "flClientKey": "Client key (PEM)",
+  "flControlWrap": "Control channel protection",
+  "flControlWrapKey": "Control channel key",
+  "flKeyDirection": "Key direction",
+  "flRemoteCertType": "Remote certificate type",
+  "flVerifyServerName": "Verify server name",
+  "flYourIdentity": "Your identity",
+  "flServerIdentity": "Server identity",
+  "flServerCertTrust": "Server certificate to trust (PEM)",
+  "flUseSystemIke": "Use the phone's own IKEv2 client",
+  "flUseTcp": "Use TCP",
+  "flHostKeys": "Host keys",
+  "flPrivateKeyPem": "Private key (PEM)",
+  "flKeyPassphrase": "Key passphrase",
+  "flBridges": "Bridges",
+  "flBridgeLines": "Bridge lines",
+  "flJc": "Jc (junk packet count)",
+  "flSignaturePacket": "I1 (signature packet)",
+  "flControlledJunk": "J1 (controlled junk)",
+  "hpAuthorizedKeys": "authorized_keys format; empty accepts any key",
+  "hpIkeTcp": "Carry IKE and ESP over TCP for networks that block UDP",
+  "hpDefaultsToServer": "Defaults to the server address",
+  "hpTorBridges": "Empty connects to Tor directly, or uses the bridge lines below",
+  "hpExampleAddress": "For example 10.8.0.2/32",
+  "hpExamplePlugin": "For example shadow-tls or v2ray-plugin",
+  "hpHostOrIp": "Host name or IP address",
+  "hpNeededReality": "Needed when Security is reality",
+  "hpOnlySelfSigned": "Only for servers with a self-signed certificate you cannot pin",
+  "hpSafeSstp": "Safe for SSTP: the password exchange proves the server",
+  "hpHysteriaObfs": "salamander for Hysteria 2; the obfuscation password for Hysteria 1",
+  "hpTrustCert": "Trust this certificate instead of the system's authorities",
+  "hpWhichBrowser": "Which browser's TLS handshake to imitate",
+  "hpWarpReserved": "Three numbers, as WARP configurations list them",
+  "hpOneBridgePerLine": "One bridge per line, as in a torrc without \"Bridge \""
+}
