@@ -97,6 +97,8 @@ class ConnectOptions {
     this.bypassLan = true,
     this.includePackages = const [],
     this.excludePackages = const [],
+    this.bypass = '',
+    this.bypassOnly = false,
   });
 
   /// Capture all traffic (needs VPN permission / admin). Otherwise proxy mode.
@@ -120,6 +122,41 @@ class ConnectOptions {
 
   /// Android split tunneling: these apps bypass the VPN.
   final List<String> excludePackages;
+
+  /// Text of the enabled bypass lists (one entry per line): these destinations go around the VPN.
+  final String bypass;
+
+  /// With [bypass]: only the listed destinations use the VPN, everything else goes direct.
+  final bool bypassOnly;
+}
+
+/// One line of a bypass list that cannot be used.
+class BypassIssue {
+  const BypassIssue(this.line, this.text, this.message);
+
+  final int line;
+  final String text;
+  final String message;
+}
+
+/// What a bypass list holds, as counted by the core.
+class BypassReport {
+  const BypassReport({this.entries = 0, this.domains = 0, this.ranges = 0, this.issues = const []});
+
+  final int entries;
+  final int domains;
+  final int ranges;
+  final List<BypassIssue> issues;
+
+  factory BypassReport.fromJson(Map<String, dynamic> j) => BypassReport(
+    entries: (j['entries'] as num?)?.toInt() ?? 0,
+    domains: (j['domains'] as num?)?.toInt() ?? 0,
+    ranges: (j['ranges'] as num?)?.toInt() ?? 0,
+    issues: [
+      for (final i in (j['issues'] as List? ?? const []))
+        BypassIssue((i['line'] as num).toInt(), i['text'] as String, i['message'] as String),
+    ],
+  );
 }
 
 /// One connection stage (see PLAN.md 3.3 #6). [percent] runs 0-100.
@@ -343,6 +380,9 @@ abstract class VpnEngine {
   /// applies them to a copy of [profile] when editing. Throws [EngineException]
   /// with a message for the user when a value is wrong.
   Future<ProfileInfo> buildProfile(Map<String, String> values, {String? protocol, ProfileInfo? profile});
+
+  /// Checks the text of a bypass list: what it holds and which lines cannot be used.
+  Future<BypassReport> parseBypass(String text);
 
   /// What the editor shows for [profile].
   Future<Map<String, String>> profileValues(ProfileInfo profile);

@@ -444,11 +444,25 @@ func (s *Server) dispatch(req Request) (any, error) {
 			IncludePackages: p.IncludePackages,
 			ExcludePackages: p.ExcludePackages,
 			TestURL:         p.TestURL,
+			BypassOnly:      p.BypassOnly,
+		}
+		if p.Bypass != "" {
+			// The app checked the lists when they were added; lines that cannot be used are skipped.
+			opts.Bypass, _ = singbox.ParseBypassList(p.Bypass)
 		}
 		if err := s.engine.Start(p.Profiles, opts); err != nil {
 			return nil, &Error{Code: CodeStartFailed, Message: err.Error()}
 		}
 		return s.engine.State(), nil
+	case "parse_bypass":
+		p, err := decode[BypassParams](req.Params)
+		if err != nil {
+			return nil, err
+		}
+		list, issues := singbox.ParseBypassList(p.Text)
+		return BypassReport{
+			Entries: list.Count(), Ranges: len(list.CIDRs), Domains: list.Count() - len(list.CIDRs), Issues: issues,
+		}, nil
 	case "stop":
 		return s.engine.State(), s.engine.Stop()
 	case "select":

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"net/url"
 	"slices"
 	"strconv"
@@ -69,6 +70,11 @@ type Options struct {
 	// TorSocks is the running Tor client's SOCKS5 address (host:port); Tor
 	// profiles are skipped without it.
 	TorSocks string
+
+	// Bypass lists destinations that go around the VPN. With BypassOnly it is
+	// the other way round: only they use the VPN and everything else goes direct.
+	Bypass     *BypassList
+	BypassOnly bool
 }
 
 // SelfPackage in ExcludePackages stands for this app: the platform replaces it
@@ -199,9 +205,17 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 		if opts.TorSocks != "" {
 			tun["stack"] = "gvisor"
 		}
-		// Local networks don't enter the VPN at all (unless ProxyPrivate).
+		// Local networks don't enter the VPN at all (unless ProxyPrivate), nor do
+		// the address ranges of the user's bypass list.
+		var excluded []netip.Prefix
 		if !opts.ProxyPrivate {
-			tun["route_exclude_address"] = prefixStrings(BypassPrefixes(profileKeep(profiles)))
+			excluded = BypassPrefixes(profileKeep(profiles))
+		}
+		if !opts.BypassOnly && opts.Bypass != nil {
+			excluded = append(excluded, opts.Bypass.CIDRs...)
+		}
+		if len(excluded) > 0 {
+			tun["route_exclude_address"] = prefixStrings(excluded)
 		}
 		// Per-app split tunneling (Android): include wins over exclude.
 		if len(opts.IncludePackages) > 0 {
@@ -230,6 +244,24 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 		// reaches the TUN); ranges a profile routes on purpose stay proxied.
 		rules = append(rules, obj{"ip_cidr": prefixStrings(BypassPrefixes(profileKeep(profiles))), "outbound": TagDirect})
 	}
+	// The user's list: these go direct, or (BypassOnly) only these use the VPN.
+	routeFinal, dnsFinal, dnsRules := TagSelect, "remote", []any(nil)
+	if !opts.Bypass.Empty() {
+		listed, listedDNS := TagDirect, "local"
+		if opts.BypassOnly {
+			listed, listedDNS = TagSelect, "remote"
+			routeFinal, dnsFinal = TagDirect, "local"
+		}
+		for _, r := range opts.Bypass.rules() {
+			r["outbound"] = listed
+			rules = append(rules, obj(r))
+		}
+		// Names are looked up the same way as they are reached.
+		for _, r := range opts.Bypass.domainRules() {
+			r["server"] = listedDNS
+			dnsRules = append(dnsRules, obj(r))
+		}
+	}
 
 	cfg := obj{
 		"log": obj{"level": opts.LogLevel, "timestamp": true},
@@ -238,14 +270,14 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 				remoteDNS,
 				obj{"type": "local", "tag": "local"},
 			},
-			"final":    "remote",
+			"final":    dnsFinal,
 			"strategy": "prefer_ipv4",
 		},
 		"inbounds":  inbounds,
 		"outbounds": outbounds,
 		"route": obj{
 			"rules":                   rules,
-			"final":                   TagSelect,
+			"final":                   routeFinal,
 			"default_domain_resolver": "local",
 		},
 	}
@@ -254,6 +286,9 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 	// Windows security software rejects interface-bound sockets).
 	if opts.Mode == ModeTUN {
 		cfg["route"].(obj)["auto_detect_interface"] = true
+	}
+	if len(dnsRules) > 0 {
+		cfg["dns"].(obj)["rules"] = dnsRules
 	}
 	if len(endpoints) > 0 {
 		cfg["endpoints"] = endpoints

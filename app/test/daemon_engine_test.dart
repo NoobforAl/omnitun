@@ -173,4 +173,33 @@ void main() {
       throwsA(isA<EngineException>().having((e) => e.message, 'message', contains('VPN'))),
     );
   }, skip: exe == null ? 'omnitun-svc not built' : false, timeout: const Timeout(Duration(seconds: 60)));
+
+  test('the core checks a bypass list; the connect request carries it', () async {
+    final dir = await Directory.systemTemp.createTemp('omnitun-test');
+    final engine = await DaemonEngine.launch(exe!, controlFile: '${dir.path}${Platform.pathSeparator}control.json');
+    addTearDown(() async {
+      engine.dispose();
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await dir.delete(recursive: true).catchError((_) => dir);
+    });
+    final report = await engine.parseBypass(
+      '# banks\nbank.example\nfull:www.bank.example\n10.0.0.0/8\nnot a name\ngeosite:ads\n',
+    );
+    expect(report.entries, 3);
+    expect(report.domains, 2);
+    expect(report.ranges, 1);
+    expect(report.issues.map((i) => i.line), [5, 6]);
+    expect(report.issues.first.message, isNotEmpty);
+
+    final profile = (await engine.importText('trojan://pw@example.com:443#t')).profiles.single;
+    final params = DaemonEngine.startParams(
+      profile,
+      const [],
+      const ConnectOptions(bypass: 'bank.example\n10.0.0.0/8', bypassOnly: true),
+    );
+    expect(params['bypass'], 'bank.example\n10.0.0.0/8');
+    expect(params['bypass_only'], true);
+    // No list: "only these" means nothing, so it is not sent.
+    expect(DaemonEngine.startParams(profile, const [], const ConnectOptions(bypassOnly: true)).containsKey('bypass_only'), isFalse);
+  }, skip: exe == null ? 'omnitun-svc not built' : false, timeout: const Timeout(Duration(seconds: 60)));
 }

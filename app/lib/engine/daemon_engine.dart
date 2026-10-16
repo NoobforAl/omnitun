@@ -189,6 +189,8 @@ class DaemonEngine implements VpnEngine {
     if (!options.bypassLan) 'proxy_private': true,
     if (options.includePackages.isNotEmpty) 'include_packages': options.includePackages,
     if (options.excludePackages.isNotEmpty) 'exclude_packages': options.excludePackages,
+    if (options.bypass.isNotEmpty) 'bypass': options.bypass,
+    if (options.bypass.isNotEmpty && options.bypassOnly) 'bypass_only': true,
   };
 
   @override
@@ -260,6 +262,10 @@ class DaemonEngine implements VpnEngine {
     });
     return ProfileInfo.fromJson(res as Map<String, dynamic>);
   }
+
+  @override
+  Future<BypassReport> parseBypass(String text) async =>
+      BypassReport.fromJson(await _call('parse_bypass', {'text': text}) as Map<String, dynamic>);
 
   @override
   Future<Map<String, String>> profileValues(ProfileInfo profile) async {

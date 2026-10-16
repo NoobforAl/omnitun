@@ -196,6 +196,9 @@ class CoreEngine implements VpnEngine {
       (await _ready).buildProfile(values, protocol: protocol, profile: profile);
 
   @override
+  Future<BypassReport> parseBypass(String text) async => (await _ready).parseBypass(text);
+
+  @override
   Future<Map<String, String>> profileValues(ProfileInfo profile) async => (await _ready).profileValues(profile);
 
   @override

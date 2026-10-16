@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../state/providers.dart';
+import 'bypass_screen.dart';
 import 'logs_screen.dart';
 import 'profiles_screen.dart';
 import 'split_tunnel_screen.dart';
@@ -64,6 +65,15 @@ class SettingsScreen extends ConsumerWidget {
               trailing: const Icon(Icons.open_in_new),
               onTap: () => _openVpnSettings(context),
             ),
+          ListTile(
+            title: const Text('Bypass lists'),
+            subtitle: Text(() {
+              final on = ref.watch(bypassListsProvider).where((l) => l.enabled).fold<int>(0, (n, l) => n + l.entries);
+              return on == 0 ? 'Websites and addresses that skip the VPN' : '$on entr${on == 1 ? 'y' : 'ies'} in use';
+            }()),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const BypassScreen())),
+          ),
           if (Platform.isAndroid)
             ListTile(
               title: const Text('Split tunneling'),

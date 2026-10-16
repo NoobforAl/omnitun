@@ -291,3 +291,30 @@ func TestSubscribeVia(t *testing.T) {
 		t.Fatalf("auto with the provider down: %v", err)
 	}
 }
+
+// The app checks a bypass list when it is added: counts and the lines that cannot be used.
+func TestParseBypassMethod(t *testing.T) {
+	s, addr := newTestServer(t, ServerConfig{})
+	c, err := Dial(t.Context(), addr, s.Token())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	var rep BypassReport
+	text := "# banks\nbank.example\nfull:www.bank.example\n10.0.0.0/8\n2001:db8::/32\nnot a name\n"
+	if err := c.Call(t.Context(), "parse_bypass", BypassParams{Text: text}, &rep); err != nil {
+		t.Fatal(err)
+	}
+	if rep.Entries != 4 || rep.Domains != 2 || rep.Ranges != 2 {
+		t.Fatalf("report: %+v", rep)
+	}
+	if len(rep.Issues) != 1 || rep.Issues[0].Line != 6 {
+		t.Fatalf("issues: %+v", rep.Issues)
+	}
+	// A running tunnel gets the list: a request that starts with one is accepted.
+	res, _ := importer.Import("trojan://pw@example.com:443#t")
+	err = c.Call(t.Context(), "start", StartParams{Profiles: res.Profiles, ListenPort: freePort(t), Bypass: text, BypassOnly: false}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+}

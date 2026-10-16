@@ -159,6 +159,24 @@ class MockEngine implements VpnEngine {
   }
 
   @override
+  Future<BypassReport> parseBypass(String text) async {
+    // A simple count so the screens work without the core (the real rules are the core's).
+    var entries = 0;
+    final issues = <BypassIssue>[];
+    final lines = text.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i].split('#').first.trim();
+      if (line.isEmpty) continue;
+      if (line.contains(' ')) {
+        issues.add(BypassIssue(i + 1, line, 'not a domain, address or range'));
+      } else {
+        entries++;
+      }
+    }
+    return BypassReport(entries: entries, domains: entries, issues: issues);
+  }
+
+  @override
   Future<Map<String, String>> profileValues(ProfileInfo profile) async => {
     'name': profile.name,
     'server': profile.server,

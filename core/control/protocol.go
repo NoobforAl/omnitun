@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/NoobforAl/omnitun/core/profile"
+	"github.com/NoobforAl/omnitun/core/singbox"
 )
 
 // Version of the control protocol.
@@ -97,6 +98,24 @@ type StartParams struct {
 	// Android per-app split tunneling (package names); include wins over exclude.
 	IncludePackages []string `json:"include_packages,omitempty"`
 	ExcludePackages []string `json:"exclude_packages,omitempty"`
+	// Bypass is the text of the user's bypass lists (one entry per line, see
+	// singbox.BypassList): these destinations go around the VPN, or with
+	// BypassOnly they are the only ones that use it.
+	Bypass     string `json:"bypass,omitempty"`
+	BypassOnly bool   `json:"bypass_only,omitempty"`
+}
+
+// BypassParams is a bypass list to check.
+type BypassParams struct {
+	Text string `json:"text"`
+}
+
+// BypassReport says what a bypass list holds and which lines cannot be used.
+type BypassReport struct {
+	Entries int                   `json:"entries"`
+	Domains int                   `json:"domains"`
+	Ranges  int                   `json:"ranges"`
+	Issues  []singbox.BypassIssue `json:"issues,omitempty"`
 }
 
 // SelectParams switches the active profile.

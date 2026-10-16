@@ -237,6 +237,8 @@ class ConnectionController extends Notifier<EngineState> {
         excludePackages: settings.splitMode == 'exclude' ? settings.splitApps : const [],
         autoFailover: settings.autoFailover,
         bypassLan: settings.bypassLan,
+        bypass: ref.read(bypassListsProvider.notifier).enabledText,
+        bypassOnly: settings.bypassOnly,
       ),
     );
   }
@@ -263,6 +265,73 @@ class LogsController extends Notifier<List<String>> {
 
 final logsProvider = NotifierProvider<LogsController, List<String>>(LogsController.new);
 
+/// A named list of destinations that go around the VPN (see core/singbox/bypasslist.go).
+class BypassList {
+  const BypassList({required this.id, required this.name, required this.text, this.enabled = true, this.entries = 0});
+
+  final String id;
+  final String name;
+
+  /// One entry per line: a domain, `full:`, `keyword:`, `regexp:`, an address or a range.
+  final String text;
+  final bool enabled;
+
+  /// How many entries the core found in [text] when it was added.
+  final int entries;
+
+  BypassList copyWith({String? name, String? text, bool? enabled, int? entries}) => BypassList(
+    id: id,
+    name: name ?? this.name,
+    text: text ?? this.text,
+    enabled: enabled ?? this.enabled,
+    entries: entries ?? this.entries,
+  );
+
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'text': text, 'enabled': enabled, 'entries': entries};
+
+  factory BypassList.fromJson(Map<String, dynamic> j) => BypassList(
+    id: j['id'] as String,
+    name: j['name'] as String? ?? 'List',
+    text: j['text'] as String? ?? '',
+    enabled: j['enabled'] as bool? ?? true,
+    entries: (j['entries'] as num?)?.toInt() ?? 0,
+  );
+}
+
+/// The user's bypass lists, persisted.
+class BypassListsController extends Notifier<List<BypassList>> {
+  static const _key = 'bypass_lists';
+
+  @override
+  List<BypassList> build() {
+    final saved = ref.read(storeProvider).read<List<dynamic>>(_key) ?? const [];
+    return [
+      for (final s in saved)
+        if (s is Map) BypassList.fromJson(Map<String, dynamic>.from(s)),
+    ];
+  }
+
+  void _save(List<BypassList> next) {
+    state = next;
+    ref.read(storeProvider).write(_key, [for (final l in next) l.toJson()]);
+  }
+
+  String add({required String name, required String text, required int entries}) {
+    final id = 'bl-${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}';
+    _save([...state, BypassList(id: id, name: name, text: text, entries: entries)]);
+    return id;
+  }
+
+  void update(BypassList list) => _save([for (final l in state) l.id == list.id ? list : l]);
+
+  void remove(String id) => _save(state.where((l) => l.id != id).toList());
+
+  /// The text of every enabled list, as sent to the core.
+  String get enabledText => [for (final l in state) if (l.enabled) l.text.trim()].where((t) => t.isNotEmpty).join('\n');
+}
+
+final bypassListsProvider = NotifierProvider<BypassListsController, List<BypassList>>(BypassListsController.new);
+
 /// Whether the first-start introduction has been seen.
 class OnboardedController extends Notifier<bool> {
   static const _key = 'onboarded';
@@ -285,6 +354,7 @@ class SettingsState {
     this.stopOnClose = true,
     this.autoFailover = true,
     this.bypassLan = true,
+    this.bypassOnly = false,
     this.remoteDns = defaultRemoteDns,
     this.splitMode = 'off',
     this.splitApps = const [],
@@ -304,6 +374,9 @@ class SettingsState {
   /// Local networks (LAN, link-local, multicast) don't go through the VPN.
   final bool bypassLan;
 
+  /// With bypass lists: only the listed destinations use the VPN, everything else goes direct.
+  final bool bypassOnly;
+
   /// Resolver used through the tunnel: https://, tls://, tcp://, udp:// or an IP.
   final String remoteDns;
 
@@ -321,6 +394,7 @@ class SettingsState {
     bool? stopOnClose,
     bool? autoFailover,
     bool? bypassLan,
+    bool? bypassOnly,
     String? remoteDns,
     String? splitMode,
     List<String>? splitApps,
@@ -332,6 +406,7 @@ class SettingsState {
         stopOnClose: stopOnClose ?? this.stopOnClose,
         autoFailover: autoFailover ?? this.autoFailover,
         bypassLan: bypassLan ?? this.bypassLan,
+        bypassOnly: bypassOnly ?? this.bypassOnly,
         remoteDns: remoteDns ?? this.remoteDns,
         splitMode: splitMode ?? this.splitMode,
         splitApps: splitApps ?? this.splitApps,
@@ -344,6 +419,7 @@ class SettingsState {
         'stop_on_close': stopOnClose,
         'auto_failover': autoFailover,
         'bypass_lan': bypassLan,
+        'bypass_only': bypassOnly,
         'remote_dns': remoteDns,
         'split_mode': splitMode,
         'split_apps': splitApps,
@@ -357,6 +433,7 @@ class SettingsState {
         stopOnClose: j['stop_on_close'] as bool? ?? defaults.stopOnClose,
         autoFailover: j['auto_failover'] as bool? ?? defaults.autoFailover,
         bypassLan: j['bypass_lan'] as bool? ?? defaults.bypassLan,
+        bypassOnly: j['bypass_only'] as bool? ?? defaults.bypassOnly,
         remoteDns: j['remote_dns'] as String? ?? defaults.remoteDns,
         splitMode: j['split_mode'] as String? ?? defaults.splitMode,
         splitApps: [for (final a in (j['split_apps'] as List? ?? const [])) a as String],

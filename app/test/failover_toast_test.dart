@@ -38,6 +38,8 @@ class ScriptedEngine implements VpnEngine {
   Future<ProfileInfo> buildProfile(Map<String, String> values, {String? protocol, ProfileInfo? profile}) async =>
       throw UnimplementedError();
   @override
+  Future<BypassReport> parseBypass(String text) async => const BypassReport();
+  @override
   Future<Map<String, String>> profileValues(ProfileInfo profile) async => const {};
   @override
   Future<String> exportLink(ProfileInfo profile) async => '';
