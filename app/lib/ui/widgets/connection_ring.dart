@@ -108,15 +108,28 @@ class _ConnectionRingState extends State<ConnectionRing> with SingleTickerProvid
                   ),
                 ),
               ),
-              TweenAnimationBuilder<double>(
-                tween: Tween(end: _showRing ? percent / 100 : (connected ? 1 : 0)),
-                duration: const Duration(milliseconds: 450),
-                curve: Curves.easeOutCubic,
-                builder: (context, value, _) => CustomPaint(
+              if (_showRing)
+                TweenAnimationBuilder<double>(
+                  tween: Tween(end: percent / 100),
+                  duration: const Duration(milliseconds: 450),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, _) => SizedBox(
+                    width: widget.size,
+                    height: widget.size,
+                    child: CircularProgressIndicator(
+                      value: value,
+                      strokeWidth: 6,
+                      strokeCap: StrokeCap.round,
+                      color: color,
+                      backgroundColor: color.withValues(alpha: 0.16),
+                    ),
+                  ),
+                )
+              else
+                CustomPaint(
                   size: Size.square(widget.size),
-                  painter: _RingPainter(color: color, value: value, gradient: connected && !_showRing),
+                  painter: _RingPainter(color: color, full: connected),
                 ),
-              ),
               if (connecting && _showRing)
                 Text(
                   '$percent%',
@@ -133,44 +146,33 @@ class _ConnectionRingState extends State<ConnectionRing> with SingleTickerProvid
   }
 }
 
+/// The ring at rest: a faint track, and once connected a full ring that blends
+/// from the status colour to the brand colour.
 class _RingPainter extends CustomPainter {
-  _RingPainter({required this.color, required this.value, required this.gradient});
+  _RingPainter({required this.color, required this.full});
 
   final Color color;
-
-  /// 0-1: how much of the ring is filled.
-  final double value;
-
-  /// Connected: the full ring blends from the status colour to the brand colour.
-  final bool gradient;
+  final bool full;
 
   @override
   void paint(Canvas canvas, Size size) {
     const stroke = 6.0;
     final rect = Offset.zero & size;
     final arc = rect.deflate(stroke / 2);
-    final track = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..color = color.withValues(alpha: 0.16);
-    canvas.drawArc(arc, 0, math.pi * 2, false, track);
-    if (value <= 0) return;
-
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round;
-    if (gradient) {
+      ..strokeWidth = stroke;
+    if (full) {
       paint.shader = SweepGradient(
         colors: [color, brandIndigo, color],
         transform: const GradientRotation(-math.pi / 2),
       ).createShader(rect);
     } else {
-      paint.color = color;
+      paint.color = color.withValues(alpha: 0.28);
     }
-    canvas.drawArc(arc, -math.pi / 2, math.pi * 2 * value.clamp(0, 1), false, paint);
+    canvas.drawArc(arc, 0, math.pi * 2, false, paint);
   }
 
   @override
-  bool shouldRepaint(_RingPainter old) => old.color != color || old.value != value || old.gradient != gradient;
+  bool shouldRepaint(_RingPainter old) => old.color != color || old.full != full;
 }

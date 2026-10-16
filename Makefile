@@ -3,7 +3,7 @@ TAGS := with_gvisor,with_quic,with_wireguard,with_utls,with_clash_api,with_openv
 LDFLAGS := -s -w -checklinkname=0
 GOFLAGS_ALL := -tags "$(TAGS)" -ldflags "$(LDFLAGS)"
 
-.PHONY: build test vet tor app-test server-release fix dev-build dev-server dev-tui dev-web dev-android dev-clean help docker-e2e
+.PHONY: build test vet tor app-test server-release fix dev-build dev-server dev-tui dev-web dev-android dev-clean help docker-e2e notices
 
 build:
 	go build $(GOFLAGS_ALL) -o bin/ ./cmd/...
@@ -23,6 +23,11 @@ app-test:
 # Static Linux server binaries (amd64, arm64) and SHA256SUMS in dist/.
 server-release:
 	scripts/build-server-release.sh
+
+# Regenerates the license list the app shows (Settings > Open-source licenses).
+# Run it after changing dependencies; CI checks that every license is known.
+notices:
+	python scripts/gen-notices.py --out app/assets/third_party_notices.md
 
 # Real clients (OpenVPN, WireGuard, AmneziaWG, SSTP, IKEv2) against the Linux
 # server, in Docker. Needs Docker; PROTO="sstp ikev2" picks some.

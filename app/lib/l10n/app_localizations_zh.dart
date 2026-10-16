@@ -1257,4 +1257,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String connectedTo(String place) {
     return '已连接到 $place';
   }
+
+  @override
+  String get noticesTitle => '开源许可';
+
+  @override
+  String get noticesIntro => 'Omnitun 采用 MIT 许可。它包含下列软件，各自适用其自己的许可。';
+
+  @override
+  String noticesMore(int count) {
+    return '另外 $count 个';
+  }
+
+  @override
+  String noticesPackages(int count) {
+    return '$count 个软件包';
+  }
+
+  @override
+  String get noticesLoadFailed => '无法读取许可列表。';
 }

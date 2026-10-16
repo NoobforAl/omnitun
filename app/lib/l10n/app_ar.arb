@@ -358,5 +358,10 @@
   "exitTitle": "إظهار عنوان الخروج والبلد",
   "exitHint": "يسأل api.country.is عن عنوان الخروج والبلد. متوقف افتراضيًا.",
   "exitIpLabel": "IP‎ {ip}",
-  "connectedTo": "متصل بـ {place}"
+  "connectedTo": "متصل بـ {place}",
+  "noticesTitle": "تراخيص المصدر المفتوح",
+  "noticesIntro": "يُوزَّع Omnitun بترخيص MIT. ويتضمن البرامج التالية، كلٌّ بترخيصه الخاص.",
+  "noticesMore": "+{count} أخرى",
+  "noticesPackages": "{count} حزمة",
+  "noticesLoadFailed": "تعذّرت قراءة قائمة التراخيص."
 }

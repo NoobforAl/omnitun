@@ -358,5 +358,10 @@
   "exitTitle": "显示出口地址和国家",
   "exitHint": "向 api.country.is 查询出口地址和国家。默认关闭。",
   "exitIpLabel": "IP {ip}",
-  "connectedTo": "已连接到 {place}"
+  "connectedTo": "已连接到 {place}",
+  "noticesTitle": "开源许可",
+  "noticesIntro": "Omnitun 采用 MIT 许可。它包含下列软件，各自适用其自己的许可。",
+  "noticesMore": "另外 {count} 个",
+  "noticesPackages": "{count} 个软件包",
+  "noticesLoadFailed": "无法读取许可列表。"
 }

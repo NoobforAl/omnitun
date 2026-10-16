@@ -55,7 +55,7 @@ void main() {
     expect(engine.asked, 1);
     expect(c.read(exitProvider)?.ip, '203.0.113.77');
     expect(find.text('IP 203.0.113.77'), findsOneWidget);
-    expect(find.text('Netherlands'), findsWidgets); // the country that was seen
+    expect(find.text('Connected to Netherlands'), findsOneWidget); // the country that was seen
     // Remembered for the profile, so the location list can use it.
     expect(c.read(learnedCountriesProvider)['a'], 'NL');
     expect(c.read(profileCountryProvider)(c.read(profilesProvider).single), 'NL');

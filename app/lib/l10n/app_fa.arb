@@ -358,5 +358,10 @@
   "exitTitle": "نمایش نشانی و کشور خروجی",
   "exitHint": "نشانی و کشور خروجی را از api.country.is بپرس. پیش‌فرض: خاموش.",
   "exitIpLabel": "IP‎ {ip}",
-  "connectedTo": "متصل به {place}"
+  "connectedTo": "متصل به {place}",
+  "noticesTitle": "مجوزهای متن‌باز",
+  "noticesIntro": "Omnitun با مجوز MIT منتشر شده است. نرم‌افزارهای زیر هر کدام با مجوز خودشان در آن به کار رفته‌اند.",
+  "noticesMore": "+{count} مورد دیگر",
+  "noticesPackages": "{count} بسته",
+  "noticesLoadFailed": "فهرست مجوزها خوانده نشد."
 }

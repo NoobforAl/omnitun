@@ -683,5 +683,24 @@
         "type": "String"
       }
     }
+  },
+  "noticesTitle": "Open-source licenses",
+  "noticesIntro": "Omnitun is MIT licensed. It includes the software below, each under its own license.",
+  "noticesMore": "+{count} more",
+  "noticesPackages": "{count} packages",
+  "noticesLoadFailed": "The license list could not be read.",
+  "@noticesMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@noticesPackages": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

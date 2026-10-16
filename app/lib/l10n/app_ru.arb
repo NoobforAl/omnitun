@@ -358,5 +358,10 @@
   "exitTitle": "Показывать адрес и страну выхода",
   "exitHint": "Спросить у api.country.is адрес и страну выхода. По умолчанию выкл.",
   "exitIpLabel": "IP {ip}",
-  "connectedTo": "Подключено: {place}"
+  "connectedTo": "Подключено: {place}",
+  "noticesTitle": "Лицензии с открытым кодом",
+  "noticesIntro": "Omnitun распространяется по лицензии MIT. В него входит ПО ниже, каждое под своей лицензией.",
+  "noticesMore": "ещё {count}",
+  "noticesPackages": "Пакетов: {count}",
+  "noticesLoadFailed": "Не удалось прочитать список лицензий."
 }

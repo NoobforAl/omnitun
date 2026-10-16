@@ -1330,4 +1330,24 @@ class AppLocalizationsRu extends AppLocalizations {
   String connectedTo(String place) {
     return 'Подключено: $place';
   }
+
+  @override
+  String get noticesTitle => 'Лицензии с открытым кодом';
+
+  @override
+  String get noticesIntro =>
+      'Omnitun распространяется по лицензии MIT. В него входит ПО ниже, каждое под своей лицензией.';
+
+  @override
+  String noticesMore(int count) {
+    return 'ещё $count';
+  }
+
+  @override
+  String noticesPackages(int count) {
+    return 'Пакетов: $count';
+  }
+
+  @override
+  String get noticesLoadFailed => 'Не удалось прочитать список лицензий.';
 }

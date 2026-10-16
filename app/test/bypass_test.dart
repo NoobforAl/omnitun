@@ -74,8 +74,8 @@ void main() {
     expect(find.text('2 entries'), findsOneWidget);
     expect(c.read(bypassListsProvider).single.text, contains('bank.example'));
 
-    // Only the listed destinations use the VPN.
-    await tester.tap(find.text('Only the listed destinations use the VPN'));
+    // Only listed use the VPN.
+    await tester.tap(find.text('Only listed use the VPN'));
     await tester.pumpAndSettle();
     expect(c.read(settingsProvider).bypassOnly, isTrue);
     await tester.pageBack();

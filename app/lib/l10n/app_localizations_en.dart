@@ -1297,4 +1297,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String connectedTo(String place) {
     return 'Connected to $place';
   }
+
+  @override
+  String get noticesTitle => 'Open-source licenses';
+
+  @override
+  String get noticesIntro =>
+      'Omnitun is MIT licensed. It includes the software below, each under its own license.';
+
+  @override
+  String noticesMore(int count) {
+    return '+$count more';
+  }
+
+  @override
+  String noticesPackages(int count) {
+    return '$count packages';
+  }
+
+  @override
+  String get noticesLoadFailed => 'The license list could not be read.';
 }

@@ -178,6 +178,8 @@ def main():
     # Full texts, each distinct text once.
     texts = {}
     for eco, name, version, spdx, files in entries:
+        # A LICENSE file that only says "MIT OR Apache-2.0" points at the real texts next to it.
+        files = [f for f in files if len(f[1].strip()) >= 40] or files
         for fname, text in files:
             key = hashlib.sha256(norm(text).encode()).hexdigest()
             texts.setdefault(key, (text, []))[1].append("%s %s %s" % (eco, name, version))

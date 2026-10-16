@@ -1346,4 +1346,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String connectedTo(String place) {
     return 'متصل بـ $place';
   }
+
+  @override
+  String get noticesTitle => 'تراخيص المصدر المفتوح';
+
+  @override
+  String get noticesIntro =>
+      'يُوزَّع Omnitun بترخيص MIT. ويتضمن البرامج التالية، كلٌّ بترخيصه الخاص.';
+
+  @override
+  String noticesMore(int count) {
+    return '+$count أخرى';
+  }
+
+  @override
+  String noticesPackages(int count) {
+    return '$count حزمة';
+  }
+
+  @override
+  String get noticesLoadFailed => 'تعذّرت قراءة قائمة التراخيص.';
 }

@@ -8,6 +8,7 @@ import '../../l10n/l10n.dart';
 import '../../state/providers.dart';
 import 'bypass_screen.dart';
 import 'logs_screen.dart';
+import 'notices_screen.dart';
 import 'profiles_screen.dart';
 import 'split_tunnel_screen.dart';
 
@@ -137,6 +138,12 @@ class SettingsScreen extends ConsumerWidget {
             title: Text(l.stopOnClose),
             value: s.stopOnClose,
             onChanged: (v) => ctrl.update((s) => s.copyWith(stopOnClose: v)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.gavel_outlined),
+            title: Text(l.noticesTitle),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NoticesScreen())),
           ),
           ListTile(
             leading: const Icon(Icons.info_outline),

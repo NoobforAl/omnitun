@@ -2257,6 +2257,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Connected to {place}'**
   String connectedTo(String place);
+
+  /// No description provided for @noticesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Open-source licenses'**
+  String get noticesTitle;
+
+  /// No description provided for @noticesIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Omnitun is MIT licensed. It includes the software below, each under its own license.'**
+  String get noticesIntro;
+
+  /// No description provided for @noticesMore.
+  ///
+  /// In en, this message translates to:
+  /// **'+{count} more'**
+  String noticesMore(int count);
+
+  /// No description provided for @noticesPackages.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} packages'**
+  String noticesPackages(int count);
+
+  /// No description provided for @noticesLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The license list could not be read.'**
+  String get noticesLoadFailed;
 }
 
 class _AppLocalizationsDelegate

@@ -1299,4 +1299,24 @@ class AppLocalizationsFa extends AppLocalizations {
   String connectedTo(String place) {
     return 'متصل به $place';
   }
+
+  @override
+  String get noticesTitle => 'مجوزهای متن‌باز';
+
+  @override
+  String get noticesIntro =>
+      'Omnitun با مجوز MIT منتشر شده است. نرم‌افزارهای زیر هر کدام با مجوز خودشان در آن به کار رفته‌اند.';
+
+  @override
+  String noticesMore(int count) {
+    return '+$count مورد دیگر';
+  }
+
+  @override
+  String noticesPackages(int count) {
+    return '$count بسته';
+  }
+
+  @override
+  String get noticesLoadFailed => 'فهرست مجوزها خوانده نشد.';
 }
