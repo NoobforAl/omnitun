@@ -10,7 +10,6 @@ import '../../l10n/l10n.dart';
 import '../../state/location.dart';
 import '../../state/providers.dart';
 import '../theme.dart';
-import '../widgets/connection_ring.dart';
 import '../widgets/country_flag.dart';
 import '../../state/geo_data.dart';
 import '../widgets/credentials_dialog.dart';
@@ -66,36 +65,44 @@ class HomeScreen extends ConsumerWidget {
         ),
         child: CustomPaint(
           painter: const StarFieldPainter(),
-          child: Stack(
-            children: [
-              Positioned.fill(child: _Earth(state: conn)),
-              SafeArea(
-            bottom: false,
-            child: Center(
-              child: ConstrainedBox(
-                // On a wide window the same screen stays one narrow column.
-                constraints: const BoxConstraints(maxWidth: _columnWidth),
-                child: Column(
-                  children: [
-                    const _TopBar(),
-                    Expanded(
-                      child: LayoutBuilder(
-                        builder: (context, box) => SingleChildScrollView(
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              minHeight: box.maxHeight,
-                            ),
-                            child: Center(child: _Hero(state: conn)),
-                          ),
-                        ),
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final g = _Geometry(box, MediaQuery.paddingOf(context).top);
+              return Stack(
+                children: [
+                  // The Earth is the picture; the status hangs under it.
+                  Positioned(
+                    left: g.left,
+                    top: g.top,
+                    width: g.d,
+                    height: g.d,
+                    child: _Earth(state: conn),
+                  ),
+                  Positioned(
+                    top: g.contentTop,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: ConstrainedBox(
+                        // On a wide window the same screen stays one narrow column.
+                        constraints: const BoxConstraints(maxWidth: _columnWidth),
+                        child: _Hero(state: conn),
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-            ],
+                  ),
+                  SafeArea(
+                    bottom: false,
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: _columnWidth),
+                        child: const _TopBar(),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -117,7 +124,7 @@ class HomeScreen extends ConsumerWidget {
 const _columnWidth = 480.0;
 
 /// Connects, cancels or disconnects, asking for a password first when the
-/// server needs one. Shared by the power ring and the main button.
+/// server needs one.
 Future<void> _toggle(BuildContext context, WidgetRef ref) async {
   final ctrl = ref.read(connectionProvider.notifier);
   if (ref.read(connectionPlanProvider) == null ||
@@ -143,7 +150,21 @@ String? _exitCode(WidgetRef ref, EngineState s) {
   return ref.watch(exitProvider)?.country ?? ref.watch(profileCountryProvider)(active);
 }
 
-/// The Earth behind everything, turned to the exit country while connected.
+/// Where things sit: the globe under the top bar, the status block right under the globe.
+class _Geometry {
+  _Geometry(BoxConstraints box, double safeTop)
+    : d = math.min(math.min(box.maxWidth * 0.74, 400.0), box.maxHeight * 0.4),
+      left = (box.maxWidth - math.min(math.min(box.maxWidth * 0.74, 400.0), box.maxHeight * 0.4)) / 2,
+      top = safeTop + 54;
+
+  final double d, left, top;
+
+  /// Below the globe: nothing is written on the Earth.
+  double get contentTop => top + d + 22;
+}
+
+/// The Earth. Not connected: it shows where you really are (red). Connecting and connected:
+/// it flies to the exit country (gold, then teal) with an arc from where you are.
 class _Earth extends ConsumerWidget {
   const _Earth({required this.state});
 
@@ -151,24 +172,28 @@ class _Earth extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final code = _exitCode(ref, state);
-    final center = code == null ? null : countryCenters[code];
-    return LayoutBuilder(
-      builder: (context, box) {
-        final d = math.min(box.maxWidth * 0.98, 520.0);
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              left: (box.maxWidth - d) / 2,
-              top: box.maxHeight * 0.41 - d / 2,
-              width: d,
-              height: d,
-              child: EarthBackdrop(target: center, markerColor: statusColor(state.status, Theme.of(context).colorScheme)),
-            ),
-          ],
-        );
-      },
+    final scheme = Theme.of(context).colorScheme;
+    (double, double)? centerOf(String? code) => code == null ? null : countryCenters[code];
+
+    // Where you are: only when address lookups are allowed (Settings).
+    final allowed = ref.watch(settingsProvider.select((s) => s.showExit));
+    final home = allowed ? centerOf(ref.watch(homeProvider)?.country) : null;
+
+    // Where the connection exits: what the service saw once connected; while connecting, the
+    // country of the server about to be used (a guess from its name or address).
+    String? exitCode;
+    if (state.status == ConnStatus.connected) {
+      exitCode = _exitCode(ref, state);
+    } else if (state.status == ConnStatus.connecting) {
+      final primary = ref.watch(connectionPlanProvider)?.primary;
+      if (primary != null && primary.protocol != 'tor') exitCode = ref.watch(profileCountryProvider)(primary);
+    }
+
+    return EarthBackdrop(
+      home: home,
+      exit: centerOf(exitCode),
+      homeColor: disconnectRed,
+      exitColor: statusColor(state.status, scheme),
     );
   }
 }
@@ -187,15 +212,15 @@ class _TopBar extends StatelessWidget {
             borderRadius: BorderRadius.circular(9),
             child: Image.asset(
               'assets/logo.png',
-              width: 32,
-              height: 32,
+              width: 26,
+              height: 26,
               filterQuality: FilterQuality.medium,
             ),
           ),
           const SizedBox(width: 10),
           Text(
             context.l10n.appName,
-            style: Theme.of(context).textTheme.titleLarge
+            style: Theme.of(context).textTheme.titleMedium
                 ?.copyWith(color: scheme.onSurface),
           ),
           const Spacer(),
@@ -212,7 +237,7 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-/// Ring, state, and — once connected — the country you exit from.
+/// The status under the globe: what is happening, where you are or exit, and — once connected — the clock and speed.
 class _Hero extends ConsumerStatefulWidget {
   const _Hero({required this.state});
 
@@ -250,7 +275,8 @@ class _HeroState extends ConsumerState<_Hero> {
     final s = widget.state;
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    final color = statusColor(s.status, scheme);
+    // Not protected is red, like the marker of where you are on the globe.
+    final color = s.status == ConnStatus.disconnected ? scheme.error : statusColor(s.status, scheme);
     final countryOf = ref.watch(profileCountryProvider);
     final profiles = ref.watch(profilesProvider);
     final active = profiles.where((p) => p.id == s.activeProfileId).firstOrNull;
@@ -258,74 +284,100 @@ class _HeroState extends ConsumerState<_Hero> {
     final exit = ref.watch(exitProvider);
     final tor = active?.protocol == 'tor';
     // The country the service saw is the truth; the guess is the fallback.
-    final code = tor
-        ? null
-        : exit?.country ?? (active == null ? null : countryOf(active));
+    final code = tor ? null : exit?.country ?? (active == null ? null : countryOf(active));
     // Where you appear to be: the country, or Tor; null when it is not known.
-    final place = tor
-        ? context.l10n.torNetwork
-        : (code == null ? null : context.countryName(code));
+    final place = tor ? context.l10n.torNetwork : (code == null ? null : context.countryName(code));
+    // Where you really are, while not protected (only when address lookups are allowed).
+    final allowed = ref.watch(settingsProvider.select((s) => s.showExit));
+    final homeCode = allowed ? ref.watch(homeProvider)?.country : null;
+    final idle = s.status == ConnStatus.disconnected || s.status == ConnStatus.error;
+    final progress = s.progress;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ConnectionRing(
-            status: s.status,
-            progress: s.progress,
-            onTap: () => _toggle(context, ref),
-          ),
-          const SizedBox(height: 28),
           Text(
-            connected && place != null
-                ? context.l10n.connectedTo(place)
-                : statusLabel(context.l10n, s.status),
-            style: text.headlineSmall?.copyWith(color: color),
+            connected && place != null ? context.l10n.connectedTo(place) : statusLabel(context.l10n, s.status),
+            style: text.titleLarge?.copyWith(color: color),
             textAlign: TextAlign.center,
           ),
-          // While connecting, say which step is running (and for which profile).
-          if (s.status == ConnStatus.connecting && s.progress != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: Text(
-                  [
-                    progressDetail(context.l10n, s.progress!) ??
-                        stageLabel(context.l10n, s.progress!.stage),
-                    ?s.progress!.profile,
-                  ].join(' · '),
-                  key: ValueKey(
-                    '${s.progress!.stage}${s.progress!.profile}${s.progress!.detail}',
-                  ),
-                  style: text.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+          // While connecting: the step, and a slim bar with the real progress.
+          if (s.status == ConnStatus.connecting && progress != null) ...[
+            const SizedBox(height: 8),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Text(
+                [progressDetail(context.l10n, progress) ?? stageLabel(context.l10n, progress.stage), ?progress.profile]
+                    .join(' · '),
+                key: ValueKey('${progress.stage}${progress.profile}${progress.detail}'),
+                style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                textAlign: TextAlign.center,
               ),
             ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(end: progress.percent / 100),
+                    duration: const Duration(milliseconds: 450),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, _) => ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: value,
+                        minHeight: 6,
+                        color: color,
+                        backgroundColor: color.withValues(alpha: 0.18),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '${progress.percent}%',
+                  style: text.titleMedium?.copyWith(
+                    color: color,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ],
+          // Not connected: where you are right now.
+          if (idle && homeCode != null) ...[
+            const SizedBox(height: 14),
+            _ExitChip(code: homeCode, tor: false, title: context.countryName(homeCode), accent: disconnectRed),
+          ],
           if (connected && active != null) ...[
-            const SizedBox(height: 18),
-            _ExitChip(code: code, tor: tor, title: active.name, ip: exit?.ip),
+            const SizedBox(height: 16),
+            _ExitChip(code: code, tor: tor, title: active.name, ip: exit?.ip, accent: color),
           ],
           if (connected && s.connectedSince != null) ...[
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             Text(
               _elapsed(s.connectedSince!),
-              style: text.headlineSmall?.copyWith(
+              style: text.titleLarge?.copyWith(
                 fontWeight: FontWeight.w500,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             _TrafficRow(up: s.upBps, down: s.downBps),
           ],
         ],
       ),
     );
   }
+}
+
+/// An address shown in part only: `147.78.x.x`, `2a07:d883:…`. Enough to recognise, not to track.
+String maskIp(String ip) {
+  if (ip.contains(':')) return '${ip.split(':').take(2).join(':')}:…';
+  final o = ip.split('.');
+  return o.length == 4 ? '${o[0]}.${o[1]}.x.x' : ip;
 }
 
 /// The flag of the exit country with the server's name and, when known, the exit address.
@@ -335,6 +387,7 @@ class _ExitChip extends StatelessWidget {
     required this.tor,
     required this.title,
     this.ip,
+    required this.accent,
   });
 
   final String? code;
@@ -342,23 +395,26 @@ class _ExitChip extends StatelessWidget {
   final String title;
   final String? ip;
 
+  /// Colour of the chip's outline: red where you are unprotected, the status colour when connected.
+  final Color accent;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsetsDirectional.fromSTEB(8, 8, 18, 8),
+      padding: const EdgeInsetsDirectional.fromSTEB(6, 6, 14, 6),
       decoration: BoxDecoration(
         color: scheme.surfaceContainer,
         borderRadius: BorderRadius.circular(40),
-        border: Border.all(color: scheme.outlineVariant),
+        border: Border.all(color: accent.withValues(alpha: 0.45)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           CountryFlag(
             code,
-            size: 40,
+            size: 30,
             icon: tor ? Icons.security : Icons.public,
             label: tor ? context.l10n.torNetwork : null,
           ),
@@ -370,12 +426,12 @@ class _ExitChip extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: text.titleMedium,
+                  style: text.titleSmall?.copyWith(letterSpacing: 0, fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (ip != null)
                   Text(
-                    context.l10n.exitIpLabel(ip!),
+                    context.l10n.exitIpLabel(maskIp(ip!)),
                     textDirection: TextDirection.ltr,
                     style: text.bodySmall?.copyWith(
                       color: scheme.onSurfaceVariant,
@@ -406,7 +462,7 @@ class _TrafficRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     Widget pill(IconData icon, int bps) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: scheme.surfaceContainer,
         borderRadius: BorderRadius.circular(20),
@@ -486,7 +542,7 @@ class _BottomPanel extends ConsumerWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         border: Border(top: BorderSide(color: scheme.outlineVariant)),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -515,18 +571,18 @@ class _BottomPanel extends ConsumerWidget {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
+                    horizontal: 12,
+                    vertical: 8,
                   ),
                   child: Row(
                     children: [
                       CountryFlag(
                         flagCode,
-                        size: 40,
+                        size: 30,
                         icon: rowIcon,
                         label: title,
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -539,7 +595,7 @@ class _BottomPanel extends ConsumerWidget {
                             ),
                             Text(
                               title,
-                              style: text.titleMedium,
+                              style: text.titleSmall?.copyWith(letterSpacing: 0, fontWeight: FontWeight.w600),
                               overflow: TextOverflow.ellipsis,
                             ),
                             Text(
@@ -561,7 +617,7 @@ class _BottomPanel extends ConsumerWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             _MainButton(
               label: connected
                   ? context.l10n.buttonDisconnect
@@ -624,7 +680,7 @@ class _MainButton extends StatelessWidget {
           child: InkWell(
             onTap: onPressed,
             child: SizedBox(
-              height: 58,
+              height: 48,
               child: Center(
                 child: Text(
                   label,

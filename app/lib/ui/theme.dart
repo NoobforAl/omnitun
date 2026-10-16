@@ -200,8 +200,10 @@ ThemeMode themeModeOf(String setting) => switch (setting) {
 /// screens always pair it with an icon and a label.
 Color statusColor(ConnStatus status, ColorScheme scheme) {
   return switch (status) {
-    ConnStatus.connected => connectedGreen,
-    ConnStatus.connecting || ConnStatus.disconnecting => connectingAmber,
+    // Darker in the light theme, where the pale glow colours would not read.
+    ConnStatus.connected => scheme.brightness == Brightness.dark ? connectedGreen : scheme.secondary,
+    ConnStatus.connecting || ConnStatus.disconnecting =>
+      scheme.brightness == Brightness.dark ? connectingAmber : scheme.tertiary,
     ConnStatus.error => scheme.error,
     ConnStatus.noInternet => scheme.outline,
     ConnStatus.disconnected => scheme.outline,

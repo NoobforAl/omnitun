@@ -1288,7 +1288,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get exitHint =>
-      'نشانی و کشور خروجی را از api.country.is بپرس. پیش‌فرض: خاموش.';
+      'نشانی و کشور شما را از api.country.is می‌پرسد، حتی بدون اتصال.';
 
   @override
   String exitIpLabel(String ip) {

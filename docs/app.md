@@ -1,6 +1,6 @@
 # Omnitun app
 
-One calm screen: a power ring that shows whether you are protected, the country you exit from, and one button.
+One calm screen: an Earth that shows where you are and where you exit, the state in words, and one button.
 
 ## Look
 
@@ -14,7 +14,8 @@ Three short screens say what the app does, how to add servers and what Android w
 
 * The ring fills while connecting (the real progress: network check, configuration, engine, tunnel, handshake). If something fails it stops red at the step that failed and says why, in your language.
 * "Connected" is only shown after a real test connection through the tunnel worked.
-* Once connected it says **Connected to <country>** with the flag, the server's name and (if you turned it on) the exit address. Tap the ring or the big button to connect and disconnect.
+* **Not connected:** the Earth is turned to where you really are, with a red marker and your country (found with a direct request to Cloudflare or `api.country.is`; Settings → "Show exit address and country" turns it off, and then the Earth just rests).
+* **Connecting:** the Earth flies to the server's country and a slim bar shows the real progress. **Connected:** it says **Connected to <country>** with the flag, the server's name and part of the exit address (`147.78.x.x`). Disconnecting flies back. Nothing is written on the Earth.
 * **Location** opens the list of places. **Connect / Cancel / Disconnect** is the only button.
 * Settings (the sliders icon) is at the top, and Logs are in Settings. Everything else opens from there and closes with Back; there is no footer.
 * A notification (Android) shows the speed and has a Disconnect button.

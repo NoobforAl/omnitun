@@ -54,7 +54,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(engine.asked, 1);
     expect(c.read(exitProvider)?.ip, '203.0.113.77');
-    expect(find.text('IP 203.0.113.77'), findsOneWidget);
+    expect(find.text('IP 203.0.x.x'), findsOneWidget);
     expect(find.text('Connected to Netherlands'), findsOneWidget); // the country that was seen
     // Remembered for the profile, so the location list can use it.
     expect(c.read(learnedCountriesProvider)['a'], 'NL');
@@ -71,11 +71,11 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('switched off (the default), nothing is asked', (tester) async {
+  testWidgets('switched off, nothing is asked (it is on by default)', (tester) async {
     final engine = ExitEngine();
     final c = await _start(tester, engine, _data(showExit: false));
     expect(c.read(settingsProvider).showExit, isFalse);
-    expect(const SettingsState().showExit, isFalse);
+    expect(const SettingsState().showExit, isTrue); // the default, for the "you are here" globe
     await tester.tap(find.text('Connect'));
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 100));
@@ -107,7 +107,7 @@ void main() {
     await tester.tap(find.text('Connect'));
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('IP 203.0.113.77'), findsOneWidget);
+    expect(find.text('IP 203.0.x.x'), findsOneWidget);
     expect(c.read(learnedCountriesProvider), isEmpty);
     await tester.tap(find.text('Disconnect'));
     await tester.pump(const Duration(milliseconds: 400));

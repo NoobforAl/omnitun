@@ -39,7 +39,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 10));
     expect(container.read(connectionProvider).status, ConnStatus.connected);
-    expect(find.text('Connected'), findsOneWidget);
+    expect(find.textContaining('Connected'), findsOneWidget); // "Connected to <country>" once the exit is known
     expect(find.text('Test Server'), findsOneWidget); // where you exit
 
     await tester.tap(find.text('Disconnect'));

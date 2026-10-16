@@ -636,7 +636,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get alwaysOnHint =>
-      'Reconnect at boot and block traffic if the VPN drops. Set it in Android\'s VPN settings (gear next to Omnitun).';
+      'Reconnect at boot and block leaks. Set in Android\'s VPN settings.';
 
   @override
   String get openVpnSettingsFallback =>
@@ -1286,7 +1286,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exitHint =>
-      'Ask api.country.is for your exit address and country. Off by default.';
+      'Ask api.country.is for your IP and country, also when not connected.';
 
   @override
   String exitIpLabel(String ip) {

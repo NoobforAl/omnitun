@@ -37,88 +37,142 @@ class _Land {
   }
 }
 
-/// Where the globe looks and what it marks.
+/// What the globe shows at one moment: where it looks, and the two places it may mark —
+/// where you are (red while unprotected) and where you exit (once connecting or connected).
 @immutable
-class _View {
-  const _View(this.lat, this.lon, this.markLat, this.markLon, this.mark);
+class _Scene {
+  const _Scene({
+    required this.lat,
+    required this.lon,
+    this.home,
+    this.exit,
+    this.homeAlpha = 0,
+    this.exitAlpha = 0,
+    required this.homeColor,
+    required this.exitColor,
+  });
 
   /// The point in the middle of the globe, degrees.
   final double lat, lon;
+  final (double, double)? home, exit;
 
-  /// The exit location and how visible its marker is (0-1).
-  final double markLat, markLon, mark;
+  /// How visible each marker is (0-1).
+  final double homeAlpha, exitAlpha;
+  final Color homeColor, exitColor;
 
-  _View lerp(_View o, double t) => _View(
-    lat + (o.lat - lat) * t,
-    lon + (o.lon - lon) * t,
-    o.markLat,
-    o.markLon,
-    mark + (o.mark - mark) * t,
+  bool same(_Scene o) =>
+      lat == o.lat &&
+      lon == o.lon &&
+      home == o.home &&
+      exit == o.exit &&
+      homeAlpha == o.homeAlpha &&
+      exitAlpha == o.exitAlpha &&
+      homeColor == o.homeColor &&
+      exitColor == o.exitColor;
+
+  /// In between [a] and [b]. A marker sits where [b] has it (or where [a] had it while it fades out).
+  static _Scene lerp(_Scene a, _Scene b, double t) => _Scene(
+    lat: a.lat + (b.lat - a.lat) * t,
+    lon: a.lon + (b.lon - a.lon) * t,
+    home: b.home ?? a.home,
+    exit: b.exit ?? a.exit,
+    homeAlpha: a.homeAlpha + (b.homeAlpha - a.homeAlpha) * t,
+    exitAlpha: a.exitAlpha + (b.exitAlpha - a.exitAlpha) * t,
+    homeColor: Color.lerp(a.homeColor, b.homeColor, t)!,
+    exitColor: Color.lerp(a.exitColor, b.exitColor, t)!,
   );
 }
 
-class _ViewTween extends Tween<_View> {
-  _ViewTween({super.end});
-
-  @override
-  _View lerp(double t) => begin!.lerp(end!, t);
-}
-
-/// A dotted Earth behind the home screen. When the VPN is connected it turns to
-/// the exit country and marks it with a glow; otherwise it rests. It moves only
-/// while turning (about a second and a half), so it costs next to nothing.
+/// A dotted Earth behind the home screen, in the manner of Mullvad's: it shows where you
+/// are while unprotected, and on connecting it flies (zooming out on the way) to where you
+/// exit, with an arc between the two; on disconnecting it flies back. It only moves during
+/// the flight (about two seconds), so it costs next to nothing the rest of the time.
 class EarthBackdrop extends StatefulWidget {
-  const EarthBackdrop({super.key, this.target, required this.markerColor});
+  const EarthBackdrop({super.key, this.home, this.exit, required this.homeColor, required this.exitColor});
 
-  /// (latitude, longitude) of the exit, or null when not connected or unknown.
-  final (double, double)? target;
-  final Color markerColor;
+  /// (latitude, longitude) of where you are, and of the exit; null when not known / not connecting.
+  final (double, double)? home, exit;
+  final Color homeColor, exitColor;
 
   @override
   State<EarthBackdrop> createState() => _EarthBackdropState();
 }
 
-class _EarthBackdropState extends State<EarthBackdrop> {
-  /// The globe at rest: Europe, Africa and the Middle East.
+class _EarthBackdropState extends State<EarthBackdrop> with SingleTickerProviderStateMixin {
+  /// The globe at rest, when no place is known: Europe, Africa and the Middle East.
   static const _restLat = 18.0, _restLon = 20.0;
 
-  /// The exit is shown this many degrees above the middle, clear of the power ring.
-  static const _lift = 34.0;
+  /// The marked place is shown this many degrees above the middle, clear of the power ring.
+  static const _lift = 14.0;
 
-  double _lon = _restLon;
-  double _markLat = 0, _markLon = 0;
+  late final AnimationController _fly = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000));
+  late _Scene _from;
+  late _Scene _to;
 
-  _View _view() {
-    final t = widget.target;
-    if (t == null) return _View(_restLat, _lon, _markLat, _markLon, 0);
-    _markLat = t.$1;
-    _markLon = t.$2;
-    // Turn the short way round.
-    _lon += ((t.$2 - _lon + 540) % 360) - 180;
-    return _View((t.$1 - _lift).clamp(-60.0, 60.0), _lon, t.$1, t.$2, 1);
+  _Scene _target(double previousLon) {
+    final home = widget.home, exit = widget.exit;
+    final focus = exit ?? home;
+    return _Scene(
+      lat: focus == null ? _restLat : (focus.$1 - _lift).clamp(-60.0, 60.0),
+      // Turn the short way round.
+      lon: focus == null ? previousLon : previousLon + ((focus.$2 - previousLon + 540) % 360) - 180,
+      home: home,
+      exit: exit,
+      // Once there is an exit, where you are fades back and the exit takes over.
+      homeAlpha: home == null ? 0 : (exit == null ? 1 : 0.55),
+      exitAlpha: exit == null ? 0 : 1,
+      homeColor: widget.homeColor,
+      exitColor: widget.exitColor,
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _to = _target(_restLon);
+    _from = _to;
+    _fly.value = 1;
+  }
+
+  @override
+  void didUpdateWidget(EarthBackdrop old) {
+    super.didUpdateWidget(old);
+    // Start from what is on screen now, so a change in mid-flight does not jump.
+    final now = _Scene.lerp(_from, _to, Curves.easeInOutCubic.transform(_fly.value));
+    final next = _target(now.lon);
+    if (next.same(_to)) return;
+    _from = now;
+    _to = next;
+    _fly.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _fly.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final dark = scheme.brightness == Brightness.dark;
-    final view = _view();
+    final dark = Theme.of(context).colorScheme.brightness == Brightness.dark;
     return IgnorePointer(
       child: RepaintBoundary(
-        child: TweenAnimationBuilder<_View>(
-          tween: _ViewTween(end: view),
-          duration: const Duration(milliseconds: 1500),
-          curve: Curves.easeInOutCubic,
-          builder: (context, v, _) => CustomPaint(
-            painter: _GlobePainter(
-              view: v,
-              ocean: dark ? const Color(0xFF0B1422) : const Color(0xFFD3DCE8),
-              oceanDeep: dark ? const Color(0xFF060A12) : const Color(0xFFC3CEDD),
-              land: dark ? const Color(0xFF7FA3D6) : const Color(0xFF4B6A99),
-              rim: dark ? const Color(0xFF86A8D8) : const Color(0xFF6E8CB8),
-              marker: widget.markerColor,
-            ),
-          ),
+        child: AnimatedBuilder(
+          animation: _fly,
+          builder: (context, _) {
+            final t = _fly.value;
+            return CustomPaint(
+              painter: _GlobePainter(
+                scene: _Scene.lerp(_from, _to, Curves.easeInOutCubic.transform(t)),
+                // Pull back in the middle of a flight, then settle: the camera "travels".
+                zoom: 1 - 0.18 * math.sin(math.pi * t),
+                ocean: dark ? const Color(0xFF0B1422) : const Color(0xFFD3DCE8),
+                oceanDeep: dark ? const Color(0xFF060A12) : const Color(0xFFC3CEDD),
+                land: dark ? const Color(0xFF7FA3D6) : const Color(0xFF4B6A99),
+                rim: dark ? const Color(0xFF86A8D8) : const Color(0xFF6E8CB8),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -127,38 +181,49 @@ class _EarthBackdropState extends State<EarthBackdrop> {
 
 class _GlobePainter extends CustomPainter {
   _GlobePainter({
-    required this.view,
+    required this.scene,
+    required this.zoom,
     required this.ocean,
     required this.oceanDeep,
     required this.land,
     required this.rim,
-    required this.marker,
   });
 
-  final _View view;
-  final Color ocean, oceanDeep, land, rim, marker;
+  final _Scene scene;
+  final double zoom;
+  final Color ocean, oceanDeep, land, rim;
 
   static const _deg = math.pi / 180;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final r = size.shortestSide / 2;
+    final r = size.shortestSide / 2 * zoom;
     final c = size.center(Offset.zero);
 
     // The sea: a dark sphere, lit from above on the left.
     canvas.drawCircle(
       c,
       r,
-      Paint()
-        ..shader = ui.Gradient.radial(
-          c + Offset(-r * 0.35, -r * 0.4),
-          r * 1.5,
-          [ocean, oceanDeep],
-        ),
+      Paint()..shader = ui.Gradient.radial(c + Offset(-r * 0.35, -r * 0.4), r * 1.5, [ocean, oceanDeep]),
     );
 
-    final cosLon = math.cos(view.lon * _deg), sinLon = math.sin(view.lon * _deg);
-    final cosLat = math.cos(view.lat * _deg), sinLat = math.sin(view.lat * _deg);
+    final cosLon = math.cos(scene.lon * _deg), sinLon = math.sin(scene.lon * _deg);
+    final cosLat = math.cos(scene.lat * _deg), sinLat = math.sin(scene.lat * _deg);
+
+    /// Screen position and depth (z > 0 faces the viewer) of a point at [k] times the globe's radius.
+    (Offset, double) project(double x, double y, double z, [double k = 1]) {
+      final x1 = x * cosLon - z * sinLon;
+      final z1 = x * sinLon + z * cosLon;
+      final y2 = y * cosLat - z1 * sinLat;
+      final z2 = y * sinLat + z1 * cosLat;
+      return (Offset(c.dx + r * k * x1, c.dy - r * k * y2), z2);
+    }
+
+    List<double> unit(double latDeg, double lonDeg) {
+      final lat = latDeg * _deg, lon = lonDeg * _deg;
+      return [math.cos(lat) * math.sin(lon), math.sin(lat), math.cos(lat) * math.cos(lon)];
+    }
+
     final land3 = _Land.instance;
     final n = land3.count;
     // Dots in three brightness steps: the rim of the globe is dimmer.
@@ -166,22 +231,17 @@ class _GlobePainter extends CustomPainter {
     var nn = 0, nm = 0, nf = 0;
     final v = land3.xyz;
     for (var i = 0; i < n; i++) {
-      final x = v[i * 3], y = v[i * 3 + 1], z = v[i * 3 + 2];
-      final x1 = x * cosLon - z * sinLon;
-      final z1 = x * sinLon + z * cosLon;
-      final y2 = y * cosLat - z1 * sinLat;
-      final z2 = y * sinLat + z1 * cosLat;
-      if (z2 <= 0.02) continue;
-      final px = c.dx + r * x1, py = c.dy - r * y2;
-      if (z2 > 0.6) {
-        near[nn++] = px;
-        near[nn++] = py;
-      } else if (z2 > 0.28) {
-        mid[nm++] = px;
-        mid[nm++] = py;
+      final (p, z) = project(v[i * 3], v[i * 3 + 1], v[i * 3 + 2]);
+      if (z <= 0.02) continue;
+      if (z > 0.6) {
+        near[nn++] = p.dx;
+        near[nn++] = p.dy;
+      } else if (z > 0.28) {
+        mid[nm++] = p.dx;
+        mid[nm++] = p.dy;
       } else {
-        far[nf++] = px;
-        far[nf++] = py;
+        far[nf++] = p.dx;
+        far[nf++] = p.dy;
       }
     }
     final dot = (r / 150).clamp(1.6, 3.4);
@@ -220,44 +280,58 @@ class _GlobePainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
     );
 
-    // The exit: a glow, a ring and a point.
-    if (view.mark > 0.01) {
-      final lat = view.markLat * _deg, lon = view.markLon * _deg;
-      final x = math.cos(lat) * math.sin(lon), y = math.sin(lat), z = math.cos(lat) * math.cos(lon);
-      final x1 = x * cosLon - z * sinLon;
-      final z1 = x * sinLon + z * cosLon;
-      final y2 = y * cosLat - z1 * sinLat;
-      final z2 = y * sinLat + z1 * cosLat;
-      if (z2 > 0.05) {
-        final p = Offset(c.dx + r * x1, c.dy - r * y2);
-        final a = view.mark;
-        final s = (r / 360).clamp(0.6, 1.2);
-        canvas.drawCircle(
-          p,
-          46 * s,
-          Paint()..shader = ui.Gradient.radial(p, 46 * s, [marker.withValues(alpha: 0.7 * a), marker.withValues(alpha: 0)]),
-        );
-        canvas.drawCircle(
-          p,
-          13 * s,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.6
-            ..color = marker.withValues(alpha: 0.9 * a),
-        );
-        canvas.drawCircle(p, 4.2 * s, Paint()..color = Color.lerp(marker, Colors.white, 0.5)!.withValues(alpha: a));
+    final home = scene.home, exit = scene.exit;
+    final s = (r / 360).clamp(0.6, 1.2);
+
+    // The path between where you are and where you exit: a dotted arc rising above the surface.
+    if (home != null && exit != null) {
+      final a = math.min(scene.homeAlpha, scene.exitAlpha);
+      final h = unit(home.$1, home.$2), e = unit(exit.$1, exit.$2);
+      final omega = math.acos((h[0] * e[0] + h[1] * e[1] + h[2] * e[2]).clamp(-1.0, 1.0));
+      if (a > 0.01 && omega > 0.02) {
+        final paint = Paint()..color = scene.exitColor.withValues(alpha: 0.8 * a);
+        const steps = 56;
+        for (var i = 0; i <= steps; i += 2) {
+          final u = i / steps;
+          final k1 = math.sin((1 - u) * omega) / math.sin(omega), k2 = math.sin(u * omega) / math.sin(omega);
+          final lift = 1 + 0.16 * math.sin(math.pi * u) * (omega / math.pi).clamp(0.25, 1.0);
+          final (p, z) = project(k1 * h[0] + k2 * e[0], k1 * h[1] + k2 * e[1], k1 * h[2] + k2 * e[2], lift);
+          if (z > 0) canvas.drawCircle(p, 1.7 * s, paint);
+        }
       }
     }
+
+    void mark((double, double)? at, double alpha, Color color, double size) {
+      if (at == null || alpha < 0.01) return;
+      final u = unit(at.$1, at.$2);
+      final (p, z) = project(u[0], u[1], u[2]);
+      if (z <= 0.05) return;
+      final glow = 46 * s * size;
+      canvas.drawCircle(
+        p,
+        glow,
+        Paint()..shader = ui.Gradient.radial(p, glow, [color.withValues(alpha: 0.7 * alpha), color.withValues(alpha: 0)]),
+      );
+      canvas.drawCircle(
+        p,
+        13 * s * size,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.6
+          ..color = color.withValues(alpha: 0.9 * alpha),
+      );
+      canvas.drawCircle(
+        p,
+        4.2 * s * size,
+        Paint()..color = Color.lerp(color, Colors.white, 0.5)!.withValues(alpha: alpha),
+      );
+    }
+
+    // Where you are (smaller once you are somewhere else), then where you exit.
+    mark(home, scene.homeAlpha, scene.homeColor, exit == null ? 1 : 0.7);
+    mark(exit, scene.exitAlpha, scene.exitColor, 1);
   }
 
   @override
-  bool shouldRepaint(_GlobePainter old) =>
-      old.view.lat != view.lat ||
-      old.view.lon != view.lon ||
-      old.view.mark != view.mark ||
-      old.view.markLat != view.markLat ||
-      old.view.markLon != view.markLon ||
-      old.marker != marker ||
-      old.land != land ||
-      old.ocean != ocean;
+  bool shouldRepaint(_GlobePainter old) => true;
 }

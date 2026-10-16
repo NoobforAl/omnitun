@@ -1335,7 +1335,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get exitHint =>
-      'يسأل api.country.is عن عنوان الخروج والبلد. متوقف افتراضيًا.';
+      'يسأل api.country.is عن عنوانك وبلدك، حتى عند عدم الاتصال.';
 
   @override
   String exitIpLabel(String ip) {

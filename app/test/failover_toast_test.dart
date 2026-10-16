@@ -103,10 +103,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('85%'), findsOneWidget);
     expect(find.text('Contacting server · PC-dev'), findsOneWidget);
-    final ring = tester.widget<CircularProgressIndicator>(find.byType(CircularProgressIndicator));
-    expect(ring.value, closeTo(0.85, 0.01));
+    final bar = tester.widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator));
+    expect(bar.value, closeTo(0.85, 0.01));
 
-    // A failure freezes the ring at the failed stage and shows the reason.
+    // A failure takes the bar away and shows the reason.
     engine.controller.add(const EngineState(
       status: ConnStatus.error,
       error: 'Contacting server failed: connection refused',
@@ -115,7 +115,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('Contacting server failed: connection refused'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(find.text('85%'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });

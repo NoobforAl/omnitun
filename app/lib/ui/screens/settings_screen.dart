@@ -130,28 +130,34 @@ class SettingsScreen extends ConsumerWidget {
                 ListTile(
                   leading: const Icon(Icons.palette_outlined),
                   title: Text(l.appearance),
-                  subtitle: Text(switch (s.theme) {
-                    'light' => l.themeLight,
-                    'system' => l.themeSystem,
-                    _ => l.themeDark,
-                  }),
-                  trailing: SegmentedButton<String>(
-                    showSelectedIcon: false,
-                    segments: [
-                      ButtonSegment(value: 'dark', icon: const Icon(Icons.dark_mode_outlined), tooltip: l.themeDark),
-                      ButtonSegment(
-                        value: 'system',
-                        icon: const Icon(Icons.brightness_auto_outlined),
-                        tooltip: l.themeSystem,
+                  // The choice sits under the title, so the title never has to wrap.
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 6),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: SegmentedButton<String>(
+                        showSelectedIcon: false,
+                        segments: [
+                          ButtonSegment(
+                            value: 'dark',
+                            icon: const Icon(Icons.dark_mode_outlined),
+                            tooltip: l.themeDark,
+                          ),
+                          ButtonSegment(
+                            value: 'system',
+                            icon: const Icon(Icons.brightness_auto_outlined),
+                            tooltip: l.themeSystem,
+                          ),
+                          ButtonSegment(
+                            value: 'light',
+                            icon: const Icon(Icons.light_mode_outlined),
+                            tooltip: l.themeLight,
+                          ),
+                        ],
+                        selected: {s.theme},
+                        onSelectionChanged: (v) => ctrl.update((s) => s.copyWith(theme: v.first)),
                       ),
-                      ButtonSegment(
-                        value: 'light',
-                        icon: const Icon(Icons.light_mode_outlined),
-                        tooltip: l.themeLight,
-                      ),
-                    ],
-                    selected: {s.theme},
-                    onSelectionChanged: (v) => ctrl.update((s) => s.copyWith(theme: v.first)),
+                    ),
                   ),
                 ),
                 SwitchListTile(

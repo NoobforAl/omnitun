@@ -149,6 +149,8 @@ void main() {
 
   testWidgets('the location list picks Auto, a country or a server; Back returns home', (tester) async {
     final store = AppStore.memory({
+      // These tests are about the choice of server, not about lookups of the exit.
+      'settings': {'show_exit': false},
       'profiles': [
         {'id': 'd1', 'name': 'DE-Berlin-01', 'protocol': 'trojan', 'server': 'a.example.com', 'port': 443},
         {'id': 'd2', 'name': 'DE-Frankfurt-02', 'protocol': 'vless', 'server': 'b.example.com', 'port': 443},
@@ -206,6 +208,8 @@ void main() {
 
   testWidgets('choosing another country while connected reconnects there', (tester) async {
     final store = AppStore.memory({
+      // These tests are about the choice of server, not about lookups of the exit.
+      'settings': {'show_exit': false},
       'profiles': [
         {'id': 'd1', 'name': 'Germany 1', 'protocol': 'trojan', 'server': 'a.example.com', 'port': 443},
         {'id': 'n1', 'name': 'Netherlands 1', 'protocol': 'trojan', 'server': 'c.example.com', 'port': 443},
@@ -244,6 +248,8 @@ void main() {
 
   test('the guess can be corrected by hand and is remembered', () {
     final store = AppStore.memory({
+      // These tests are about the choice of server, not about lookups of the exit.
+      'settings': {'show_exit': false},
       'profiles': [
         {'id': 'x1', 'name': 'Home VPN', 'protocol': 'trojan', 'server': 'd.example.com', 'port': 443},
       ],

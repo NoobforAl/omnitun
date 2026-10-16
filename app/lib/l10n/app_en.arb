@@ -329,7 +329,7 @@
     }
   },
   "alwaysOnTitle": "Always-on VPN and kill switch",
-  "alwaysOnHint": "Reconnect at boot and block traffic if the VPN drops. Set it in Android's VPN settings (gear next to Omnitun).",
+  "alwaysOnHint": "Reconnect at boot and block leaks. Set in Android's VPN settings.",
   "openVpnSettingsFallback": "Settings → Network → VPN → gear next to Omnitun",
   "splitTunneling": "Split tunneling",
   "splitSummaryOnly": "{count, plural, =1{Only 1 selected app uses the VPN} other{Only {count} selected apps use the VPN}}",
@@ -667,7 +667,7 @@
   "hpWarpReserved": "Three numbers, as WARP configurations list them",
   "hpOneBridgePerLine": "One bridge per line, as in a torrc without \"Bridge \"",
   "exitTitle": "Show exit address and country",
-  "exitHint": "Ask api.country.is for your exit address and country. Off by default.",
+  "exitHint": "Ask api.country.is for your IP and country, also when not connected.",
   "exitIpLabel": "IP {ip}",
   "@exitIpLabel": {
     "placeholders": {

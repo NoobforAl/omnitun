@@ -356,7 +356,7 @@
   "hpWarpReserved": "Три числа, как в конфигурациях WARP",
   "hpOneBridgePerLine": "Один мост на строку, как в torrc, но без «Bridge »",
   "exitTitle": "Показывать адрес и страну выхода",
-  "exitHint": "Спросить у api.country.is адрес и страну выхода. По умолчанию выкл.",
+  "exitHint": "Спрашивать у api.country.is ваш адрес и страну, в том числе без подключения.",
   "exitIpLabel": "IP {ip}",
   "connectedTo": "Подключено: {place}",
   "noticesTitle": "Лицензии с открытым кодом",

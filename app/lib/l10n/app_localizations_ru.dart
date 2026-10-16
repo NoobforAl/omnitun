@@ -1319,7 +1319,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get exitHint =>
-      'Спросить у api.country.is адрес и страну выхода. По умолчанию выкл.';
+      'Спрашивать у api.country.is ваш адрес и страну, в том числе без подключения.';
 
   @override
   String exitIpLabel(String ip) {

@@ -356,7 +356,7 @@
   "hpWarpReserved": "三个数字，与 WARP 配置中的写法一致",
   "hpOneBridgePerLine": "每行一个网桥，与 torrc 相同但不带“Bridge ”",
   "exitTitle": "显示出口地址和国家",
-  "exitHint": "向 api.country.is 查询出口地址和国家。默认关闭。",
+  "exitHint": "向 api.country.is 查询你的地址和国家，未连接时也会查询。",
   "exitIpLabel": "IP {ip}",
   "connectedTo": "已连接到 {place}",
   "noticesTitle": "开源许可",

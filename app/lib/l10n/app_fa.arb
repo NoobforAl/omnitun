@@ -356,7 +356,7 @@
   "hpWarpReserved": "سه عدد، همان‌طور که در پیکربندی‌های WARP آمده است",
   "hpOneBridgePerLine": "در هر خط یک پل، مانند torrc ولی بدون «Bridge »",
   "exitTitle": "نمایش نشانی و کشور خروجی",
-  "exitHint": "نشانی و کشور خروجی را از api.country.is بپرس. پیش‌فرض: خاموش.",
+  "exitHint": "نشانی و کشور شما را از api.country.is می‌پرسد، حتی بدون اتصال.",
   "exitIpLabel": "IP‎ {ip}",
   "connectedTo": "متصل به {place}",
   "noticesTitle": "مجوزهای متن‌باز",

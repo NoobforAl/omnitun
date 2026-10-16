@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -310,6 +311,98 @@ class ExitController extends Notifier<ExitInfo?> {
 
 final exitProvider = NotifierProvider<ExitController, ExitInfo?>(ExitController.new);
 
+/// True when running under `flutter test`: no real network, no real waiting.
+bool get _underTest => Platform.environment.containsKey('FLUTTER_TEST');
+
+/// Asks a public service where this device's own address is, directly (not through any tunnel).
+typedef DirectLookup = Future<ExitInfo> Function();
+
+final directLookupProvider = Provider<DirectLookup>((ref) {
+  /// One GET, read as text.
+  Future<String> get(String url) async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 6);
+    try {
+      final request = await client.getUrl(Uri.parse(url)).timeout(const Duration(seconds: 8));
+      final response = await request.close().timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) throw HttpException('status ${response.statusCode}');
+      return await response.transform(const Utf8Decoder()).join().timeout(const Duration(seconds: 8));
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  return () async {
+    // Tests never reach the network.
+    if (_underTest) throw const SocketException('no network in tests');
+    // Some networks block one of the services, so there are two; the first that answers wins.
+    final sources = <Future<ExitInfo> Function()>[
+      () async {
+        // Cloudflare's trace: "key=value" lines with ip= and loc=.
+        final lines = (await get('https://1.1.1.1/cdn-cgi/trace')).split('\n');
+        final fields = {
+          for (final l in lines)
+            if (l.contains('=')) l.substring(0, l.indexOf('=')): l.substring(l.indexOf('=') + 1).trim(),
+        };
+        final loc = fields['loc'];
+        return ExitInfo(fields['ip'] ?? '', loc == null || loc.length != 2 ? null : loc);
+      },
+      () async => ExitInfo.fromJson(jsonDecode(await get('https://api.country.is/')) as Map<String, dynamic>),
+    ];
+    Object? last;
+    for (final source in sources) {
+      try {
+        final info = await source();
+        if (info.country != null) return info;
+      } catch (e) {
+        last = e;
+      }
+    }
+    throw last ?? const HttpException('no answer');
+  };
+});
+
+/// Where the device really is, by its address: shown on the globe while the VPN is off (like Mullvad's
+/// "you are here"). Looked up only while not connected and only when the user allows address lookups
+/// (Settings); the last answer is remembered so the globe has it at once on the next start.
+class HomeLocation extends Notifier<ExitInfo?> {
+  static const _key = 'home_country';
+  int _generation = 0;
+
+  @override
+  ExitInfo? build() {
+    ref.listen(connectionProvider.select((s) => s.status), (prev, next) {
+      if (next == ConnStatus.disconnected && prev != next) _lookup(const Duration(milliseconds: 1500));
+    });
+    ref.listen(settingsProvider.select((s) => s.showExit), (prev, next) {
+      if (next && !prev!) _lookup();
+    });
+    Future.microtask(_lookup);
+    final saved = ref.read(storeProvider).read<String>(_key);
+    return saved == null ? null : ExitInfo('', saved);
+  }
+
+  Future<void> _lookup([Duration delay = Duration.zero]) async {
+    final generation = ++_generation;
+    if (delay > Duration.zero && !_underTest) await Future<void>.delayed(delay);
+    bool idle() =>
+        generation == _generation &&
+        ref.mounted &&
+        ref.read(settingsProvider).showExit &&
+        const {ConnStatus.disconnected, ConnStatus.error}.contains(ref.read(connectionProvider).status);
+    if (!idle()) return;
+    try {
+      final info = await ref.read(directLookupProvider)();
+      if (!idle()) return; // connected meanwhile: that answer would describe the VPN, not the device
+      state = info;
+      if (info.country != null) ref.read(storeProvider).write(_key, info.country);
+    } catch (_) {
+      // Offline or blocked: keep what is known.
+    }
+  }
+}
+
+final homeProvider = NotifierProvider<HomeLocation, ExitInfo?>(HomeLocation.new);
+
 class LogsController extends Notifier<List<String>> {
   static const _max = 500;
 
@@ -423,7 +516,7 @@ class SettingsState {
     this.splitApps = const [],
     this.theme = 'dark',
     this.language = '',
-    this.showExit = false,
+    this.showExit = true,
   });
 
   static const defaultRemoteDns = 'https://1.1.1.1/dns-query';

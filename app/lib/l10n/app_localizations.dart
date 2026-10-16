@@ -1169,7 +1169,7 @@ abstract class AppLocalizations {
   /// No description provided for @alwaysOnHint.
   ///
   /// In en, this message translates to:
-  /// **'Reconnect at boot and block traffic if the VPN drops. Set it in Android\'s VPN settings (gear next to Omnitun).'**
+  /// **'Reconnect at boot and block leaks. Set in Android\'s VPN settings.'**
   String get alwaysOnHint;
 
   /// No description provided for @openVpnSettingsFallback.
@@ -2243,7 +2243,7 @@ abstract class AppLocalizations {
   /// No description provided for @exitHint.
   ///
   /// In en, this message translates to:
-  /// **'Ask api.country.is for your exit address and country. Off by default.'**
+  /// **'Ask api.country.is for your IP and country, also when not connected.'**
   String get exitHint;
 
   /// No description provided for @exitIpLabel.
