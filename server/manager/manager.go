@@ -173,7 +173,7 @@ func (m *Manager) serverInfo(st *store.State) *ServerInfo {
 		PublicHost:  st.Server.PublicHost,
 		Users:       len(st.Users),
 		ActiveUsers: len(st.ActiveUsers(m.Now())),
-		SelfSigned:  st.Server.SelfSigned,
+		SelfSigned:  st.Server.SelfSigned && !st.Server.ACMEActive(),
 	}
 	if st.Server.Subscription.Enabled {
 		info.SubscriptionPort = st.Server.Subscription.Port
@@ -543,6 +543,8 @@ type APIPatch struct {
 	Enabled *bool
 	Listen  *string
 	Port    *int
+	// TLS serves the API over HTTPS with the server's certificate.
+	TLS *bool
 	// NewToken issues a fresh token.
 	NewToken bool
 }
@@ -563,6 +565,9 @@ func (m *Manager) SetAPI(p APIPatch) (store.API, error) {
 				return invalid("port %d is out of range", *p.Port)
 			}
 			a.Port = *p.Port
+		}
+		if p.TLS != nil {
+			a.TLS = *p.TLS
 		}
 		if p.NewToken {
 			a.Token = store.RandomHex(24)

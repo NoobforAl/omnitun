@@ -65,6 +65,14 @@ type inbound struct {
 
 var nameChars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
+// Imported secrets end up inside text formats (.ovpn files, ShadowTLS plugin
+// options, share links), so only plain characters are accepted: no
+// whitespace, quotes, semicolons or control characters.
+var (
+	safeUUID     = regexp.MustCompile(`^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$`)
+	safePassword = regexp.MustCompile(`^[A-Za-z0-9._~+=/:@!*,-]{1,128}$`)
+)
+
 // userName makes a valid, unique Omnitun user name from an email (or a fallback).
 func userName(email, fallback string, taken map[string]bool) string {
 	name := email
@@ -140,7 +148,11 @@ func ParseServer(text string) (*Config, error) {
 		switch strings.ToLower(in.Protocol) {
 		case "vless", "vmess":
 			for _, c := range in.Settings.Clients {
-				if c.ID != "" {
+				switch {
+				case c.ID == "":
+				case !safeUUID.MatchString(c.ID):
+					cfg.Notes = append(cfg.Notes, fmt.Sprintf("client %q skipped: its id is not a UUID", c.Email))
+				default:
 					add(User{Name: c.Email, UUID: c.ID, Note: "imported from " + in.Protocol})
 				}
 			}
@@ -172,7 +184,11 @@ func ParseServer(text string) (*Config, error) {
 			}
 		case "trojan":
 			for _, c := range in.Settings.Clients {
-				if c.Password != "" {
+				switch {
+				case c.Password == "":
+				case !safePassword.MatchString(c.Password):
+					cfg.Notes = append(cfg.Notes, fmt.Sprintf("trojan client %q skipped: its password has characters that are not allowed (letters, digits and ._~+=/:@!*,- only)", c.Email))
+				default:
 					add(User{Name: c.Email, Password: c.Password, Note: "imported from trojan"})
 				}
 			}

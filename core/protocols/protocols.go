@@ -70,7 +70,11 @@ type Env struct {
 	// CertPath and KeyPath are the TLS certificate and key files.
 	CertPath, KeyPath string
 	// CertPEM is the certificate's content (pinned by clients for SelfSigned).
-	CertPEM    string
+	CertPEM string
+	// CertProvider is the tag of a sing-box certificate provider (ACME); when
+	// set it replaces CertPath and KeyPath.
+	CertProvider string
+	// SelfSigned is true only when clients must be told to skip verification.
 	SelfSigned bool
 	Reality    Reality
 	// SSServerKey is the Shadowsocks-2022 server key (base64).
@@ -179,10 +183,12 @@ func users(accts []Account, f func(Account) map[string]any) []any {
 
 // tlsBlock is the inbound TLS section from the server's certificate.
 func tlsBlock(env Env, extra map[string]any) map[string]any {
-	t := map[string]any{
-		"enabled":          true,
-		"certificate_path": env.CertPath,
-		"key_path":         env.KeyPath,
+	t := map[string]any{"enabled": true}
+	if env.CertProvider != "" {
+		t["certificate_provider"] = env.CertProvider
+	} else {
+		t["certificate_path"] = env.CertPath
+		t["key_path"] = env.KeyPath
 	}
 	for k, v := range extra {
 		t[k] = v

@@ -69,6 +69,25 @@ type Subscription struct {
 	Path string `json:"path"`
 }
 
+// ACME asks a certificate authority (Let's Encrypt by default) for a real
+// certificate for Domain; the VPN core obtains and renews it by itself. It
+// needs the domain to point at this server and port 80 (HTTP-01) or 443
+// (TLS-ALPN-01) free, or a DNS-01 provider.
+type ACME struct {
+	Enabled bool   `json:"enabled"`
+	Domain  string `json:"domain,omitempty"`
+	Email   string `json:"email,omitempty"`
+	// Provider is "letsencrypt" (default), "zerossl" or an ACME directory URL.
+	Provider string `json:"provider,omitempty"`
+	// DNSProvider ("cloudflare" or "alidns") switches to the DNS-01 challenge,
+	// which needs no open port; the secrets below belong to it.
+	DNSProvider string `json:"dns_provider,omitempty"`
+	DNSToken    string `json:"dns_token,omitempty"`  // Cloudflare API token, or AliDNS access key ID
+	DNSSecret   string `json:"dns_secret,omitempty"` // AliDNS access key secret
+	// HTTPPort is the port the HTTP-01 challenge listens on if not 80.
+	HTTPPort int `json:"http_port,omitempty"`
+}
+
 // API is the management web API (see server/api). It is off until enabled and
 // listens on the loopback interface by default; the bearer token is required.
 type API struct {
@@ -76,6 +95,8 @@ type API struct {
 	Listen  string `json:"listen"`
 	Port    int    `json:"port"`
 	Token   string `json:"token"`
+	// TLS serves the API over HTTPS with the server's certificate.
+	TLS bool `json:"tls,omitempty"`
 }
 
 // DefaultAPIPort is the web API's default port.
@@ -98,7 +119,11 @@ type Server struct {
 	Subscription Subscription `json:"subscription"`
 	OpenVPN      OpenVPN      `json:"openvpn"`
 	API          API          `json:"api"`
+	ACME         ACME         `json:"acme"`
 }
+
+// ACMEActive reports whether certificates come from an ACME provider.
+func (s Server) ACMEActive() bool { return s.ACME.Enabled && s.ACME.Domain != "" }
 
 // User is one account. Every protocol uses the same user with its own credentials.
 type User struct {

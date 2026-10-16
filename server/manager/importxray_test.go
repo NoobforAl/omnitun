@@ -119,3 +119,30 @@ func TestImportXrayRejectsGarbage(t *testing.T) {
 		}
 	}
 }
+
+func TestImportXrayRefusesUnsafeSecrets(t *testing.T) {
+	m := newManager(t)
+	cfg := `{"inbounds":[
+	  {"protocol":"trojan","port":443,"settings":{"clients":[
+	    {"password":"good-secret.1","email":"ok"},
+	    {"password":"bad\nremote evil 1194","email":"newline"},
+	    {"password":"bad;host=x","email":"semicolon"},
+	    {"password":"has space","email":"space"}]}},
+	  {"protocol":"vless","port":8443,"settings":{"clients":[{"id":"not-a-uuid\nremote x","email":"badid"},{"id":"11111111-1111-4111-8111-111111111111","email":"fine"}]}}]}`
+	res, err := m.ImportXray(cfg, ImportXrayOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.UsersAdded) != 2 || res.UsersAdded[0] != "fine" && res.UsersAdded[0] != "ok" {
+		t.Fatalf("added = %v, want only ok and fine", res.UsersAdded)
+	}
+	if len(res.Notes) < 4 {
+		t.Errorf("notes = %v, want each refused client explained", res.Notes)
+	}
+	st, _ := m.Store.Load()
+	for _, u := range st.Users {
+		if u.Name == "newline" || u.Name == "semicolon" || u.Name == "space" || u.Name == "badid" {
+			t.Errorf("user %q should not have been imported", u.Name)
+		}
+	}
+}

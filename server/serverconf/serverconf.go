@@ -41,8 +41,45 @@ func Env(st *store.State, s *store.Store) protocols.Env {
 	if data, err := os.ReadFile(env.CertPath); err == nil {
 		env.CertPEM = string(data)
 	}
+	if srv.ACMEActive() {
+		// A real certificate: clients verify it normally and nothing is pinned.
+		env.CertProvider, env.SelfSigned, env.CertPEM = ACMETag, false, ""
+	}
 	return env
 }
+
+// ACMETag is the tag of the ACME certificate provider in the sing-box config.
+const ACMETag = "acme"
+
+// ACMEProvider is the sing-box certificate provider that obtains and renews
+// the domain's certificate; its data (account, certificates) lives in the
+// data directory's "acme" folder.
+func ACMEProvider(st *store.State, s *store.Store) obj {
+	a := st.Server.ACME
+	p := obj{
+		"type": "acme", "tag": ACMETag, "domain": []string{a.Domain}, "default_server_name": a.Domain,
+		"data_directory": ACMEDir(s),
+	}
+	if a.Email != "" {
+		p["email"] = a.Email
+	}
+	if a.Provider != "" && a.Provider != "letsencrypt" {
+		p["provider"] = a.Provider
+	}
+	if a.HTTPPort > 0 {
+		p["alternative_http_port"] = a.HTTPPort
+	}
+	switch a.DNSProvider {
+	case "cloudflare":
+		p["dns01_challenge"] = obj{"provider": "cloudflare", "api_token": a.DNSToken}
+	case "alidns":
+		p["dns01_challenge"] = obj{"provider": "alidns", "access_key_id": a.DNSToken, "access_key_secret": a.DNSSecret}
+	}
+	return p
+}
+
+// ACMEDir is where the ACME account and certificates are kept.
+func ACMEDir(s *store.Store) string { return s.Path("acme") }
 
 // Account maps a user to the credentials the protocols use.
 func Account(u *store.User) protocols.Account {
@@ -83,10 +120,24 @@ func Build(st *store.State, s *store.Store, now time.Time) obj {
 		"inbounds":  inbounds,
 		"outbounds": []any{obj{"type": "direct", "tag": "direct"}},
 	}
+	if env.CertProvider != "" && usesCertificate(st) {
+		cfg["certificate_providers"] = []any{ACMEProvider(st, s)}
+	}
 	if len(endpoints) > 0 {
 		cfg["endpoints"] = endpoints
 	}
 	return cfg
+}
+
+// usesCertificate reports whether an enabled protocol needs the TLS certificate.
+func usesCertificate(st *store.State) bool {
+	for _, key := range store.AllProtocols {
+		p, ok := protocols.Get(key)
+		if ok && st.Server.Protocols[key] != nil && st.Server.Protocols[key].Enabled && p.Spec().NeedsCertificate {
+			return true
+		}
+	}
+	return false
 }
 
 // OVPN returns a single-file OpenVPN client config for the user, with the
@@ -142,7 +193,7 @@ type Link struct {
 // without a share link (OpenVPN) are left out; see OVPN and OVPNURL.
 func Links(st *store.State, u *store.User) []Link {
 	env := protocols.Env{
-		Name: st.Server.Name, Host: st.Server.PublicHost, SelfSigned: st.Server.SelfSigned,
+		Name: st.Server.Name, Host: st.Server.PublicHost, SelfSigned: st.Server.SelfSigned && !st.Server.ACMEActive(),
 		Reality: protocols.Reality{
 			PublicKey: st.Server.Reality.PublicKey, ShortID: st.Server.Reality.ShortID, Handshake: st.Server.Reality.Handshake,
 		},
@@ -184,5 +235,9 @@ func SubscriptionURL(st *store.State, u *store.User) string {
 	if !sub.Enabled {
 		return ""
 	}
-	return fmt.Sprintf("http://%s/%s/%s", net.JoinHostPort(st.Server.PublicHost, strconv.Itoa(sub.Port)), sub.Path, u.SubToken)
+	scheme := "http"
+	if st.Server.ACMEActive() {
+		scheme = "https" // the subscription endpoint serves the real certificate too
+	}
+	return fmt.Sprintf("%s://%s/%s/%s", scheme, net.JoinHostPort(st.Server.PublicHost, strconv.Itoa(sub.Port)), sub.Path, u.SubToken)
 }

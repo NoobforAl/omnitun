@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
@@ -270,4 +271,13 @@ func TestPortConflictOnPatch(t *testing.T) {
 	if _, err := m.SetProtocol(store.Shadowsocks, ProtocolPatch{Port: &port}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("tcp+udp vs udp: %v", err)
 	}
+}
+
+func mustJSON(t *testing.T, v any) string {
+	t.Helper()
+	raw, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
 }

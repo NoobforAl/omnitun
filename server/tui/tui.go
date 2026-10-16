@@ -59,6 +59,7 @@ type model struct {
 	protos []manager.ProtocolInfo
 	users  []manager.UserInfo
 	api    store.API
+	cert   *manager.CertInfo
 
 	view    view
 	table   table.Model
@@ -139,7 +140,11 @@ func (m *model) load() error {
 	if err != nil {
 		return err
 	}
-	m.info, m.protos, m.users, m.api = info, protos, users, api
+	cert, err := m.mgr.Certificate()
+	if err != nil {
+		return err
+	}
+	m.info, m.protos, m.users, m.api, m.cert = info, protos, users, api, cert
 	m.loaded = m.mgr.Store.ModTime()
 	m.refreshRows()
 	if m.view == viewUser {
@@ -668,8 +673,14 @@ func (m *model) serverView() string {
 	if i.SubscriptionPort > 0 {
 		b.WriteString(fmt.Sprintf(" · subscriptions on port %d", i.SubscriptionPort))
 	}
-	if i.SelfSigned {
-		b.WriteString(dimStyle.Render(" · self-signed certificate"))
+	b.WriteString("\n")
+	switch {
+	case m.cert.Mode == "acme" && m.cert.Status == "issued":
+		b.WriteString(okStyle.Render(fmt.Sprintf("certificate: %s, valid until %s", m.cert.Domain, m.cert.NotAfter.Local().Format("2006-01-02"))))
+	case m.cert.Mode == "acme":
+		b.WriteString(errStyle.Render(fmt.Sprintf("certificate: waiting for %s from the CA (self-signed meanwhile)", m.cert.Domain)))
+	default:
+		b.WriteString(dimStyle.Render("certificate: self-signed (omnitun-server cert acme --domain … for a real one)"))
 	}
 	b.WriteString("\n\nWeb API\n")
 	state := errStyle.Render("off")

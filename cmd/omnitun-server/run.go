@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"os"
@@ -17,7 +18,9 @@ import (
 	"github.com/NoobforAl/omnitun/server/api"
 	"github.com/NoobforAl/omnitun/server/manager"
 	"github.com/NoobforAl/omnitun/server/runtime"
+	"github.com/NoobforAl/omnitun/server/serverconf"
 	"github.com/NoobforAl/omnitun/server/store"
+	"github.com/NoobforAl/omnitun/server/tlsfiles"
 	"github.com/NoobforAl/omnitun/server/tui"
 )
 
@@ -44,7 +47,7 @@ func newRunCmd(o *options) *cobra.Command {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					if err := api.Serve(ctx, a.Listen, a.Port, handler, logger.Printf); err != nil {
+					if err := api.Serve(ctx, a.Listen, a.Port, handler, apiTLS(m, a), logger.Printf); err != nil {
 						logger.Printf("web API stopped: %v", err)
 					}
 				}()
@@ -55,6 +58,23 @@ func newRunCmd(o *options) *cobra.Command {
 			return srv.Close()
 		},
 	}
+}
+
+// apiTLS is the HTTPS configuration of the web API (nil for plain HTTP): the
+// server's certificate, the ACME one when there is one.
+func apiTLS(m *manager.Manager, a store.API) *tls.Config {
+	if !a.TLS {
+		return nil
+	}
+	st, err := m.Store.Load()
+	if err != nil {
+		return nil
+	}
+	domain := ""
+	if st.Server.ACMEActive() {
+		domain = st.Server.ACME.Domain
+	}
+	return tlsfiles.New(serverconf.ACMEDir(m.Store), domain, m.Store.Path(st.Server.CertFile), m.Store.Path(st.Server.KeyFile)).TLSConfig()
 }
 
 // tokenTTL bounds how long a rotated or disabled token can still be accepted
@@ -106,9 +126,13 @@ func newAPICmd(o *options) *cobra.Command {
 			if a.Enabled {
 				state = "enabled"
 			}
-			fmt.Printf("web API: %s, listening on %s:%d\n", state, a.Listen, a.Port)
+			scheme := "http"
+			if a.TLS {
+				scheme = "https"
+			}
+			fmt.Printf("web API: %s, listening on %s:%d (%s)\n", state, a.Listen, a.Port, scheme)
 			fmt.Printf("token:   %s\n", a.Token)
-			fmt.Printf("docs:    http://%s:%d/docs\n", a.Listen, a.Port)
+			fmt.Printf("docs:    %s://%s:%d/docs\n", scheme, a.Listen, a.Port)
 		}
 	}
 	apply := func(p func() (store.API, error)) error {
@@ -158,7 +182,18 @@ func newAPICmd(o *options) *cobra.Command {
 			return apply(func() (store.API, error) { return o.manager().SetAPI(apiPatchListen(host, port)) })
 		},
 	}
-	cmd.AddCommand(status, enable("enable", true), enable("disable", false), token, listen)
+	tlsCmd := &cobra.Command{
+		Use: "tls <on|off>", Short: "Serve the web API over HTTPS with the server's certificate (applies on the next `run`)",
+		Args: cobra.ExactArgs(1), ValidArgs: []string{"on", "off"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if args[0] != "on" && args[0] != "off" {
+				return fmt.Errorf("%w: use on or off", manager.ErrInvalid)
+			}
+			on := args[0] == "on"
+			return apply(func() (store.API, error) { return o.manager().SetAPI(manager.APIPatch{TLS: &on}) })
+		},
+	}
+	cmd.AddCommand(status, enable("enable", true), enable("disable", false), token, listen, tlsCmd)
 	return cmd
 }
 

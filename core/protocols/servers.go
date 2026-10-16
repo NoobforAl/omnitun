@@ -246,6 +246,9 @@ func (shadowTLS) Inbounds(env Env, port int, accts []Account) Config {
 }
 
 func (s shadowTLS) Profile(env Env, port int, u Account) (*profile.Profile, error) {
+	if err := safeField("password", u.Password, unsafeInOpts); err != nil {
+		return nil, err
+	}
 	sni, _ := SplitHostPort(env.Reality.Handshake, 443)
 	opts := fmt.Sprintf("host=%s;password=%s;version=3", sni, u.Password)
 	if env.SelfSigned {
@@ -290,6 +293,24 @@ func (n naive) Profile(env Env, port int, u Account) (*profile.Profile, error) {
 		p.TLS.Certificate = env.CertPEM
 	}
 	return p, nil
+}
+
+// Characters that break out of the text formats a secret is written into: a
+// line break in an .ovpn file adds directives, a semicolon (or a line break)
+// in plugin options adds options.
+var (
+	unsafeInLines = string([]rune{13, 10})
+	unsafeInOpts  = ";" + unsafeInLines
+)
+
+// safeField rejects values that would break out of the text format they are
+// written into (a newline in an .ovpn file adds directives, a semicolon in
+// plugin options adds options).
+func safeField(what, value, bad string) error {
+	if strings.ContainsAny(value, bad) {
+		return fmt.Errorf("the %s contains characters that cannot be written safely into the client config", what)
+	}
+	return nil
 }
 
 // ----------------------------------------------------------------- OpenVPN
@@ -341,6 +362,13 @@ func (o openvpn) Inbounds(env Env, port int, accts []Account) Config {
 // File is the user's single-file OpenVPN client config with the credentials
 // inline (OpenVPN 2.6+ and Omnitun).
 func (o openvpn) File(env Env, port int, u Account) (string, string, error) {
+	// The credentials are written as two lines of the config file.
+	if err := safeField("user name", u.Name, unsafeInLines); err != nil {
+		return "", "", err
+	}
+	if err := safeField("password", u.Password, unsafeInLines); err != nil {
+		return "", "", err
+	}
 	cfg := fmt.Sprintf(`# %s (%s) for %s
 client
 dev tun

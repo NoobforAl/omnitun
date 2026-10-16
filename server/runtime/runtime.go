@@ -24,6 +24,7 @@ import (
 	"github.com/NoobforAl/omnitun/server/serverconf"
 	"github.com/NoobforAl/omnitun/server/stats"
 	"github.com/NoobforAl/omnitun/server/store"
+	"github.com/NoobforAl/omnitun/server/tlsfiles"
 )
 
 // Server is a running VPN server.
@@ -78,8 +79,15 @@ func (s *Server) Start() error {
 			return fmt.Errorf("subscription endpoint: %w", err)
 		}
 		s.sub = &http.Server{Handler: serverconf.SubscriptionHandler(s.store), ReadHeaderTimeout: 10 * time.Second}
-		go s.sub.Serve(ln)
-		s.logf("subscriptions on %s", ln.Addr())
+		if st.Server.ACMEActive() {
+			src := tlsfiles.New(serverconf.ACMEDir(s.store), st.Server.ACME.Domain, s.store.Path(st.Server.CertFile), s.store.Path(st.Server.KeyFile))
+			s.sub.TLSConfig = src.TLSConfig()
+			go s.sub.ServeTLS(ln, "", "")
+			s.logf("subscriptions on https://%s", ln.Addr())
+		} else {
+			go s.sub.Serve(ln)
+			s.logf("subscriptions on %s", ln.Addr())
+		}
 	}
 	return nil
 }

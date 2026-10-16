@@ -199,6 +199,30 @@ func New(o Options) http.Handler {
 	})
 
 	huma.Register(a, huma.Operation{
+		OperationID: "get-certificate", Method: http.MethodGet, Path: "/api/v1/certificate",
+		Summary: "Where the TLS certificate comes from (self-signed or ACME) and when it expires", Security: bearer,
+	}, func(ctx context.Context, _ *struct{}) (*body[*manager.CertInfo], error) {
+		c, err := m.Certificate()
+		return &body[*manager.CertInfo]{Body: c}, toHTTP(err)
+	})
+
+	huma.Register(a, huma.Operation{
+		OperationID: "enable-acme", Method: http.MethodPut, Path: "/api/v1/certificate/acme",
+		Summary: "Get a real certificate for a domain (Let's Encrypt by default); the domain becomes the public address", Security: bearer,
+	}, func(ctx context.Context, in *struct{ Body manager.ACMEPatch }) (*body[*manager.CertInfo], error) {
+		c, err := m.EnableACME(in.Body)
+		return &body[*manager.CertInfo]{Body: c}, toHTTP(err)
+	})
+
+	huma.Register(a, huma.Operation{
+		OperationID: "use-self-signed", Method: http.MethodDelete, Path: "/api/v1/certificate/acme",
+		Summary: "Go back to the self-signed certificate", Security: bearer,
+	}, func(ctx context.Context, _ *struct{}) (*body[*manager.CertInfo], error) {
+		c, err := m.UseSelfSigned()
+		return &body[*manager.CertInfo]{Body: c}, toHTTP(err)
+	})
+
+	huma.Register(a, huma.Operation{
 		OperationID: "import-xray", Method: http.MethodPost, Path: "/api/v1/import/xray",
 		Summary: "Import users (UUIDs, passwords, Reality identity) from an Xray/V2Ray server config", Security: bearer,
 		MaxBodyBytes: 4 << 20,

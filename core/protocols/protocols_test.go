@@ -122,3 +122,30 @@ func TestSplitHostPort(t *testing.T) {
 		}
 	}
 }
+
+// A secret with a line break or a semicolon must not reach a text config.
+func TestUnsafeSecretsAreRefused(t *testing.T) {
+	env := testEnv()
+	ovpn, _ := Get("openvpn-udp")
+	stls, _ := Get("shadowtls")
+	for _, bad := range []string{"pw\nremote evil.example 1194", "pw\r\nup /bin/sh", "name\nx"} {
+		acct := Account{Name: "alice", Password: bad, SSKey: alice.SSKey, UUID: alice.UUID}
+		if _, err := ovpn.Profile(env, 1194, acct); err == nil {
+			t.Errorf("openvpn accepted password %q", bad)
+		}
+		if f, ok := ovpn.(FileProtocol); ok {
+			if _, _, err := f.File(env, 1194, acct); err == nil {
+				t.Errorf("the .ovpn writer accepted password %q", bad)
+			}
+		}
+		if _, err := stls.Profile(env, 8446, acct); err == nil {
+			t.Errorf("shadowtls accepted password %q", bad)
+		}
+	}
+	if _, err := stls.Profile(env, 8446, Account{Name: "a", Password: "pw;host=evil", SSKey: alice.SSKey}); err == nil {
+		t.Error("shadowtls accepted a semicolon in the password")
+	}
+	if _, err := ovpn.Profile(env, 1194, alice); err != nil {
+		t.Errorf("a normal password failed: %v", err)
+	}
+}
