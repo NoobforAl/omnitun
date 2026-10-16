@@ -85,6 +85,25 @@ func Start(key string, cfg Config) (Server, error) {
 	return nil, fmt.Errorf("%q is not a host-level protocol", key)
 }
 
+// configureTUN gives a server's kernel TUN device the gateway address of its
+// client network and brings it up. The veepin servers open the device but leave
+// the host's networking to the caller; without this the device stays down and
+// no client traffic ever reaches the kernel. A device with no name (a test
+// device) has nothing to configure.
+func configureTUN(r Runner, name string, gateway net.IP, network *net.IPNet) error {
+	if name == "" || gateway == nil || network == nil {
+		return nil
+	}
+	if r == nil {
+		r = ExecRunner{}
+	}
+	ones, _ := network.Mask.Size()
+	if err := r.Run("ip", "addr", "add", fmt.Sprintf("%s/%d", gateway, ones), "dev", name); err != nil {
+		return err
+	}
+	return r.Run("ip", "link", "set", "dev", name, "up")
+}
+
 // publicDNS is pushed to clients.
 var publicDNS = []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("8.8.8.8")}
 
@@ -115,6 +134,10 @@ func startSSTP(cfg Config) (Server, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+	if err := configureTUN(cfg.Runner, srv.TUNName(), srv.Gateway(), srv.Network()); err != nil {
+		srv.Close()
+		return nil, fmt.Errorf("sstp: %w", err)
 	}
 	go srv.ListenAndServe()
 	return sstpServer{srv}, nil
@@ -219,6 +242,11 @@ func startIKEv2(cfg Config) (Server, error) {
 	if err != nil {
 		os.Remove(file)
 		return nil, err
+	}
+	if err := configureTUN(cfg.Runner, srv.TUNName(), srv.Gateway(), srv.Network()); err != nil {
+		srv.Close()
+		os.Remove(file)
+		return nil, fmt.Errorf("ikev2: %w", err)
 	}
 	go srv.ListenAndServe()
 	return ikev2Server{s: srv, users: file, m: &ikeMeter{last: map[string][2]uint64{}, total: map[string][2]uint64{}}}, nil

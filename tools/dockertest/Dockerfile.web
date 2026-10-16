@@ -1,0 +1,4 @@
+FROM python:3.12-alpine
+# Says who is asking: the address a request came from, which is what NAT changes.
+COPY web.py /web.py
+CMD ["python", "/web.py"]

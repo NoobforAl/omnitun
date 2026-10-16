@@ -18,3 +18,13 @@ Trimmed: docs, tests, CLI (`cmd/`), packaging and upstream agent files.
    `internal/ikev2/ike/peers.go`, `ikev2/server.go`: the EAP-MSCHAPv2 user name
    is reported as the peer's `Name` (the IKE ID is whatever the client sends), so
    `Peers()` can be summed per user.
+5. `dataplane/tun_opener.go` `OpenPlainTUNFor`, used by `sstp/server.go`: the SSTP
+   server has its own TUN loop reading and writing plain IP packets, but
+   `OpenTUNFor` opens a GSO (virtio-net header) device that only `dataplane.Pump`
+   understands; every write was refused with EINVAL on real Linux. Found by the
+   Docker end-to-end tests (`tools/dockertest`).
+6. `internal/ikev2/ike/sa_init.go` `addNATDetection`: the responder always reports a
+   NAT_DETECTION_SOURCE_IP that cannot match, so every initiator floats to 4500
+   and UDP-encapsulates. The server has no raw-IP ESP path; a client on a network
+   without NAT (strongSwan in Docker) otherwise sent bare ESP the server never
+   received. Found by `tools/dockertest`.

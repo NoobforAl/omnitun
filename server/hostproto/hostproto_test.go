@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -451,5 +452,29 @@ func TestIKEv2ClientRefusesAnotherCertificate(t *testing.T) {
 	certFiles(t, otherDir) // the profile now pins a different certificate
 	if err := pingThrough(t, "ikev2", port, alice.Password); err == nil {
 		t.Fatal("the client connected to a server whose certificate it had not pinned")
+	}
+}
+
+// The servers open their TUN device but never address it: the host has to, or
+// the device stays down (found by running the server on real Linux).
+func TestConfigureTUN(t *testing.T) {
+	r := &fakeRunner{}
+	_, network, _ := net.ParseCIDR("10.9.0.0/24")
+	if err := configureTUN(r, "tun7", net.ParseIP("10.9.0.1"), network); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"ip addr add 10.9.0.1/24 dev tun7", "ip link set dev tun7 up"}
+	if strings.Join(r.ran, "|") != strings.Join(want, "|") {
+		t.Fatalf("ran %v, want %v", r.ran, want)
+	}
+	// A test device has no name: nothing to do, nothing run.
+	r = &fakeRunner{}
+	if err := configureTUN(r, "", net.ParseIP("10.9.0.1"), network); err != nil || len(r.ran) != 0 {
+		t.Fatalf("unnamed device: %v %v", err, r.ran)
+	}
+	// A failing command is an error: a server whose device is down must not look started.
+	r = &fakeRunner{failing: map[string]bool{"ip link set dev tun7 up": true}}
+	if err := configureTUN(r, "tun7", net.ParseIP("10.9.0.1"), network); err == nil {
+		t.Fatal("a failed `ip link set up` was ignored")
 	}
 }

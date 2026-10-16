@@ -169,7 +169,7 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 		logger = vlog.Text(debuglog.Writer())
 	}
 
-	tun, err := dataplane.OpenTUNFor(dataplane.TUNRequest{Name: cfg.TUNName, Server: true})
+	tun, err := dataplane.OpenPlainTUNFor(dataplane.TUNRequest{Name: cfg.TUNName, Server: true})
 	if err != nil {
 		return nil, fmt.Errorf("sstp: open TUN: %w", err)
 	}

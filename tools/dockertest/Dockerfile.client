@@ -1,0 +1,9 @@
+FROM debian:bookworm-slim
+ENV DEBIAN_FRONTEND=noninteractive WG_QUICK_USERSPACE_IMPLEMENTATION=wireguard-go
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        iproute2 iputils-ping curl ca-certificates procps python3 openssl \
+        openvpn wireguard-tools wireguard-go \
+        strongswan-charon strongswan-swanctl libcharon-extra-plugins libstrongswan-extra-plugins libstrongswan-standard-plugins libcharon-extauth-plugins \
+        sstp-client ppp \
+    && rm -rf /var/lib/apt/lists/*
+COPY awgclient /usr/local/bin/awgclient

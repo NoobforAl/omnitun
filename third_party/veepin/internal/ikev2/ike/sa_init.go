@@ -282,16 +282,14 @@ func (s *Server) detectNAT(payloads []payload.RawPayload, spiI, spiR uint64, rem
 // NAT_DETECTION_DESTINATION_IP (the initiator) notifies so the peer can detect
 // NAT on its side too.
 func (s *Server) addNATDetection(b *payload.Builder, spiI, spiR uint64, remote *net.UDPAddr, on4500 bool) {
-	ourIP := s.cfg.PublicIP
-	if ourIP == nil {
-		ourIP = net.IPv4zero
-	}
-	ourPort := uint16(s.cfg.Port500)
-	if on4500 {
-		ourPort = uint16(s.cfg.Port4500)
-	}
-	// Source = us.
-	srcHash := natDetectionHash(spiI, spiR, ourIP, ourPort)
+	// Source = us, deliberately wrong. This build has no raw-IP ESP path: ESP
+	// only ever travels UDP-encapsulated on 4500. A client that sees our real
+	// address concludes there is no NAT and sends bare ESP (IP protocol 50),
+	// which a UDP socket never receives — the tunnel then comes up and carries
+	// nothing (seen with strongSwan on a network without NAT). A hash that
+	// cannot match tells the initiator we are behind NAT (RFC 7296 2.23), so it
+	// floats to 4500 and encapsulates, like every client behind a NAT already does.
+	srcHash := natDetectionHash(spiI, spiR, net.IPv4zero, 0)
 	b.Add(payload.TypeNotify, false, payload.MarshalNotify(payload.NotifyPayload{
 		Protocol: payload.ProtoNone, Type: payload.NATDetectionSourceIP, Data: srcHash,
 	}))

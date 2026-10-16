@@ -44,3 +44,14 @@ func OpenTUNFor(req TUNRequest) (*TUN, error) {
 	}
 	return wrapDevice(dev, req.Name)
 }
+
+// OpenPlainTUNFor is OpenTUNFor for a protocol with its own TUN loop. The
+// kernel device OpenTUNFor opens carries a virtio-net header on every read and
+// write (GSO) and only dataplane.Pump understands it: a loop that reads and
+// writes plain IP packets on it has every write refused with EINVAL.
+func OpenPlainTUNFor(req TUNRequest) (*TUN, error) {
+	if TUNOpener != nil {
+		return OpenTUNFor(req)
+	}
+	return OpenTUN(req.Name)
+}
