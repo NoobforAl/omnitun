@@ -21,6 +21,7 @@ import (
 	sjson "github.com/sagernet/sing/common/json"
 	"github.com/sagernet/sing/service"
 
+	"github.com/NoobforAl/omnitun/server/logs"
 	"github.com/NoobforAl/omnitun/server/serverconf"
 	"github.com/NoobforAl/omnitun/server/stats"
 	"github.com/NoobforAl/omnitun/server/store"
@@ -38,6 +39,7 @@ type Server struct {
 	sub      *http.Server
 	loaded   time.Time // state file mod time of the running config
 
+	file    *logs.Log      // server.log
 	tracker *stats.Tracker // per-user traffic, shared by every sing-box run
 	accMu   sync.Mutex     // guards the collector's tick against the final flush
 	coll    *collector     // the running instance's collector (guarded by accMu)
@@ -49,7 +51,15 @@ func New(s *store.Store, logf func(string, ...any)) *Server {
 	if logf == nil {
 		logf = func(string, ...any) {}
 	}
-	return &Server{store: s, logf: logf}
+	// Everything the server says also goes to server.log, where the CLI, the
+	// TUI and the API can read it.
+	file := logs.Open(s.Dir)
+	srv := &Server{store: s, file: file}
+	srv.logf = func(format string, args ...any) {
+		logf(format, args...)
+		file.Write("info", fmt.Sprintf(format, args...))
+	}
+	return srv
 }
 
 // Start loads the state and starts sing-box and the subscription endpoint.
@@ -111,7 +121,7 @@ func (s *Server) startBoxLocked(st *store.State) error {
 		var instance *box.Box
 		// The platform writer makes sing-box create its traffic manager,
 		// which the accounting reads.
-		instance, err = box.New(box.Options{Context: ctx, Options: opts, PlatformLogWriter: discardLog{}})
+		instance, err = box.New(box.Options{Context: ctx, Options: opts, PlatformLogWriter: sbLog{s.file}})
 		if err == nil {
 			if err = instance.Start(); err == nil {
 				s.instance, s.cancel = instance, cancel
@@ -213,6 +223,7 @@ func (s *Server) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.stopBoxLocked()
+	defer s.file.Close()
 	if s.accStop != nil {
 		s.accStop()
 	}

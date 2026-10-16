@@ -8,6 +8,7 @@ import (
 	"github.com/sagernet/sing-box/common/trafficcontrol"
 	"github.com/sagernet/sing-box/log"
 
+	"github.com/NoobforAl/omnitun/server/logs"
 	"github.com/NoobforAl/omnitun/server/stats"
 	"github.com/NoobforAl/omnitun/server/store"
 )
@@ -20,11 +21,23 @@ var (
 	enforceEvery       = 5
 )
 
-// discardLog is the platform log writer sing-box needs before it creates its
-// traffic manager; the normal log output is unaffected.
-type discardLog struct{}
+// sbLog is the platform log writer sing-box needs before it creates its
+// traffic manager; it also puts sing-box's own messages (warnings and errors,
+// at the configured level) into server.log. The normal log output continues.
+type sbLog struct{ file *logs.Log }
 
-func (discardLog) WriteMessage(log.Level, string) {}
+func (w sbLog) WriteMessage(level log.Level, message string) {
+	w.file.Write("sing-box "+log.FormatLevel(level), message)
+}
+
+// protocolKey maps an inbound tag to the protocol it serves: ShadowTLS hands
+// its streams to an internal Shadowsocks inbound.
+func protocolKey(inbound string) string {
+	if inbound == "shadowtls-ss" {
+		return "shadowtls"
+	}
+	return inbound
+}
 
 // seenConn is what was already counted of one connection.
 type seenConn struct {
@@ -63,20 +76,27 @@ func (c *collector) tick() {
 		live[user] = l
 	}
 
+	liveProto := map[string]int{}
 	for _, md := range c.tm.Connections() {
-		user := md.Metadata.User
+		up, down := md.Upload.Load(), md.Download.Load()
+		prev := c.seen[md.ID]
+		du, dd := up-prev.up, down-prev.down
+		user, proto := md.Metadata.User, protocolKey(md.Metadata.Inbound)
+		c.seen[md.ID] = seenConn{user: user, up: up, down: down}
+		c.tr.AddProtocol(proto, du, dd)
+		if proto != "" {
+			liveProto[proto]++
+		}
 		if user == "" {
 			continue
 		}
-		up, down := md.Upload.Load(), md.Download.Load()
-		prev := c.seen[md.ID]
-		c.tr.Add(user, up-prev.up, down-prev.down)
-		speed(user, up-prev.up, down-prev.down)
-		c.seen[md.ID] = seenConn{user: user, up: up, down: down}
+		c.tr.Add(user, du, dd)
+		speed(user, du, dd)
 		l := live[user]
 		l.Connections++
 		live[user] = l
 	}
+	c.tr.SetProtocolConnections(liveProto)
 
 	closedNow := map[uuid.UUID]bool{}
 	for _, md := range c.tm.ClosedConnections() {
@@ -84,14 +104,14 @@ func (c *collector) tick() {
 		if c.done[md.ID] || md.ClosedAt.Before(c.started) {
 			continue
 		}
-		user := md.Metadata.User
-		if user == "" {
-			continue
-		}
 		up, down := md.Upload.Load(), md.Download.Load()
 		prev := c.seen[md.ID] // zero when the connection opened and closed between ticks
-		c.tr.Add(user, up-prev.up, down-prev.down)
-		speed(user, up-prev.up, down-prev.down)
+		du, dd := up-prev.up, down-prev.down
+		c.tr.AddProtocol(protocolKey(md.Metadata.Inbound), du, dd)
+		if user := md.Metadata.User; user != "" {
+			c.tr.Add(user, du, dd)
+			speed(user, du, dd)
+		}
 		delete(c.seen, md.ID)
 		c.done[md.ID] = true
 	}

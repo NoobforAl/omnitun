@@ -44,6 +44,20 @@ type User struct {
 // MonthTotal is the traffic counted against the quota this month.
 func (u User) MonthTotal() int64 { return u.MonthUp + u.MonthDown }
 
+// Protocol is one protocol's traffic (all users together), counted at its
+// inbound; connections that carry no user (OpenVPN) are counted here too.
+type Protocol struct {
+	Up          int64  `json:"up"`
+	Down        int64  `json:"down"`
+	Month       string `json:"month"`
+	MonthUp     int64  `json:"month_up"`
+	MonthDown   int64  `json:"month_down"`
+	Connections int    `json:"connections"`
+}
+
+// MonthTotal is the protocol's traffic this month.
+func (p Protocol) MonthTotal() int64 { return p.MonthUp + p.MonthDown }
+
 // Snapshot is the stats file.
 type Snapshot struct {
 	// UpdatedAt is when the server last wrote the file; a stale value means
@@ -51,6 +65,8 @@ type Snapshot struct {
 	UpdatedAt time.Time        `json:"updated_at"`
 	StartedAt time.Time        `json:"started_at"`
 	Users     map[string]*User `json:"users"`
+	// Protocols is keyed by protocol key (vless-reality, trojan, ...).
+	Protocols map[string]*Protocol `json:"protocols,omitempty"`
 }
 
 // Running reports whether the server wrote the file recently.
@@ -62,7 +78,7 @@ func (s Snapshot) Running(now time.Time) bool {
 func Read(dir string) (Snapshot, error) {
 	data, err := os.ReadFile(filepath.Join(dir, fileName))
 	if errors.Is(err, os.ErrNotExist) {
-		return Snapshot{Users: map[string]*User{}}, nil
+		return Snapshot{Users: map[string]*User{}, Protocols: map[string]*Protocol{}}, nil
 	}
 	if err != nil {
 		return Snapshot{}, err
@@ -73,6 +89,9 @@ func Read(dir string) (Snapshot, error) {
 	}
 	if s.Users == nil {
 		s.Users = map[string]*User{}
+	}
+	if s.Protocols == nil {
+		s.Protocols = map[string]*Protocol{}
 	}
 	return s, nil
 }
@@ -107,6 +126,44 @@ func (t *Tracker) user(name string, now time.Time) *User {
 		u.Month, u.MonthUp, u.MonthDown = m, 0, 0
 	}
 	return u
+}
+
+func (t *Tracker) protocol(key string, now time.Time) *Protocol {
+	p := t.snap.Protocols[key]
+	if p == nil {
+		p = &Protocol{}
+		t.snap.Protocols[key] = p
+	}
+	if m := monthKey(now); p.Month != m {
+		p.Month, p.MonthUp, p.MonthDown = m, 0, 0
+	}
+	return p
+}
+
+// AddProtocol counts traffic for a protocol.
+func (t *Tracker) AddProtocol(key string, up, down int64) {
+	if key == "" || (up == 0 && down == 0) {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	p := t.protocol(key, t.now())
+	p.Up += up
+	p.Down += down
+	p.MonthUp += up
+	p.MonthDown += down
+}
+
+// SetProtocolConnections replaces the live connection count of every protocol.
+func (t *Tracker) SetProtocolConnections(live map[string]int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	for _, p := range t.snap.Protocols {
+		p.Connections = 0
+	}
+	for key, n := range live {
+		t.protocol(key, t.now()).Connections = n
+	}
 }
 
 // Add counts traffic for a user.
@@ -219,6 +276,9 @@ func (t *Tracker) Stop() error {
 	t.stopped = true
 	for _, u := range t.snap.Users {
 		u.Connections, u.UpBps, u.DownBps = 0, 0, 0
+	}
+	for _, p := range t.snap.Protocols {
+		p.Connections = 0
 	}
 	t.mu.Unlock()
 	return t.Save()

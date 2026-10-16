@@ -410,7 +410,7 @@ Step 2 — accounting and safety
 - [x] File locking (`state.json.lock`, works across processes): CLI, TUI, API and the running server can write at the same time without losing changes
 - [x] Backup and restore: `omnitun-server backup <file>` / `restore <file> [--force]` (tar.gz of state, keys and certificates; hostile archives rejected) and `GET /api/v1/backup`
 - [x] Live status: running/not running, connections and speed per user (CLI `status`/`user list`, TUI, API `server`)
-- [ ] Traffic per protocol and server logs (API + TUI)
+- [x] Traffic per protocol (month, all-time, live connections: `proto list`, API `/protocols`, TUI) and the server log (`server.log`, rotated at 4 MB: `omnitun-server logs [-n N] [-f]`, `GET /api/v1/logs`, TUI Logs tab; the server's own messages and sing-box warnings/errors, so quota blocks, reloads and failures are visible remotely)
 - [ ] OpenVPN per-user accounting (read the endpoint's status/management output)
 
 Step 3 — more protocols and setup

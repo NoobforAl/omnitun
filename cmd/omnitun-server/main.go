@@ -75,7 +75,7 @@ otherwise ~/.omnitun-server; override with --data or OMNITUN_SERVER_DATA.`,
 	root.PersistentFlags().BoolVar(&o.json, "json", false, "print results as JSON")
 	root.AddCommand(
 		newInitCmd(o), newStatusCmd(o), newProtoCmd(o), newUserCmd(o), newLinkCmd(o),
-		newAPICmd(o), newBackupCmd(o), newRestoreCmd(o), newImportCmd(o), newCertCmd(o), newRunCmd(o), newTUICmd(o), newServiceCmd(o),
+		newAPICmd(o), newBackupCmd(o), newRestoreCmd(o), newImportCmd(o), newCertCmd(o), newLogsCmd(o), newRunCmd(o), newTUICmd(o), newServiceCmd(o),
 	)
 	return root
 }

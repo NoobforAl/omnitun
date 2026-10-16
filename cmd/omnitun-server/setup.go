@@ -41,16 +41,20 @@ func newStatusCmd(o *options) *cobra.Command {
 
 func printProtocols(list []manager.ProtocolInfo, subPort int) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "PROTOCOL\tNAME\tPORT\tTRANSPORT\tSTATUS")
+	fmt.Fprintln(w, "PROTOCOL\tNAME\tPORT\tTRANSPORT\tSTATUS\tTRAFFIC (MONTH)\tCONN")
 	for _, p := range list {
 		status := "disabled"
 		if p.Enabled {
 			status = "enabled"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\n", p.Key, p.Name, p.Port, p.Transport, status)
+		conn := "-"
+		if p.Connections > 0 {
+			conn = fmt.Sprint(p.Connections)
+		}
+		fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\t%s\n", p.Key, p.Name, p.Port, p.Transport, status, humanBytes(p.MonthBytes), conn)
 	}
 	if subPort > 0 {
-		fmt.Fprintf(w, "subscriptions\t\t%d\ttcp\thttp\n", subPort)
+		fmt.Fprintf(w, "subscriptions\t\t%d\ttcp\thttp\t\t\n", subPort)
 	}
 	w.Flush()
 }

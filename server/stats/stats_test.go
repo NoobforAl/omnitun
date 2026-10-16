@@ -1,12 +1,13 @@
 package stats
 
 import (
+	"os"
 	"testing"
 	"time"
 )
 
 func TestCountSaveAndReload(t *testing.T) {
-	dir := t.TempDir()
+	dir := tempDir(t)
 	tr := NewTracker(dir)
 	tr.Add("alice", 100, 900)
 	tr.Add("alice", 1, 2)
@@ -37,7 +38,7 @@ func TestCountSaveAndReload(t *testing.T) {
 }
 
 func TestMonthRollover(t *testing.T) {
-	tr := NewTracker(t.TempDir())
+	tr := NewTracker(tempDir(t))
 	now := time.Date(2026, 10, 31, 23, 0, 0, 0, time.UTC)
 	tr.now = func() time.Time { return now }
 	tr.Add("bob", 10, 20)
@@ -55,7 +56,7 @@ func TestMonthRollover(t *testing.T) {
 }
 
 func TestApplyReset(t *testing.T) {
-	tr := NewTracker(t.TempDir())
+	tr := NewTracker(tempDir(t))
 	tr.Add("carol", 50, 50)
 	asked := time.Now().Add(time.Minute)
 	if !tr.ApplyReset("carol", asked) || tr.MonthTotal("carol") != 0 {
@@ -74,7 +75,7 @@ func TestApplyReset(t *testing.T) {
 }
 
 func TestStopAndForget(t *testing.T) {
-	dir := t.TempDir()
+	dir := tempDir(t)
 	tr := NewTracker(dir)
 	tr.Add("dave", 1, 1)
 	tr.Add("gone", 1, 1)
@@ -90,8 +91,54 @@ func TestStopAndForget(t *testing.T) {
 }
 
 func TestReadMissingFile(t *testing.T) {
-	snap, err := Read(t.TempDir())
+	snap, err := Read(tempDir(t))
 	if err != nil || snap.Users == nil || snap.Running(time.Now()) {
 		t.Fatalf("snap = %+v err = %v", snap, err)
 	}
+}
+
+func TestProtocolCounters(t *testing.T) {
+	dir := tempDir(t)
+	tr := NewTracker(dir)
+	now := time.Date(2026, 10, 31, 23, 0, 0, 0, time.UTC)
+	tr.now = func() time.Time { return now }
+	tr.AddProtocol("trojan", 100, 900)
+	tr.AddProtocol("trojan", 1, 1)
+	tr.AddProtocol("", 5, 5) // unknown inbound: ignored
+	tr.SetProtocolConnections(map[string]int{"trojan": 3, "tuic": 1})
+	if err := tr.Save(); err != nil {
+		t.Fatal(err)
+	}
+	snap, _ := Read(dir)
+	p := snap.Protocols["trojan"]
+	if p == nil || p.Up != 101 || p.Down != 901 || p.MonthTotal() != 1002 || p.Connections != 3 || snap.Protocols["tuic"].Connections != 1 {
+		t.Fatalf("trojan = %+v tuic = %+v", p, snap.Protocols["tuic"])
+	}
+
+	now = now.Add(2 * time.Hour) // the month rolls over, the lifetime total stays
+	tr.AddProtocol("trojan", 1, 1)
+	if p := tr.snap.Protocols["trojan"]; p.MonthTotal() != 2 || p.Up != 102 {
+		t.Fatalf("after the month rolled: %+v", p)
+	}
+	tr.SetProtocolConnections(nil)
+	tr.Stop()
+	snap, _ = Read(dir)
+	if snap.Protocols["trojan"].Connections != 0 {
+		t.Fatal("connections survive a stop")
+	}
+}
+
+// tempDir is t.TempDir with a retrying cleanup (Windows file locks).
+func tempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "omnitun-stats-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for i := 0; i < 40 && os.RemoveAll(dir) != nil; i++ {
+			time.Sleep(50 * time.Millisecond)
+		}
+	})
+	return dir
 }

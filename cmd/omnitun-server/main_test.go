@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NoobforAl/omnitun/server/logs"
 	"github.com/NoobforAl/omnitun/server/manager"
 	"github.com/NoobforAl/omnitun/server/store"
 )
@@ -239,5 +240,26 @@ func TestLiveTokenFollowsTheState(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	if tok() != "" {
 		t.Fatal("disabled API still has a token")
+	}
+}
+
+func TestLogsCommand(t *testing.T) {
+	dir := tempDir(t)
+	run(t, dir, "init", "--host", "203.0.113.7")
+	lg := logs.Open(dir)
+	lg.Write("warn", "something happened")
+	lg.Write("info", "and then this")
+	lg.Close()
+	out, err := run(t, dir, "logs", "-n", "1")
+	if err != nil || !strings.Contains(out, "and then this") || strings.Contains(out, "something happened") {
+		t.Fatalf("logs -n 1: %v\n%s", err, out)
+	}
+	out, _ = run(t, dir, "--json", "logs")
+	var lines []string
+	if json.Unmarshal([]byte(out), &lines) != nil || len(lines) != 2 {
+		t.Fatalf("json logs = %q", out)
+	}
+	if _, err := run(t, dir, "logs", "-n", "0"); exitCode(err) != 2 {
+		t.Fatalf("logs -n 0: code %d", exitCode(err))
 	}
 }

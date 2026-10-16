@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/NoobforAl/omnitun/core/protocols"
+	"github.com/NoobforAl/omnitun/server/logs"
 	"github.com/NoobforAl/omnitun/server/serverconf"
 	"github.com/NoobforAl/omnitun/server/stats"
 	"github.com/NoobforAl/omnitun/server/store"
@@ -86,6 +87,11 @@ type ProtocolInfo struct {
 	NeedsCertificate bool `json:"needs_certificate"`
 	// ShareLink is false for protocols that travel as a config file (OpenVPN).
 	ShareLink bool `json:"share_link"`
+	// Traffic through this protocol's inbound, all users together. Live
+	// connections are 0 while the server is stopped.
+	MonthBytes  int64 `json:"month_bytes"`
+	TotalBytes  int64 `json:"total_bytes"`
+	Connections int   `json:"connections"`
 }
 
 // UserInfo is one account without its secrets.
@@ -202,13 +208,19 @@ func (m *Manager) Server() (*ServerInfo, error) {
 	return m.serverInfo(st), nil
 }
 
-func protocolInfo(st *store.State, key string) ProtocolInfo {
+func protocolInfo(st *store.State, key string, snap stats.Snapshot, running bool) ProtocolInfo {
 	p := st.Server.Protocols[key]
 	info := ProtocolInfo{Key: key, Name: key, Port: p.Port, Enabled: p.Enabled, Transport: "tcp"}
 	if proto, ok := protocols.Get(key); ok {
 		s := proto.Spec()
 		info.Name, info.Description, info.DefaultPort = s.Name, s.Description, s.DefaultPort
 		info.Transport, info.NeedsCertificate, info.ShareLink = s.Transport, s.NeedsCertificate, s.ShareLink
+	}
+	if t := snap.Protocols[key]; t != nil {
+		info.MonthBytes, info.TotalBytes = t.MonthTotal(), t.Up+t.Down
+		if running {
+			info.Connections = t.Connections
+		}
 	}
 	return info
 }
@@ -219,9 +231,10 @@ func (m *Manager) Protocols() ([]ProtocolInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	snap := m.snapshot()
 	out := make([]ProtocolInfo, 0, len(store.AllProtocols))
 	for _, k := range store.AllProtocols {
-		out = append(out, protocolInfo(st, k))
+		out = append(out, protocolInfo(st, k, snap, snap.Running(m.Now())))
 	}
 	return out, nil
 }
@@ -287,7 +300,7 @@ func (m *Manager) SetProtocol(key string, patch ProtocolPatch) (*ProtocolInfo, e
 		if err := portConflict(st); err != nil {
 			return err
 		}
-		out = protocolInfo(st, key)
+		out = protocolInfo(st, key, m.snapshot(), false)
 		return nil
 	})
 	if err != nil {
@@ -591,4 +604,14 @@ func mapKeys[V any](m map[string]V) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// Logs returns the last lines of the server log (oldest first). It holds
+// what the server and sing-box reported: starts, reloads, quota blocks,
+// warnings and errors.
+func (m *Manager) Logs(lines int) ([]string, error) {
+	if lines <= 0 || lines > 5000 {
+		return nil, invalid("lines must be between 1 and 5000")
+	}
+	return logs.Tail(m.Store.Dir, lines)
 }

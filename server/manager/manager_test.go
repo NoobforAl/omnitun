@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NoobforAl/omnitun/server/logs"
 	"github.com/NoobforAl/omnitun/server/stats"
 	"github.com/NoobforAl/omnitun/server/store"
 )
@@ -280,4 +281,46 @@ func mustJSON(t *testing.T, v any) string {
 		t.Fatal(err)
 	}
 	return string(raw)
+}
+
+func TestProtocolTrafficAndLogs(t *testing.T) {
+	m := newManager(t)
+	tr := stats.NewTracker(m.Store.Dir)
+	tr.AddProtocol("trojan", 1<<20, 3<<20)
+	tr.SetProtocolConnections(map[string]int{"trojan": 2})
+	if err := tr.Save(); err != nil {
+		t.Fatal(err)
+	}
+	protos, _ := m.Protocols()
+	var trojan ProtocolInfo
+	for _, p := range protos {
+		if p.Key == store.Trojan {
+			trojan = p
+		}
+	}
+	if trojan.MonthBytes != 4<<20 || trojan.TotalBytes != 4<<20 || trojan.Connections != 2 {
+		t.Fatalf("trojan = %+v", trojan)
+	}
+	tr.Stop()
+	protos, _ = m.Protocols()
+	for _, p := range protos {
+		if p.Key == store.Trojan && (p.Connections != 0 || p.TotalBytes != 4<<20) {
+			t.Fatalf("after stop: %+v", p)
+		}
+	}
+
+	if lines, err := m.Logs(10); err != nil || len(lines) != 0 {
+		t.Fatalf("no log yet: %v %v", lines, err)
+	}
+	lg := logs.Open(m.Store.Dir)
+	lg.Write("info", "hello")
+	lg.Close()
+	if lines, _ := m.Logs(10); len(lines) != 1 || !strings.HasSuffix(lines[0], "hello") {
+		t.Fatalf("lines = %q", lines)
+	}
+	for _, bad := range []int{0, -1, 5001} {
+		if _, err := m.Logs(bad); !errors.Is(err, ErrInvalid) {
+			t.Errorf("Logs(%d): %v", bad, err)
+		}
+	}
 }

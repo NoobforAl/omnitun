@@ -199,6 +199,16 @@ func New(o Options) http.Handler {
 	})
 
 	huma.Register(a, huma.Operation{
+		OperationID: "get-logs", Method: http.MethodGet, Path: "/api/v1/logs",
+		Summary: "The last lines of the server log (oldest first)", Security: bearer,
+	}, func(ctx context.Context, in *struct {
+		Lines int `query:"lines" default:"200" minimum:"1" maximum:"5000" doc:"How many lines"`
+	}) (*body[[]string], error) {
+		lines, err := m.Logs(in.Lines)
+		return &body[[]string]{Body: lines}, toHTTP(err)
+	})
+
+	huma.Register(a, huma.Operation{
 		OperationID: "get-certificate", Method: http.MethodGet, Path: "/api/v1/certificate",
 		Summary: "Where the TLS certificate comes from (self-signed or ACME) and when it expires", Security: bearer,
 	}, func(ctx context.Context, _ *struct{}) (*body[*manager.CertInfo], error) {

@@ -17,6 +17,7 @@ import (
 	"github.com/NoobforAl/omnitun/core/engine"
 	"github.com/NoobforAl/omnitun/core/importer"
 	"github.com/NoobforAl/omnitun/core/singbox"
+	"github.com/NoobforAl/omnitun/server/logs"
 	"github.com/NoobforAl/omnitun/server/serverconf"
 	"github.com/NoobforAl/omnitun/server/stats"
 	"github.com/NoobforAl/omnitun/server/store"
@@ -106,6 +107,10 @@ func TestUserAccountingAndQuota(t *testing.T) {
 	if err != nil || snap.Users["alice"] == nil || snap.Users["alice"].Down < payload || !snap.Running(time.Now()) {
 		t.Fatalf("stats file: %+v err %v", snap.Users["alice"], err)
 	}
+	// The same traffic is counted against the protocol it came through.
+	if tj := snap.Protocols["trojan"]; tj == nil || tj.Down < payload {
+		t.Fatalf("trojan traffic = %+v, want at least %d bytes down", tj, payload)
+	}
 
 	// Quota below what she already used: blocked within a few ticks.
 	if err := s.Update(func(st *store.State) error { st.User("alice").QuotaGB = 100 << 10 / float64(stats.GiB); return nil }); err != nil {
@@ -123,6 +128,12 @@ func TestUserAccountingAndQuota(t *testing.T) {
 		defer srv.mu.Unlock()
 		return srv.instance == nil
 	})
+
+	// The block is in the server log, where the CLI, TUI and API show it.
+	lines, _ := logs.Tail(s.Dir, 100)
+	if !strings.Contains(strings.Join(lines, "\n"), "used up the monthly quota") {
+		t.Fatalf("the quota block is not in server.log: %q", lines)
+	}
 
 	// Raising the quota lets her back in.
 	if err := s.Update(func(st *store.State) error { st.User("alice").QuotaGB = 10; return nil }); err != nil {

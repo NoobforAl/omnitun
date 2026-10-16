@@ -27,10 +27,11 @@ const (
 	viewUsers view = iota
 	viewProtocols
 	viewServer
+	viewLogs
 	viewUser // links and QR codes of one user
 )
 
-var tabs = []string{"Users", "Protocols", "Server"}
+var tabs = []string{"Users", "Protocols", "Server", "Logs"}
 
 // prompt is a pending single-line input or yes/no question.
 type prompt struct {
@@ -60,6 +61,7 @@ type model struct {
 	users  []manager.UserInfo
 	api    store.API
 	cert   *manager.CertInfo
+	logs   []string
 
 	view    view
 	table   table.Model
@@ -250,6 +252,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
 		m.reload()
+		if m.view == viewLogs {
+			m.loadLogs()
+		}
 		return m, tick()
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
@@ -275,8 +280,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "shift+tab":
 				m.view = (m.view + view(len(tabs)) - 1) % view(len(tabs))
 				return m, nil
-			case "1", "2", "3":
+			case "1", "2", "3", "4":
 				m.view = view(msg.String()[0] - '1')
+				if m.view == viewLogs {
+					m.loadLogs()
+				}
 				return m, nil
 			}
 		}
@@ -289,6 +297,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateProtocols(msg)
 		case viewServer:
 			return m.updateServer(msg)
+		case viewLogs:
+			return m.updateLogs(msg)
 		}
 	}
 	return m, nil
@@ -588,6 +598,8 @@ func (m *model) View() string {
 		b.WriteString(m.protocolsView())
 	case viewServer:
 		b.WriteString(m.serverView())
+	case viewLogs:
+		b.WriteString(m.logsView())
 	}
 
 	b.WriteString("\n\n")

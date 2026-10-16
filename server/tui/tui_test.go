@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/NoobforAl/omnitun/server/logs"
 	"github.com/NoobforAl/omnitun/server/manager"
 	"github.com/NoobforAl/omnitun/server/store"
 )
@@ -28,6 +29,8 @@ func send(m *model, ks ...string) tea.Cmd {
 			msg = tea.KeyMsg{Type: tea.KeyRight}
 		case "tab":
 			msg = tea.KeyMsg{Type: tea.KeyTab}
+		case "shift+tab":
+			msg = tea.KeyMsg{Type: tea.KeyShiftTab}
 		case " ":
 			msg = tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}}
 		default:
@@ -193,12 +196,31 @@ func TestServerTabAPISettings(t *testing.T) {
 
 func TestTabsCycle(t *testing.T) {
 	m, _ := newTestModel(t)
-	send(m, "tab")
-	if m.view != viewProtocols {
-		t.Fatalf("view = %v", m.view)
+	for i, want := range []view{viewProtocols, viewServer, viewLogs, viewUsers} {
+		send(m, "tab")
+		if m.view != want {
+			t.Fatalf("after %d tab(s) the view is %v, want %v", i+1, m.view, want)
+		}
 	}
-	send(m, "tab", "tab")
+	send(m, "shift+tab")
+	if m.view != viewLogs {
+		t.Fatalf("shift+tab from the first tab went to %v", m.view)
+	}
+}
+
+func TestLogsTab(t *testing.T) {
+	m, mgr := newTestModel(t)
+	lg := logs.Open(mgr.Store.Dir)
+	lg.Write("warn", "disk is almost full")
+	lg.Write("error", "something failed")
+	lg.Close()
+	send(m, "4")
+	view := m.View()
+	if m.view != viewLogs || !strings.Contains(view, "disk is almost full") || !strings.Contains(view, "something failed") {
+		t.Fatalf("logs tab:\n%s", view)
+	}
+	send(m, "tab")
 	if m.view != viewUsers {
-		t.Fatalf("view = %v after wrapping", m.view)
+		t.Fatalf("tab from the last tab went to %v", m.view)
 	}
 }

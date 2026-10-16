@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NoobforAl/omnitun/server/logs"
 	"github.com/NoobforAl/omnitun/server/manager"
 	"github.com/NoobforAl/omnitun/server/store"
 )
@@ -255,5 +256,32 @@ func TestTokenIsReadPerRequest(t *testing.T) {
 	current = ""
 	if get("second") != 401 || get("") != 401 {
 		t.Fatal("an empty token (API disabled) accepted a request")
+	}
+}
+
+func TestLogsEndpoint(t *testing.T) {
+	m := manager.New(store.Open(tempDir(t)))
+	if _, err := m.Init(manager.InitOptions{PublicHost: "203.0.113.7"}); err != nil {
+		t.Fatal(err)
+	}
+	lg := logs.Open(m.Store.Dir)
+	for i := 0; i < 5; i++ {
+		lg.Write("info", "line "+string(rune('a'+i)))
+	}
+	lg.Close()
+	srv := httptest.NewServer(New(Options{Manager: m, Token: func() string { return token }}))
+	defer srv.Close()
+	c := &client{t: t, srv: srv}
+
+	var lines []string
+	json.Unmarshal(c.ok("GET", "/api/v1/logs?lines=3", nil, 200), &lines)
+	if len(lines) != 3 || !strings.HasSuffix(lines[2], "line e") || !strings.HasSuffix(lines[0], "line c") {
+		t.Fatalf("lines = %q", lines)
+	}
+	if status, _ := c.do("GET", "/api/v1/logs?lines=0", nil, "Bearer "+token); status != 422 {
+		t.Errorf("lines=0 -> %d, want 422", status)
+	}
+	if status, _ := c.do("GET", "/api/v1/logs", nil, ""); status != 401 {
+		t.Errorf("without a token -> %d, want 401", status)
 	}
 }
