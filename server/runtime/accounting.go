@@ -232,6 +232,10 @@ func (c *collector) tick() {
 func (s *Server) accountingLoop(ctx context.Context) {
 	t := time.NewTicker(accountingInterval)
 	defer t.Stop()
+	// Write the file at once, so `status` sees a running server straight away.
+	if err := s.tracker.Save(); err != nil {
+		s.logf("save stats: %v", err)
+	}
 	for n := 1; ; n++ {
 		select {
 		case <-ctx.Done():
