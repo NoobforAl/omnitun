@@ -40,16 +40,17 @@ Decision (2026-10-15): dependencies are chosen on technical merit; license compa
 | **sing-box** (Go lib) | VLESS/Reality, VMess, Trojan, SS, Hysteria2, TUIC, WireGuard/NordLynx, TUN, DNS, routing, groups |
 | amneziawg-go | AmneziaWG (not supported by sing-box) |
 | Arti (Rust) + lyrebird/snowflake/webtunnel | Tor with bridges |
-| NaiveProxy | Separate binary (Chromium network stack) |
+| NaiveProxy | sing-box `with_naive_outbound` (Chromium cronet, statically linked on Android; libcronet.dll on Windows) |
 | OpenVPN | sing-box 1.14's `openvpn-client` / `openvpn-server` endpoints (`with_openvpn` tag) — in use for client and server; the OpenVPN 2.6 binary is only needed for the XOR patch |
-| OpenConnect / NaiveProxy | Also built into sing-box 1.14 (`with_openconnect`, `with_naive_outbound` — naive needs cronet, so it's off for now) |
+| OpenConnect | Built into sing-box 1.14 (`with_openconnect`); not exposed in the app yet |
+| SSTP / IKEv2 | Pure-Go `veepin` in the core (patched copy in `third_party/veepin`); OS IKEv2 client optional |
 | Lightway (Rust, Linux/macOS only today) | Separate binary, low priority |
 | Windows RAS / Android `Ikev2VpnProfile` | IKEv2, L2TP, SSTP (OS-native) |
 | strongSwan / xl2tpd / accel-ppp (server) | Installed as system packages by the server CLI |
 
 Omnitun is **not tied to one core** (it doesn't use Xray at all): each protocol maps to an engine adapter (sing-box, amneziawg-go, Arti, OS-native VPN, external binary). Adding a protocol beyond the list above means adding an importer + an adapter; the UI, profiles, failover and control protocol stay the same.
 
-IKEv2, L2TP/IPsec and SSTP on **Windows** use the built-in RAS VPN client (no third-party code). On **Android**: IKEv2 uses the platform `Ikev2VpnProfile` (Android 11+); SSTP uses a Kotlin port of Open SSTP Client (MIT — verify before use); **L2TP is not available** (Android 12 removed it) — the UI shows "not supported on this device".
+IKEv2, L2TP/IPsec and SSTP on **Windows** use the built-in RAS VPN client (no third-party code). On **Android**: IKEv2 uses the platform `Ikev2VpnProfile` (Android 11+); SSTP and IKEv2 also run in the core (pure-Go `veepin`), so they work on phones without IPsec support; **L2TP is not available** (Android 12 removed it) — the UI shows "not supported on this device".
 
 ### 1.3 Language split
 
@@ -167,29 +168,33 @@ Split tunneling (per-app on Android, per-route on Windows), bypass LAN, geoip/ge
 
 ---
 
-## 4. Server CLI (`omnitun-server`, Go, Linux first)
+## 4. Server (`omnitun-server`, Go, Linux first)
 
-One binary (`cmd/omnitun-server`) that runs sing-box as the server and manages users. Implemented:
+One binary (`cmd/omnitun-server`): CLI (cobra), TUI (Bubble Tea) and a web API (huma + chi) over one service layer (`server/manager`); the VPN core is sing-box in-process.
 
 ```
 omnitun-server init --host IP_OR_DOMAIN [--name N] [--reality-site HOST:PORT] [--sub-port P]
+omnitun-server status                          running state, users, connections
 omnitun-server proto list | enable <p> | disable <p> | port <p> <port>
-omnitun-server user add <name> [--days N] [--quota GB] [--note T] | list | del | enable | disable
-omnitun-server user expire <name> <days|never> | quota <name> <GB> | reset <name>
-omnitun-server link <name> [--qr] [--sub]      share links + terminal QR codes
-omnitun-server run                             server + subscription endpoint, live reload
+omnitun-server user add <name> [--days N] [--quota GB] [--note T]
+omnitun-server user list | del | enable | disable | expire | quota | note | reset | usage [--reset]
+omnitun-server link <name> [--qr] [--sub] [--ovpn udp|tcp]
+omnitun-server api status | enable | disable | token [--new] | listen <host> [port]
+omnitun-server backup <file> | restore <file> [--force]
+omnitun-server run                             VPN core + subscriptions + web API (if enabled), live reload
 omnitun-server tui                             interactive manager
 omnitun-server service                         systemd unit
+(every command: --data DIR, --json; exit codes 2 invalid / 3 not found / 4 conflict)
 ```
 
-- **Protocols (in-process, sing-box):** VLESS+Reality (no certificate needed; impersonates a real site), Shadowsocks-2022 (multi-user), Trojan, Hysteria2, TUIC, AnyTLS, ShadowTLS v3 (+ Shadowsocks-2022, borrowing the Reality site's handshake), NaiveProxy (the subscription pins the self-signed certificate; certificates are 90-day and renewed on start because Chromium rejects long-lived ones), OpenVPN over UDP and TCP (own CA, tls-crypt, users sign in with name + password; `.ovpn` download per user; Omnitun clients get a sing-box JSON subscription that includes OpenVPN). Trojan/Hysteria2/TUIC use a generated self-signed certificate (links carry `insecure=1`).
-- **Users:** every user gets credentials for every protocol and **one subscription URL** (`http://host:port/<random path>/<token>`) that returns all links in failover order with `subscription-userinfo` (quota, expiry), `profile-update-interval` and `profile-title` headers. The Omnitun client imports it as a group.
-- **Live changes:** CLI and TUI edit the same state file; `run` reloads within 2 s and removes expired users each minute.
-- **TUI** (Bubble Tea): user table (status, expiry, quota, note), add / enable-disable / expiry / quota / note / new credentials / delete, per-user view with QR codes for the subscription and each link, protocol on/off and ports.
-- **Storage:** one JSON file (`state.json`, mode 0600) with atomic writes — enough for personal/small servers; SQLite only if user counts grow.
-- **Verified:** every generated link connects through the Omnitun client engine to the generated server (all 5 protocols, offline test); real `run` served a subscription and browsing worked through it.
+- **Protocols** come from one registry (`core/protocols`, shared with the client): VLESS+Reality, Shadowsocks-2022, Trojan, Hysteria2, TUIC, AnyTLS, ShadowTLS v3, NaiveProxy (the subscription pins the self-signed certificate; certificates are 90-day and renewed on start), OpenVPN UDP/TCP (own CA, tls-crypt, name + password, `.ovpn` per user). Trojan/Hysteria2/TUIC/AnyTLS use a generated self-signed certificate (links carry `insecure=1`).
+- **Users:** every user gets credentials for every protocol and **one subscription URL** returning all links in failover order, with `Subscription-Userinfo` (real monthly usage, quota, expiry), `profile-update-interval` and `profile-title`. The Omnitun client imports it as a group.
+- **Accounting:** per-user traffic (month and lifetime), live connections and speed (`stats.json`); the monthly quota blocks a user at the cap until the month rolls over, the quota is raised or the usage is reset.
+- **Web API:** OpenAPI at `/openapi.json`, docs at `/docs`, bearer token read live (rotation or disable applies within ~2 s); loopback by default.
+- **Storage:** `state.json` (0600), atomic writes under a cross-process file lock; backup/restore as tar.gz.
+- **Verified:** every generated profile connects through the Omnitun client engine to the generated server (all protocols, offline test); traffic is counted end to end through a real client connection; Tor/others verified on the phone.
 
-Still to do on the server: see the checklist in §7 (traffic accounting, ACME certificates, HTTPS subscriptions, WireGuard/AmneziaWG/OpenVPN/IKEv2/SSTP/Tor bridges, firewall setup, installer).
+Still to do on the server: see Phase 8 (wizard, v2ray/xray import, ACME, more server protocols, installer, firewall, per-protocol traffic and logs, OpenVPN accounting).
 
 ---
 
@@ -244,19 +249,24 @@ omnitun/
 ├─ app/                    Flutter client (Android + Windows; iOS/macOS/Linux scaffolded)
 │  └─ android/…/kotlin/    VpnService, platform glue for the Go core
 ├─ core/                   Go client core
-│  ├─ profile/ importer/   profile model; share links, subscriptions, .conf
+│  ├─ profile/ importer/   profile model; share links, subscriptions, configs → profiles
+│  ├─ links/               profiles → share links (reverse of importer)
+│  ├─ protocols/           protocol registry shared with the server (Spec, server inbound, client profile)
 │  ├─ singbox/             profiles → sing-box config
-│  ├─ engine/              tunnel, handshake + progress, failover, latency
+│  ├─ engine/              tunnel, handshake + progress, failover, latency, Tor/AWG/SSTP/IKEv2 runs
+│  ├─ awg/ classicvpn/     AmneziaWG, SSTP + IKEv2 (veepin)
+│  ├─ tor/                 Arti process manager + bridge transports
+│  ├─ nordlynx/ subscription/ netcheck/
 │  ├─ control/             UI ↔ core protocol (JSON lines over loopback)
-│  ├─ netcheck/ subscription/
 │  └─ mobile/              gomobile entry point (Android)
 ├─ cmd/omnitun-svc/        desktop core daemon
 ├─ cmd/omnitun/            developer CLI
-├─ cmd/omnitun-server/     server CLI
-├─ server/                 store, serverconf (inbounds/links/subscriptions), runtime, tui, qrterm
-├─ tor/                    Rust crate for Arti (C ABI stub so far)
-├─ tools/devserver/        local Shadowsocks server for device tests
-├─ scripts/                go.ps1 (build tags), build-android-core.sh
+├─ cmd/omnitun-server/     server CLI (cobra)
+├─ server/                 manager (service layer), api (huma), tui, store, stats, serverconf, runtime, qrterm
+├─ tor/                    Rust: omnitun-tor (Arti behind a local SOCKS5 port)
+├─ third_party/veepin/     patched pure-Go SSTP/IKEv2 (see PATCHES.md)
+├─ tools/                  devserver, awgdev, sstpdev: local servers for device tests
+├─ scripts/                go.ps1 (build tags), build-android-core.sh, build-android-tor.sh, build-android-release.sh
 └─ .github/workflows/      CI
 ```
 
@@ -267,6 +277,27 @@ omnitun/
 `[x]` done (and tested) · `[ ]` left. Device tests ran on a Samsung A30s (Android 11).
 
 **Priority (2026-10-15): mobile first.** Android, core, server and shared UI items come first; Phase 3 (Windows VPN) is deferred until everything else is done.
+
+### Status board (2026-10-16)
+
+**Working today (tested; on-device parts on a Samsung A30s, Android 11):** the client core with 20+ link/config formats; Android app with VpnService, failover, subscriptions, split tunneling, local-network bypass, release APKs; protocols WireGuard, AmneziaWG, OpenVPN, VLESS/VMess/Trojan/Shadowsocks/Hysteria/Hysteria2/TUIC/AnyTLS/ShadowTLS/SSH/Naive, SSTP, IKEv2, NordLynx subscriptions and Tor (Snowflake bridge verified in Iran); the server with 10 protocols, users, quotas, accounting, CLI, TUI, web API, backup; one protocol registry shared by server and client.
+
+**What is left, in the order I would do it**
+
+1. **Server, finishing (current focus)** — Phase 8:
+   - `init` wizard and v2ray/xray config import (easy setup);
+   - ACME certificates and HTTPS for the subscription and the API;
+   - more server protocols as registry entries: WireGuard/AmneziaWG, Tor bridge, IKEv2/SSTP;
+   - `install` command with firewall/NAT and the systemd unit; server release binaries;
+   - traffic per protocol, server logs (API + TUI), OpenVPN per-user accounting.
+2. **Protocol layer, finishing** — Phases 1 and 5: client-side forms generated from the registry (profile editor), Xray JSON / SIP008 import, OpenVPN XOR/Stunnel, Stealth (WireGuard over TLS), AmneziaWG 2.0, IKEv2 against a real strongSwan, Lightway (low priority), L2TP (deferred).
+3. **App GUI** — Phase 7 (Mullvad-style, very simple, country shown, no footer) with the Phase 4/6 items that need UI: Tor bridge settings and exit country, profile editor and share/QR, onboarding, typed translatable errors, strategies (lowest latency, round-robin), subscription secrets in the keystore, fetching subscriptions through the tunnel.
+4. **Android leftovers** — Phase 2: always-on VPN / start on boot, AAB for Google Play; Tor binaries for armeabi-v7a and x86_64 are built but untested.
+5. **Polish and release** — Phase 9: translations with RTL, routing rules and the bypass-list file, CI builds (APK, Windows, server), third-party notices, signed releases (GitHub, F-Droid), user docs.
+6. **Windows (deferred by decision)** — Phase 3: service for TUN mode, tray, kill switch, installer and signing.
+7. **Later** — iOS/macOS (NetworkExtension), Linux desktop client.
+
+**Known limits and debt:** pion pinned for Snowflake (see the dependency note); built-in obfs4/meek bridges unusable from Iran (custom bridges untested); OpenVPN traffic is not counted per user; the web API has no TLS of its own; the registry's `Option`s are not used by any form yet; CLI install story is "copy the binary" until the installer exists.
 
 ### Phase 0 — Bootstrap ✅
 - [x] Monorepo: Go module, Rust `tor` crate, Flutter app, CI workflow, MIT license
@@ -281,10 +312,12 @@ omnitun/
 - [x] Desktop bridge: `omnitun-svc` daemon + control protocol, lease, parent-death exit
 - [x] Android bridge: gomobile `core/mobile` + Kotlin `VpnService` (minSdk 29)
 - [x] Importer: Clash / Clash.Meta YAML (`proxies:`), sing-box JSON (outbounds + WireGuard endpoints) — also as subscription bodies
-- [ ] Importer: Xray JSON, `.ovpn`, SIP008, `naive+https://`, Tor bridge lines
+- [x] Importer: `.ovpn`, `naive+https://`, Tor bridge lines and `tor://` links
+- [ ] Importer: Xray/V2Ray JSON (also for importing an existing server's users), SIP008
 - [x] AmneziaWG engine on Android (amneziawg-go 1.x params Jc/Jmin/Jmax/S1/S2/H1-H4; handshake check, traffic, failover to the next profile; dev server `tools/awgdev`) — verified on device: handshake, ping through tunnel, notification speed, failover to the next profile
 - [ ] AmneziaWG 2.0 params (S3/S4, I1-I5) — reported as unsupported for now; AmneziaWG on desktop (Windows phase)
-- [ ] Profile editor (create/edit a profile by hand) and export as link/QR
+- [x] Export a profile as a share link (`core/links`, round-trip tested)
+- [ ] Profile editor in the app (create/edit by hand, form generated from the protocol registry) and share/QR from the app
 
 ### Phase 2 — Android
 - [x] VPN consent dialog, foreground notification with Disconnect, `onRevoke`
@@ -367,7 +400,7 @@ Done so far
 Step 1 — one service layer for every front end
 - [x] `server/manager`: every operation (init, protocols, users, links, status, reload) as typed methods with JSON-tagged results; the CLI, the TUI and the web API only call it, so they always behave the same
 - [x] **CLI on cobra** (help, shell completion, `--json` output, `--data`, consistent errors); same commands as today
-- [x] **Web API on huma + chi** (OpenAPI 3 generated, validation, `/docs`): `/api/v1/server`, `/protocols`, `/users`, `/users/{name}` (get, patch, delete), `/users/{name}/reset`, `/users/{name}/links`, `/users/{name}/ovpn/{proto}`, `/reload`; bearer token (`omnitun-server api token`), listens on 127.0.0.1 by default, optional TLS; started by `run`
+- [x] **Web API on huma + chi** (OpenAPI 3 generated, validation, `/docs`): `/api/v1/server`, `/protocols`, `/users`, `/users/{name}` (get, patch, delete), `/users/{name}/reset`, `/users/{name}/links`, `/users/{name}/ovpn/{proto}`, `/reload`; bearer token (`omnitun-server api token`), listens on 127.0.0.1 by default; started by `run`. **TLS for the API itself is not built in yet** (use an SSH tunnel or a reverse proxy; the server warns when it listens publicly)
 - [x] **TUI on Bubble Tea** (+ bubbles, huh form for adding users): same features through the manager, tabs for Users / Protocols / Server, API token view; per-user traffic and logs come with Step 2
 - [x] Tests for the manager, the API (httptest, incl. live token rotation) and the TUI; CLI checked by hand (exit codes 2/3/4 for invalid/not found/conflict)
 - [x] CLI tests (cobra command tree against a temp data dir)
