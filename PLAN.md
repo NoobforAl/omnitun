@@ -276,21 +276,27 @@ omnitun/
 
 **Priority (2026-10-15): mobile first.** Android, core, server and shared UI items come first; Phase 3 (Windows VPN) is deferred until everything else is done.
 
-### Status board (2026-10-16)
+### Status board (2026-10-16, end of day)
 
-**Working today (tested; on-device parts on a Samsung A30s, Android 11; the Linux-only server parts only with fakes, never on a real Linux host):** the client core with 20+ link/config formats; Android app with VpnService, failover, subscriptions, split tunneling, local-network bypass, release APKs; protocols WireGuard, AmneziaWG, OpenVPN, VLESS/VMess/Trojan/Shadowsocks/Hysteria/Hysteria2/TUIC/AnyTLS/ShadowTLS/SSH/Naive, SSTP, IKEv2, NordLynx subscriptions and Tor (Snowflake bridge verified in Iran); the server with 14 protocols (SSTP, IKEv2 and AmneziaWG off by default), users, quotas, accounting, CLI, TUI, web API, backup, ACME, wizard, Xray import and installer; the profile editor in the core (forms for 16 protocols); one protocol registry shared by server and client.
+**Working today (tested; on-device parts on a Samsung A30s, Android 11; the Linux-only server parts only with fakes, never on a real Linux host):** the client core with 20+ link/config formats; the Android app with VpnService, failover, subscriptions (also through the VPN), split tunneling, bypass lists, local-network bypass, always-on VPN, release APKs; the **Mullvad-style UI** (one screen, no footer, country list, Automatic, exit address and country on request), profile editor, share/QR, onboarding, **five languages with right-to-left layout**; protocols WireGuard, AmneziaWG 1.x, OpenVPN, VLESS/VMess/Trojan/Shadowsocks/Hysteria/Hysteria2/TUIC/AnyTLS/ShadowTLS/SSH/Naive, SSTP, IKEv2, NordLynx subscriptions and Tor (Snowflake verified in Iran); the server with 14 protocols (SSTP, IKEv2 and AmneziaWG off by default), users, quotas and per-user accounting for every protocol except OpenVPN, CLI, TUI, web API, backup, ACME, wizard, Xray import and installer; one protocol registry shared by server and client; user docs, CI and a notices generator.
+
+**Not verified (cannot be done from this PC, or needs a person):**
+
+* the **real Linux host**: kernel TUN + NAT for SSTP/IKEv2/AmneziaWG, `install`/`firewall`, ACME against a real CA, the Linux server binaries (built, never run); IKEv2 against a real strongSwan/Windows/iOS peer;
+* on the phone: QR scanning with the camera, importing a file through the system picker (my automation could not select a file), onboarding (the phone has servers), "only these" bypass mode, address-range bypass, Chinese and Arabic screens, the lockdown switch ("Block connections without VPN"), Tor on armeabi-v7a/x86_64, custom Tor bridge lines;
+* the translations were written by me and need a native reader; the GitHub workflow has never run.
 
 **What is left, in the order I would do it**
 
-1. **Server — done except** (Phase 8): OpenVPN per-user accounting (upstream limit), per-user/per-protocol counters for SSTP/IKEv2/AmneziaWG, server release binaries, and a run of the Linux-only parts (kernel TUN + NAT, installer, firewall, ACME against a real CA) on a real host.
-2. **Protocol layer — done except** (Phases 1 and 5): OpenVPN XOR/Stunnel and AmneziaWG 2.0 (both blocked upstream), IKEv2 against a real strongSwan/Windows/iOS peer, Stealth (WireGuard over TLS), Lightway (low priority), L2TP (deferred), registry `Option`s driving the wizard and the server form.
-3. **App GUI (current focus)** — Phase 7 (Mullvad-style, very simple, country shown, no footer) with the Phase 4/6 items that need UI: Tor bridge settings and exit country, profile editor and share/QR, onboarding, typed translatable errors, strategies (lowest latency, round-robin), subscription secrets in the keystore, fetching subscriptions through the tunnel.
-4. **Android leftovers** — Phase 2: upload to Google Play (the AAB builds; needs a Play signing and listing decision); Tor binaries for armeabi-v7a and x86_64 are built but untested.
-5. **Polish and release** — Phase 9: translations with RTL, routing rules and the bypass-list file, CI builds (APK, Windows, server), third-party notices, signed releases (GitHub, F-Droid), user docs.
-6. **Windows (deferred by decision)** — Phase 3: service for TUN mode, tray, kill switch, installer and signing.
+1. **Read, try and correct** what is listed as not verified above (a person with a Linux VPS and the phone: about an hour).
+2. **Release**: a GitHub release job (signed APKs, server binaries, notices; needs the signing key as a secret), notices inside the app, CI builds for APK and Windows, F-Droid; upload to Google Play (needs a signing and listing decision).
+3. **Server**: OpenVPN per-user accounting (upstream limit: needs sing-box support or a management-interface reader), live speed for the host protocols.
+4. **Protocol layer**: OpenVPN XOR/Stunnel and AmneziaWG 2.0 (both blocked upstream: sing-box 1.14.3 and amneziawg-go 1.0.4), Stealth (WireGuard over TLS), Lightway (low priority), L2TP (deferred).
+5. **App polish**: quiet Snowflake's logging, translate the core's own messages (they are English), country names in the user's language, an app lock with the keystore decision (see Phase 4).
+6. **Windows (deferred by decision)** — Phase 3: service for TUN mode, tray (the "mini window" popup), kill switch, installer and signing.
 7. **Later** — iOS/macOS (NetworkExtension), Linux desktop client.
 
-**Known limits and debt:** pion pinned for Snowflake (see the dependency note); built-in obfs4/meek bridges unusable from Iran (custom bridges untested); OpenVPN traffic is not counted per user; ACME untested against a real CA; the registry's `Option`s are not used by any form yet; CLI install story is "copy the binary" until the installer exists.
+**Known limits and debt:** pion pinned for Snowflake (see the dependency note); built-in obfs4/meek bridges unusable from Iran (custom bridges untested); OpenVPN traffic is not counted per user; messages that the core writes (validation, bypass-list problems) are English; the app has no GeoIP database (country = what the user set, what the exit lookup saw, or a guess from the name).
 
 ### Phase 0 — Bootstrap ✅
 - [x] Monorepo: Go module, Rust `tor` crate, Flutter app, CI workflow, MIT license
