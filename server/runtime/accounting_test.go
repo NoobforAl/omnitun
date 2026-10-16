@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -23,6 +24,23 @@ import (
 	"github.com/NoobforAl/omnitun/server/stats"
 	"github.com/NoobforAl/omnitun/server/store"
 )
+
+// tempDir is t.TempDir with a cleanup that retries: on Windows a file that
+// sing-box just closed can stay locked for a moment, which fails t.TempDir's
+// own cleanup.
+func tempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "omnitun-runtime-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		for i := 0; i < 40 && os.RemoveAll(dir) != nil; i++ {
+			time.Sleep(50 * time.Millisecond)
+		}
+	})
+	return dir
+}
 
 // loadState reads the state file, retrying: on Windows a read can fail for a
 // moment while the file is being replaced.
@@ -91,7 +109,7 @@ func TestUserAccountingAndQuota(t *testing.T) {
 	}
 	p := res.Profiles[0]
 	proxyPort := freeTCP(t)
-	e := engine.New(engine.Config{DataDir: t.TempDir()})
+	e := engine.New(engine.Config{DataDir: tempDir(t)})
 	if err := e.Start(p.AsSlice(), singbox.Options{
 		ListenPort: proxyPort, LogLevel: "error", ProxyPrivate: true, Selected: p.ID, TestURL: web.URL + "/probe",
 	}); err != nil {
@@ -220,7 +238,7 @@ func TestWireGuardTrafficIsCountedForTheUser(t *testing.T) {
 		t.Fatal("no WireGuard profile")
 	}
 	proxyPort := freeTCP(t)
-	e := engine.New(engine.Config{DataDir: t.TempDir()})
+	e := engine.New(engine.Config{DataDir: tempDir(t)})
 	if err := e.Start(p.AsSlice(), singbox.Options{
 		ListenPort: proxyPort, LogLevel: "error", ProxyPrivate: true, Selected: p.ID, TestURL: web.URL + "/probe",
 	}); err != nil {

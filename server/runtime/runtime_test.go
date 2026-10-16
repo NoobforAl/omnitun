@@ -69,7 +69,7 @@ func setup(t *testing.T) (*store.Store, *Server) {
 	t.Cleanup(decoy.Close)
 	_, decoyPort, _ := net.SplitHostPort(decoy.Listener.Addr().String())
 
-	s := store.Open(t.TempDir())
+	s := store.Open(tempDir(t))
 	_, err := store.Init(s, store.InitOptions{
 		Name:       "Test",
 		PublicHost: "127.0.0.1",
@@ -158,7 +158,7 @@ func TestGeneratedProfilesConnect(t *testing.T) {
 				t.Skip("naive client needs -tags with_naive_outbound (see naive_test.go)")
 			}
 			proxyPort := freeTCP(t)
-			e := engine.New(engine.Config{DataDir: t.TempDir()})
+			e := engine.New(engine.Config{DataDir: tempDir(t)})
 			if err := e.Start(p.AsSlice(), singbox.Options{
 				ListenPort: proxyPort, LogLevel: "error", ProxyPrivate: true,
 				Selected: p.ID, TestURL: web.URL + "/probe",

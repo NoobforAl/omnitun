@@ -54,7 +54,7 @@ func TestACMEConfigIsAcceptedBySingBox(t *testing.T) {
 // The subscription endpoint serves HTTPS under ACME, with the self-signed
 // certificate until the first real one exists.
 func TestSubscriptionOverHTTPSWithACME(t *testing.T) {
-	s := store.Open(t.TempDir())
+	s := store.Open(tempDir(t))
 	m := manager.New(s)
 	if _, err := m.Init(manager.InitOptions{PublicHost: "127.0.0.1", SubPort: freeTCP(t)}); err != nil {
 		t.Fatal(err)

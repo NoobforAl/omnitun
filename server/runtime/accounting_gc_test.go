@@ -57,7 +57,7 @@ func TestClosedConnectionIsCountedEvenIfAGCEmptiesTheList(t *testing.T) {
 	}
 	p := res.Profiles[0]
 	proxyPort := freeTCP(t)
-	e := engine.New(engine.Config{DataDir: t.TempDir()})
+	e := engine.New(engine.Config{DataDir: tempDir(t)})
 	if err := e.Start(p.AsSlice(), singbox.Options{
 		ListenPort: proxyPort, LogLevel: "error", ProxyPrivate: true, Selected: p.ID, TestURL: web.URL + "/probe",
 	}); err != nil {
