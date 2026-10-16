@@ -130,6 +130,21 @@ class ConnectOptions {
   final bool bypassOnly;
 }
 
+/// Where the tunnel exits, as a public service sees it.
+class ExitInfo {
+  const ExitInfo(this.ip, [this.country]);
+
+  final String ip;
+
+  /// ISO 3166-1 alpha-2 code, or null when the service did not say.
+  final String? country;
+
+  factory ExitInfo.fromJson(Map<String, dynamic> j) {
+    final c = j['country'] as String?;
+    return ExitInfo(j['ip'] as String, c == null || c.isEmpty ? null : c);
+  }
+}
+
 /// One line of a bypass list that cannot be used.
 class BypassIssue {
   const BypassIssue(this.line, this.text, this.message);
@@ -387,6 +402,10 @@ abstract class VpnEngine {
   /// applies them to a copy of [profile] when editing. Throws [EngineException]
   /// with a message for the user when a value is wrong.
   Future<ProfileInfo> buildProfile(Map<String, String> values, {String? protocol, ProfileInfo? profile});
+
+  /// Asks a public service, through the running tunnel, which address and country it sees.
+  /// Throws [EngineException] when no tunnel can carry the request or the service fails.
+  Future<ExitInfo> exitInfo();
 
   /// Checks the text of a bypass list: what it holds and which lines cannot be used.
   Future<BypassReport> parseBypass(String text);

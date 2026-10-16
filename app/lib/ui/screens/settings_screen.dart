@@ -52,6 +52,12 @@ class SettingsScreen extends ConsumerWidget {
             onChanged: (v) => ctrl.update((s) => s.copyWith(autoFailover: v)),
           ),
           SwitchListTile(
+            title: Text(l.exitTitle),
+            subtitle: Text(l.exitHint),
+            value: s.showExit,
+            onChanged: (v) => ctrl.update((s) => s.copyWith(showExit: v)),
+          ),
+          SwitchListTile(
             title: Text(l.bypassLan),
             subtitle: Text(l.bypassLanHint),
             value: s.bypassLan,

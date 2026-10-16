@@ -174,6 +174,20 @@ void main() {
     );
   }, skip: exe == null ? 'omnitun-svc not built' : false, timeout: const Timeout(Duration(seconds: 60)));
 
+  test('the exit lookup refuses without a tunnel (it would describe this device, not the VPN)', () async {
+    final dir = await Directory.systemTemp.createTemp('omnitun-test');
+    final engine = await DaemonEngine.launch(exe!, controlFile: '${dir.path}${Platform.pathSeparator}control.json');
+    addTearDown(() async {
+      engine.dispose();
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await dir.delete(recursive: true).catchError((_) => dir);
+    });
+    await expectLater(
+      engine.exitInfo(),
+      throwsA(isA<EngineException>().having((e) => e.code, 'code', 'NOT_RUNNING')),
+    );
+  }, skip: exe == null ? 'omnitun-svc not built' : false, timeout: const Timeout(Duration(seconds: 60)));
+
   test('the core checks a bypass list; the connect request carries it', () async {
     final dir = await Directory.systemTemp.createTemp('omnitun-test');
     final engine = await DaemonEngine.launch(exe!, controlFile: '${dir.path}${Platform.pathSeparator}control.json');

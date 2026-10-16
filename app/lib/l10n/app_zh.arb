@@ -354,5 +354,8 @@
   "hpTrustCert": "信任此证书，而不是系统的证书颁发机构",
   "hpWhichBrowser": "模仿哪个浏览器的 TLS 握手",
   "hpWarpReserved": "三个数字，与 WARP 配置中的写法一致",
-  "hpOneBridgePerLine": "每行一个网桥，与 torrc 相同但不带“Bridge ”"
+  "hpOneBridgePerLine": "每行一个网桥，与 torrc 相同但不带“Bridge ”",
+  "exitTitle": "显示出口地址和国家",
+  "exitHint": "连接后，通过 VPN 向 api.country.is 询问它看到的地址和国家。默认关闭。",
+  "exitIpLabel": "IP {ip}"
 }

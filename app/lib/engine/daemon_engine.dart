@@ -265,6 +265,9 @@ class DaemonEngine implements VpnEngine {
   }
 
   @override
+  Future<ExitInfo> exitInfo() async => ExitInfo.fromJson(await _call('exit_info') as Map<String, dynamic>);
+
+  @override
   Future<BypassReport> parseBypass(String text) async =>
       BypassReport.fromJson(await _call('parse_bypass', {'text': text}) as Map<String, dynamic>);
 

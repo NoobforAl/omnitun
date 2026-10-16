@@ -56,6 +56,7 @@ class _OmnitunAppState extends ConsumerState<OmnitunApp> {
   Widget build(BuildContext context) {
     // Collect core logs from startup, not only once the Logs tab is opened.
     ref.listen(logsProvider, (_, _) {});
+    ref.watch(exitProvider); // looks up the exit address after each connection, when switched on
     final theme = ref.watch(settingsProvider.select((s) => s.theme));
     final language = ref.watch(settingsProvider.select((s) => s.language));
     return MaterialApp(

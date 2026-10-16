@@ -665,5 +665,15 @@
   "hpTrustCert": "Trust this certificate instead of the system's authorities",
   "hpWhichBrowser": "Which browser's TLS handshake to imitate",
   "hpWarpReserved": "Three numbers, as WARP configurations list them",
-  "hpOneBridgePerLine": "One bridge per line, as in a torrc without \"Bridge \""
+  "hpOneBridgePerLine": "One bridge per line, as in a torrc without \"Bridge \"",
+  "exitTitle": "Show exit address and country",
+  "exitHint": "After connecting, asks api.country.is, through the VPN, which address and country it sees. Off by default.",
+  "exitIpLabel": "IP {ip}",
+  "@exitIpLabel": {
+    "placeholders": {
+      "ip": {
+        "type": "String"
+      }
+    }
+  }
 }

@@ -164,11 +164,33 @@ class CountryOverrides extends Notifier<Map<String, String>> {
 
 final countryOverridesProvider = NotifierProvider<CountryOverrides, Map<String, String>>(CountryOverrides.new);
 
-/// The country of a profile: the user's choice, else a guess from its name and address.
+/// Countries seen when connected (the exit lookup), by profile ID.
+class LearnedCountries extends Notifier<Map<String, String>> {
+  static const _key = 'learned_countries';
+
+  @override
+  Map<String, String> build() {
+    final saved = ref.read(storeProvider).read<Map<String, dynamic>>(_key) ?? const {};
+    return {for (final e in saved.entries) e.key: e.value as String};
+  }
+
+  void learn(String id, String code) {
+    if (state[id] == code) return;
+    final next = {...state, id: code};
+    state = next;
+    ref.read(storeProvider).write(_key, next);
+  }
+}
+
+final learnedCountriesProvider = NotifierProvider<LearnedCountries, Map<String, String>>(LearnedCountries.new);
+
+/// The country of a profile: the user's choice, else the one seen when connected, else a guess
+/// from its name and address.
 final profileCountryProvider = Provider<String? Function(ProfileInfo)>((ref) {
   final overrides = ref.watch(countryOverridesProvider);
+  final learned = ref.watch(learnedCountriesProvider);
   final guesses = <String, String?>{};
-  return (p) => overrides[p.id] ?? guesses.putIfAbsent(p.id, () => guessCountry(p));
+  return (p) => overrides[p.id] ?? learned[p.id] ?? guesses.putIfAbsent(p.id, () => guessCountry(p));
 });
 
 /// The profile to start with and the ones to fall back to, for the current choice.
@@ -246,6 +268,47 @@ class ConnectionController extends Notifier<EngineState> {
 
 final connectionProvider =
     NotifierProvider<ConnectionController, EngineState>(ConnectionController.new);
+
+/// What the exit lookup found for the current connection (null until it did, or when it is off).
+class ExitController extends Notifier<ExitInfo?> {
+  int _generation = 0;
+
+  @override
+  ExitInfo? build() {
+    ref.listen(connectionProvider.select((s) => (s.status, s.activeProfileId)), (prev, next) {
+      final (status, id) = next;
+      if (status != ConnStatus.connected) {
+        _generation++;
+        if (state != null) state = null;
+        return;
+      }
+      // Once per connection (and again after a failover moved it).
+      if (prev?.$1 == ConnStatus.connected && prev?.$2 == id) return;
+      _lookup(id);
+    });
+    return null;
+  }
+
+  Future<void> _lookup(String? profileId) async {
+    if (!ref.read(settingsProvider).showExit) return;
+    final generation = ++_generation;
+    state = null;
+    try {
+      final info = await ref.read(engineProvider).exitInfo();
+      if (generation != _generation) return; // connected elsewhere, or disconnected, meanwhile
+      state = info;
+      // Tor's exit changes with every circuit, so it says nothing about the profile.
+      final profile = ref.read(profilesProvider).where((p) => p.id == profileId).firstOrNull;
+      if (info.country != null && profile != null && profile.protocol != 'tor') {
+        ref.read(learnedCountriesProvider.notifier).learn(profile.id, info.country!);
+      }
+    } catch (_) {
+      // The address is a nicety; a failed lookup shows nothing.
+    }
+  }
+}
+
+final exitProvider = NotifierProvider<ExitController, ExitInfo?>(ExitController.new);
 
 class LogsController extends Notifier<List<String>> {
   static const _max = 500;
@@ -360,6 +423,7 @@ class SettingsState {
     this.splitApps = const [],
     this.theme = 'dark',
     this.language = '',
+    this.showExit = false,
   });
 
   static const defaultRemoteDns = 'https://1.1.1.1/dns-query';
@@ -392,6 +456,9 @@ class SettingsState {
   /// The app's language: a code from l10n.dart's supportedLanguages, or '' for the system's.
   final String language;
 
+  /// After connecting, ask a public service (through the VPN) for the exit address and country.
+  final bool showExit;
+
   SettingsState copyWith({
     bool? tunMode,
     bool? systemProxy,
@@ -404,6 +471,7 @@ class SettingsState {
     List<String>? splitApps,
     String? theme,
     String? language,
+    bool? showExit,
   }) =>
       SettingsState(
         tunMode: tunMode ?? this.tunMode,
@@ -417,6 +485,7 @@ class SettingsState {
         splitApps: splitApps ?? this.splitApps,
         theme: theme ?? this.theme,
         language: language ?? this.language,
+        showExit: showExit ?? this.showExit,
       );
 
   Map<String, dynamic> toJson() => {
@@ -431,6 +500,7 @@ class SettingsState {
         'split_apps': splitApps,
         'theme': theme,
         'language': language,
+        'show_exit': showExit,
       };
 
   /// Missing keys keep the values from [defaults].
@@ -446,6 +516,7 @@ class SettingsState {
         splitApps: [for (final a in (j['split_apps'] as List? ?? const [])) a as String],
         theme: j['theme'] as String? ?? defaults.theme,
         language: j['language'] as String? ?? defaults.language,
+        showExit: j['show_exit'] as bool? ?? defaults.showExit,
       );
 }
 

@@ -159,7 +159,9 @@ class _HeroState extends ConsumerState<_Hero> {
     final profiles = ref.watch(profilesProvider);
     final active = profiles.where((p) => p.id == s.activeProfileId).firstOrNull;
     final connected = s.status == ConnStatus.connected;
-    final code = active == null ? null : countryOf(active);
+    final exit = ref.watch(exitProvider);
+    // The country the service saw is the truth; the guess is the fallback.
+    final code = active?.protocol == 'tor' ? null : exit?.country ?? (active == null ? null : countryOf(active));
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -211,6 +213,15 @@ class _HeroState extends ConsumerState<_Hero> {
                 ],
               ),
             const SizedBox(height: 4),
+            if (exit != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  context.l10n.exitIpLabel(exit.ip),
+                  textDirection: TextDirection.ltr,
+                  style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ),
             Text(
               active.name,
               style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),

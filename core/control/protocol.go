@@ -50,6 +50,7 @@ const (
 	CodeNotRunning         = "NOT_RUNNING"
 	CodeSubscriptionFailed = "SUBSCRIPTION_FAILED"
 	CodeAuthFailed         = "AUTH_FAILED"
+	CodeLookupFailed       = "LOOKUP_FAILED"
 )
 
 // Error is a typed failure.

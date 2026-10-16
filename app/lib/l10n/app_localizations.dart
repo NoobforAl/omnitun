@@ -2233,6 +2233,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'One bridge per line, as in a torrc without \"Bridge \"'**
   String get hpOneBridgePerLine;
+
+  /// No description provided for @exitTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show exit address and country'**
+  String get exitTitle;
+
+  /// No description provided for @exitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After connecting, asks api.country.is, through the VPN, which address and country it sees. Off by default.'**
+  String get exitHint;
+
+  /// No description provided for @exitIpLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'IP {ip}'**
+  String exitIpLabel(String ip);
 }
 
 class _AppLocalizationsDelegate

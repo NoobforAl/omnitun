@@ -354,5 +354,8 @@
   "hpTrustCert": "به‌جای مراجع سیستم، به این گواهی اعتماد کن",
   "hpWhichBrowser": "هندشیک TLS کدام مرورگر تقلید شود",
   "hpWarpReserved": "سه عدد، همان‌طور که در پیکربندی‌های WARP آمده است",
-  "hpOneBridgePerLine": "در هر خط یک پل، مانند torrc ولی بدون «Bridge »"
+  "hpOneBridgePerLine": "در هر خط یک پل، مانند torrc ولی بدون «Bridge »",
+  "exitTitle": "نمایش نشانی و کشور خروجی",
+  "exitHint": "پس از اتصال، از طریق VPN از api.country.is می‌پرسد چه نشانی و کشوری می‌بیند. به‌طور پیش‌فرض خاموش است.",
+  "exitIpLabel": "IP‎ {ip}"
 }

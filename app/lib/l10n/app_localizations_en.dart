@@ -1290,4 +1290,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get hpOneBridgePerLine =>
       'One bridge per line, as in a torrc without \"Bridge \"';
+
+  @override
+  String get exitTitle => 'Show exit address and country';
+
+  @override
+  String get exitHint =>
+      'After connecting, asks api.country.is, through the VPN, which address and country it sees. Off by default.';
+
+  @override
+  String exitIpLabel(String ip) {
+    return 'IP $ip';
+  }
 }

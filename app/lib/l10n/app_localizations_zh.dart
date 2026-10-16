@@ -1244,4 +1244,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hpOneBridgePerLine => '每行一个网桥，与 torrc 相同但不带“Bridge ”';
+
+  @override
+  String get exitTitle => '显示出口地址和国家';
+
+  @override
+  String get exitHint => '连接后，通过 VPN 向 api.country.is 询问它看到的地址和国家。默认关闭。';
+
+  @override
+  String exitIpLabel(String ip) {
+    return 'IP $ip';
+  }
 }

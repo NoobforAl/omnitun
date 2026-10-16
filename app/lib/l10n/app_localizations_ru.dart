@@ -1321,4 +1321,16 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get hpOneBridgePerLine =>
       'Один мост на строку, как в torrc, но без «Bridge »';
+
+  @override
+  String get exitTitle => 'Показывать адрес и страну выхода';
+
+  @override
+  String get exitHint =>
+      'После подключения запрашивает у api.country.is через VPN, какой адрес и какую страну он видит. По умолчанию выключено.';
+
+  @override
+  String exitIpLabel(String ip) {
+    return 'IP $ip';
+  }
 }

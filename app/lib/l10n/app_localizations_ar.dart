@@ -1337,4 +1337,16 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get hpOneBridgePerLine =>
       'جسر واحد في كل سطر كما في torrc لكن بدون «Bridge »';
+
+  @override
+  String get exitTitle => 'إظهار عنوان الخروج والبلد';
+
+  @override
+  String get exitHint =>
+      'بعد الاتصال يسأل api.country.is عبر VPN عن العنوان والبلد اللذين يراهما. متوقف افتراضيًا.';
+
+  @override
+  String exitIpLabel(String ip) {
+    return 'IP‎ $ip';
+  }
 }

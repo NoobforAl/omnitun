@@ -454,6 +454,19 @@ func (s *Server) dispatch(req Request) (any, error) {
 			return nil, &Error{Code: CodeStartFailed, Message: err.Error()}
 		}
 		return s.engine.State(), nil
+	case "exit_info":
+		p, err := decode[ExitInfoParams](req.Params)
+		if err != nil {
+			return nil, err
+		}
+		info, err := s.exitInfo(context.Background(), p)
+		if errors.Is(err, engine.ErrNoTunnel) {
+			return nil, &Error{Code: CodeNotRunning, Message: err.Error()}
+		}
+		if err != nil {
+			return nil, &Error{Code: CodeLookupFailed, Message: err.Error()}
+		}
+		return info, nil
 	case "parse_bypass":
 		p, err := decode[BypassParams](req.Params)
 		if err != nil {

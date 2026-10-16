@@ -158,6 +158,12 @@ class MockEngine implements VpnEngine {
     });
   }
 
+  /// What [exitInfo] answers (tests change it).
+  ExitInfo exit = const ExitInfo('203.0.113.77', 'NL');
+
+  @override
+  Future<ExitInfo> exitInfo() async => exit;
+
   @override
   Future<BypassReport> parseBypass(String text) async {
     // A simple count so the screens work without the core (the real rules are the core's).

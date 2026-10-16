@@ -354,5 +354,8 @@
   "hpTrustCert": "الوثوق بهذه الشهادة بدلًا من جهات النظام",
   "hpWhichBrowser": "مصافحة TLS لأي متصفح تُحاكى",
   "hpWarpReserved": "ثلاثة أرقام كما تُدرج في إعدادات WARP",
-  "hpOneBridgePerLine": "جسر واحد في كل سطر كما في torrc لكن بدون «Bridge »"
+  "hpOneBridgePerLine": "جسر واحد في كل سطر كما في torrc لكن بدون «Bridge »",
+  "exitTitle": "إظهار عنوان الخروج والبلد",
+  "exitHint": "بعد الاتصال يسأل api.country.is عبر VPN عن العنوان والبلد اللذين يراهما. متوقف افتراضيًا.",
+  "exitIpLabel": "IP‎ {ip}"
 }

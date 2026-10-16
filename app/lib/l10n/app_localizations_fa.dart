@@ -1291,4 +1291,16 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get hpOneBridgePerLine =>
       'در هر خط یک پل، مانند torrc ولی بدون «Bridge »';
+
+  @override
+  String get exitTitle => 'نمایش نشانی و کشور خروجی';
+
+  @override
+  String get exitHint =>
+      'پس از اتصال، از طریق VPN از api.country.is می‌پرسد چه نشانی و کشوری می‌بیند. به‌طور پیش‌فرض خاموش است.';
+
+  @override
+  String exitIpLabel(String ip) {
+    return 'IP‎ $ip';
+  }
 }
