@@ -47,6 +47,9 @@ Decision (2026-10-15): dependencies are chosen on technical merit; license compa
 | Lightway (Rust, Linux/macOS only today) | Separate binary, low priority |
 | Windows RAS / Android `Ikev2VpnProfile` | IKEv2, L2TP, SSTP (OS-native) |
 | strongSwan / xl2tpd / accel-ppp (server) | Installed as system packages by the server CLI |
+| sing-box `tailscale` endpoint (`with_tailscale`) | Planned (Phase 10): peer-to-peer mesh with a Tailscale or Headscale control server |
+| Nebula (in `third_party/veepin`) / WireGuard + our own coordinator | Planned (Phase 10): a mesh that needs no third-party control server |
+| DNSCrypt library (`github.com/ameshkov/dnscrypt/v2`, `dnsstamps`) | Planned (Phase 11): DNSCrypt v2 and Anonymized DNSCrypt; sing-box 1.14 has no DNSCrypt transport |
 
 Omnitun is **not tied to one core** (it doesn't use Xray at all): each protocol maps to an engine adapter (sing-box, amneziawg-go, Arti, OS-native VPN, external binary). Adding a protocol beyond the list above means adding an importer + an adapter; the UI, profiles, failover and control protocol stay the same.
 
@@ -106,6 +109,31 @@ Small, versioned, JSON-in/JSON-out C ABI (`core_start(json)`, `core_stop()`, `co
 - **Tor bridges**: Arti with obfs4/snowflake/webtunnel transports compiled into the Go core and launched as managed PTs.
 - **NordLynx**: WireGuard plus NordVPN's API — the user enters an access token, we fetch the WireGuard key and server list.
 
+### 2.4 Peer-to-peer mesh VPN (plan, Phase 10)
+
+What "p2p like a VPN" means here: devices reach **each other** directly (phone ↔ home PC ↔ a friend's phone) over encrypted WireGuard tunnels, with no VPN server in the data path when the NATs allow it; and any device can offer to be an **exit** for the others ("use my home connection"). Like Tailscale, ZeroTier or Nebula, not like a file-sharing P2P network.
+
+Three layers, built in this order so each is useful alone:
+
+1. **Join an existing mesh (client only).** A `tailscale://` profile (auth key, optional Headscale/control URL, optional exit node) runs sing-box's `tailscale` endpoint (it embeds the Tailscale client: control, DERP relays, NAT traversal, MagicDNS). Cheapest path; works with Tailscale or a self-hosted **Headscale**. Needs no new server code.
+2. **Our own coordinator in `omnitun-server`** (so a mesh does not depend on anyone's control plane, which matters where Tailscale is blocked): the server keeps the device list per user, hands each device a WireGuard key, a mesh address (a private range of our own, not the 10/8, 172.16/12, 192.168/16 ranges the VPN NAT drops) and the list of peers with their latest endpoints; devices find each other's public address with **STUN**, punch through NATs by sending to each other at the same time, and fall back to a **relay** (the server forwards the already-encrypted packets) when both sides are behind symmetric NAT or CGNAT. Data plane: WireGuard (sing-box's endpoint or amneziawg-go, so the mesh can also be obfuscated); control plane: HTTPS long-poll over the same TLS certificate and subscription port.
+3. **Exit through a friend's device.** An invite link (`omnitun://mesh?…`) gives one person the right to use my home PC or phone as an exit: opt-in on the sharing side, per-peer bandwidth and monthly caps, allow/deny lists, a visible "sharing" notification on Android, and revoke at any time. The exit device NATs the guest's traffic and drops private ranges and other guests (same rules as the server's NAT).
+
+Open questions before layer 2: ACLs (who may reach whom; start with "all my devices see each other, guests see only the exit"), DNS names for devices (`phone.mesh`), IPv6, and whether a phone may be an exit at all (battery, mobile data, store policy; default off).
+
+Another reading of "p2p" is a **volunteer network** (Snowflake/Lantern style: strangers donate bandwidth to people in censored countries). It is a different product (abuse handling, legal exposure, broker infrastructure) and is not planned here; the Snowflake client we already ship is the supported way to use one.
+
+### 2.5 DNSCrypt (plan, Phase 11)
+
+[DNSCrypt](https://www.dnscrypt.org/) encrypts **and authenticates** DNS between the client and the resolver (the resolver's public key is part of its address, so a man in the middle cannot answer), over UDP or TCP, and **Anonymized DNSCrypt** hides the client's address from the resolver by sending the query through a relay. Today the app offers DoH/DoT/TCP/UDP through one "Remote DNS" URL (`core/singbox/build.go` `dnsServer`).
+
+Design:
+- **Addresses are DNS stamps** (`sdns://…`, a compact string that holds the protocol, address, port, provider name and public key; it also covers DoH, DoT and DoQ resolvers and relays). The core parses them (`github.com/ameshkov/dnsstamps`), and the existing "Remote DNS" field accepts a stamp as well as a URL.
+- **A local DNS forwarder in the core** speaks DNSCrypt and listens on loopback (UDP and TCP); sing-box's DNS server points at it (`type: udp`, `127.0.0.1:port`) because sing-box has no DNSCrypt transport. The forwarder's own sockets go **through the tunnel** (the profile's outbound as detour) so the network sees only the VPN; with Tor it uses TCP through Arti's SOCKS port (Tor has no UDP). It fetches and caches the resolver's certificate, rotates when it expires, and refuses a resolver whose key does not match the stamp.
+- **Resolver list:** a snapshot of the public `public-resolvers.md` list (stamps, with the minisign signature checked) is bundled in the app, because GitHub (where the list lives) may be blocked; it is refreshed through the VPN. The picker shows a short curated set (no-logging, no-filtering, DNSSEC) with a country and latency, "Anonymized (through a relay)" as a switch, and "Custom stamp".
+- **Server side (optional):** `omnitun-server` can run a DNSCrypt resolver for its own users (same library), so the VPN's DNS is private and under the operator's control; keys are generated at `init` and rotated; the port is opened with `firewall`. Off by default.
+- **Failure behaviour:** if the DNSCrypt resolver cannot be reached the connection does not silently fall back to plain DNS; the home screen says "DNS unavailable" and offers the previous resolver (a setting, off = fail closed).
+
 ---
 
 ## 3. Features
@@ -164,7 +192,7 @@ Everything is normalized into one internal **Profile** model (`protocol`, `serve
 
 ### 3.5 Routing and extras (after MVP)
 
-Split tunneling (per-app on Android, per-route on Windows), bypass LAN, geoip/geosite rules, custom DNS (DoH/DoT), IPv6 on/off, MTU, latency test for all profiles, traffic statistics, logs view with export.
+Split tunneling (per-app on Android, per-route on Windows), bypass LAN, geoip/geosite rules, custom DNS (DoH/DoT now, DNSCrypt in Phase 11), IPv6 on/off, MTU, latency test for all profiles, traffic statistics, logs view with export.
 
 ---
 
@@ -194,7 +222,7 @@ omnitun-server service                         systemd unit
 - **Storage:** `state.json` (0600), atomic writes under a cross-process file lock; backup/restore as tar.gz.
 - **Verified:** every generated profile connects through the Omnitun client engine to the generated server (all protocols, offline test); traffic is counted end to end through a real client connection; Tor/others verified on the phone.
 
-Still to do on the server: see Phase 8 (wizard, v2ray/xray import, ACME, more server protocols, installer, firewall, per-protocol traffic and logs, OpenVPN accounting).
+Still to do on the server: see Phase 8 (the real-VPS checks), Phase 10 (mesh coordinator and relay) and Phase 11 (optional DNSCrypt resolver). OpenVPN accounting, live numbers and the Docker test are done.
 
 ---
 
@@ -264,7 +292,10 @@ omnitun/
 ├─ server/                 manager (service layer), api (huma), tui, store, stats, serverconf, runtime, qrterm
 ├─ tor/                    Rust: omnitun-tor (Arti behind a local SOCKS5 port)
 ├─ third_party/veepin/     patched pure-Go SSTP/IKEv2 (see PATCHES.md)
+├─ third_party/sing-openvpn/  patched copy: reports which user holds which tunnel address (see PATCHES.md)
 ├─ tools/                  devserver, awgdev, sstpdev: local servers for device tests
+├─ tools/dockertest/       `make docker-e2e`: the Linux server against real clients in Docker
+│                          (planned: core/mesh, server/mesh, core/dnscrypt; see Phases 10 and 11)
 ├─ scripts/                go.ps1 (build tags), build-android-core.sh, build-android-tor.sh, build-android-release.sh
 └─ .github/workflows/      CI
 ```
@@ -294,6 +325,7 @@ omnitun/
 1. **Read, try and correct** what is listed as not verified above (a person with a Linux VPS and the phone: about an hour).
 2. **Release**: a GitHub release job (signed APKs, server binaries, notices; needs the signing key as a secret), CI builds for APK and Windows, F-Droid; upload to Google Play (needs a signing and listing decision).
 3. **Server**: run the Docker test in CI (a job with the Docker socket), more than one user at a time, IPv6.
+3b. **New (2026-10-17), planned only, nothing written yet:** **Phase 11 DNSCrypt** first (small, self-contained, helps every user), then **Phase 10 peer-to-peer mesh** (large; layer 1 needs no server code).
 4. **Protocol layer**: OpenVPN XOR/Stunnel and AmneziaWG 2.0 (both blocked upstream: sing-box 1.14.3 and amneziawg-go 1.0.4), Stealth (WireGuard over TLS), Lightway (low priority), L2TP (deferred).
 5. **App polish**: an app lock with the keystore decision (see Phase 4).
 6. **Windows (deferred by decision)** — Phase 3: service for TUN mode, tray (the "mini window" popup), kill switch, installer and signing.
@@ -447,7 +479,7 @@ Step 3 — more protocols and setup
 - [x] NAT/forwarding setup for the host-level servers (AmneziaWG, IKEv2, SSTP): see the entry above (nftables, iptables fallback; not run on a real host)
 
 ### Phase 9 — Polish & release
-- [x] Translations (English, Persian, Russian, Chinese, Arabic) with right-to-left layout: `app/lib/l10n/app_*.arb` (355 messages each, generated classes next to them), a **Language** choice in Settings (system default or one of the five, each named in its own language; applies at once and is remembered), correct plural forms (Russian one/few/many, Arabic zero…many), Persian and Arabic mirror the layout (chevrons, back arrow, lists), addresses and examples inside right-to-left text keep their own order. The core's profile-editor labels and help texts are translated by the app (`l10n/form_text.dart`, keyed by the core's English text; a Dart test checks every label and help of the real core is covered). Tests: all languages have all messages with the same placeholders, plural rules, a smoke run of home, locations, add-server, settings and bypass in each language on a 360×760 phone (no overflow), the Settings language switch. Seen on the A30s in Persian (RTL, Samsung's own Persian font). **The core's own messages are translated too (2026-10-17):** editor problems ("Password is required"…), import and subscription failures, bypass-list line problems and Tor's progress steps now come with a code and values (`control.Error.Args`, `BypassIssue.Code`, `Progress.DetailCode`); the app translates them (`l10n/errors.dart`) and shows the core's English text for a code it does not know. Country names follow the language of the app (CLDR, `scripts/gen-country-names.py` → `state/country_names.dart`; the search matches English and local names). Tested: every code has a translation in all five languages, the real daemon's codes reach the app with their values, every country has a name. **Limits:** low-level network errors (the part after "download subscription:"), server and subscription names stay as they are; the translations were written by me and should be read by native speakers; Chinese and Arabic have not been looked at on a device
+- [x] Translations (English, Persian, Russian, Chinese, Arabic) with right-to-left layout: `app/lib/l10n/app_*.arb` (about 390 messages each, generated classes next to them), a **Language** choice in Settings (system default or one of the five, each named in its own language; applies at once and is remembered), correct plural forms (Russian one/few/many, Arabic zero…many), Persian and Arabic mirror the layout (chevrons, back arrow, lists), addresses and examples inside right-to-left text keep their own order. The core's profile-editor labels and help texts are translated by the app (`l10n/form_text.dart`, keyed by the core's English text; a Dart test checks every label and help of the real core is covered). Tests: all languages have all messages with the same placeholders, plural rules, a smoke run of home, locations, add-server, settings and bypass in each language on a 360×760 phone (no overflow), the Settings language switch. Seen on the A30s in Persian (RTL, Samsung's own Persian font). **The core's own messages are translated too (2026-10-17):** editor problems ("Password is required"…), import and subscription failures, bypass-list line problems and Tor's progress steps now come with a code and values (`control.Error.Args`, `BypassIssue.Code`, `Progress.DetailCode`); the app translates them (`l10n/errors.dart`) and shows the core's English text for a code it does not know. Country names follow the language of the app (CLDR, `scripts/gen-country-names.py` → `state/country_names.dart`; the search matches English and local names). Tested: every code has a translation in all five languages, the real daemon's codes reach the app with their values, every country has a name. **Limits:** low-level network errors (the part after "download subscription:"), server and subscription names stay as they are; the translations were written by me and should be read by native speakers; Chinese and Arabic have not been looked at on a device
 - [x] Open-source licenses inside the app: Settings → "Open-source licenses" lists every license text with the packages that use it (693 packages: Go, Dart, Rust), read from `app/assets/third_party_notices.md`, which `make notices` regenerates (`scripts/gen-notices.py`; run it after changing dependencies). Tested: the bundled file parses and covers Go, Dart and Rust; the screen opens a license; the failure text is translated
 - [x] Developer commands: `make dev-server`, `dev-tui`, `dev-web` (a local server in `.dev/server`), `dev-android` (builds the core for the phone and runs the app), `fix` (gofmt, go fix, go vet, dart fix, cargo fmt), `docker-e2e`, `notices`, `help`. `make fix` ran clean on this tree
 - [ ] Routing rules (geoip/geosite, bypass LAN, per-domain), IPv6 toggle, MTU
@@ -455,6 +487,33 @@ Step 3 — more protocols and setup
 - [x] Bypass lists (a .txt file, pasted text, a link, or typed): **Settings → Bypass lists**. Entries, one per line: `example.com` (and its subdomains), `domain:`, `full:exact.example.com`, `keyword:bank`, `regexp:…`, `1.2.3.4`, `10.0.0.0/8`, `2001:db8::/32`; `#` comments; several named lists, each on/off; "only the listed destinations use the VPN" inverts it. The core (`core/singbox/bypasslist.go`) parses and checks the text (the app shows the count and the lines it will ignore, `geosite:`/`geoip:` are refused with a hint) and builds sing-box rules: one route rule per kind of entry (direct, or the VPN in "only these" mode), matching DNS rules so listed names are resolved the same way they are reached, and the listed address ranges are also left out of the TUN's routes. Tested: parser, sing-box accepts every shape of config (proxy and TUN, both modes), a real routing test (with a dead VPN a request only works when the list sends it direct; "only these" reverses it), control protocol (`parse_bypass`, `start` with `bypass`), the app's screens and a Dart test against the real daemon. **On the A30s:** the list is checked by the core as it is typed, and with Tor connected a listed site (`ipify.org`) that had worked through Tor stopped using Tor while Tor kept working (the direct path from this network cannot reach it, so a "real IP shown" result was not obtained); "only these", address ranges and the Android route exclusion were not tried on the device. No `geosite`/`geoip` databases (not bundled); 50 000 entries at most. **Battery and CPU (2026-10-17, `core/singbox/bypassopt.go`):** a list is optimized before use (names under a listed domain, names containing a listed keyword, nested and neighbouring ranges are merged); rules run cheapest first (DNS by port 53, then address rules, and only then packet sniffing, restricted to TLS/HTTP/QUIC and used **only when the list has names**); listed ranges are left out of the VPN's routes up to a budget of 512 routes (the biggest first; before, a 50 000-range list could produce tens of thousands of routes on Android); in "only these" mode with addresses only the VPN gets just those routes (`route_address`), so other traffic never enters the tunnel. Unit-tested (optimizer, route budget, rule order, no sniffing without names) and the engine's end-to-end bypass test passes; **not measured on the phone** (no battery numbers), and the new route handling was not exercised on the device with a list (only a Tor connection with the new rules was)
 - [ ] Signed releases on GitHub (APK, Windows installer, server binaries for Linux amd64/arm64), F-Droid: the pieces exist (`scripts/build-android-release.sh` signs per-ABI APKs, `scripts/build-server-release.sh` builds the server for Linux and `omnitun-server --version` reports it, the notices generator), but nothing publishes a release; the Linux server binaries were built and checked as static ELF files, **never run**
 - [x] User docs: `docs/app.md` (the app, location list, subscriptions, bypass lists, always-on VPN, messages) and `docs/server.md` (install, protocols and ports, users and quotas, certificates, API, backup, what is and is not tested), README refreshed
+
+### Phase 10 — Peer-to-peer mesh VPN (planned, 2026-10-17; design in 2.4)
+Layer 1 — join a mesh that already exists
+- [ ] Spike (half a day): build sing-box with `with_tailscale` for Android and Windows, check the binary-size and battery cost, and connect to a Headscale instance run in Docker (`make docker-e2e` style: control server, two nodes behind two NAT routers)
+- [ ] `tailscale://` profile (auth key, control URL, hostname, exit node, accept routes) in `core/profile`, importer, links, the form schema (editor) and `core/singbox` (endpoint); `exit_node` shows in the location list as a "My devices" group
+- [ ] App: a "My devices" screen (peers, their addresses, online state, "use as exit"); MagicDNS names; works in the same Connect button flow (a mesh profile is a profile)
+- [ ] Tests: config accepted by sing-box; engine end to end against Headscale in Docker (two clients in different NAT'd networks reach each other directly, then through a relay when direct paths are blocked); device check on the A30s
+Layer 2 — our own coordinator (no third-party control server)
+- [ ] Protocol (versioned, JSON over HTTPS): enroll with a one-time key from `omnitun-server mesh invite`, long-poll for the peer list, report my endpoints; keys are WireGuard keys, the server never sees private keys
+- [ ] `server/mesh`: device registry per user, address allocation from a range of our own, peer maps, STUN endpoint (UDP 3478), relay (forwards encrypted WireGuard packets, accounted per user and capped); CLI `mesh invite|devices|revoke`, API and TUI like the other features; docs
+- [ ] `core/mesh`: NAT-type detection, endpoint discovery, simultaneous-open hole punching, path upgrade from relay to direct, keepalives that are cheap on battery (Android doze), roaming between Wi-Fi and mobile
+- [ ] Tests in Docker with NAT routers (full-cone, restricted, symmetric): direct path when possible, relay when not, a peer that changes network keeps the session
+Layer 3 — exit through a friend
+- [ ] Invite links, per-peer caps (speed, monthly bytes), allow/deny lists, a persistent notification while sharing (Android), revoke; the exit NATs and drops private ranges and other guests
+- [ ] Abuse and legal text in the app and docs (the owner of the exit is the one the internet sees)
+Cross-cutting
+- [ ] Obfuscation: carry the mesh's WireGuard over AmneziaWG parameters when the network blocks plain WireGuard; the relay also reachable over TLS (TCP 443) for UDP-hostile networks
+- [ ] Settings and onboarding copy in five languages; Windows later (Phase 3)
+
+### Phase 11 — DNSCrypt (planned, 2026-10-17; design in 2.5)
+- [ ] `core/dnscrypt`: DNS stamp parser (DNSCrypt, DoH, DoT, DoQ, relays), certificate fetch and verification, the local loopback forwarder (UDP + TCP, in-flight limits, small cache), Anonymized DNSCrypt through a relay, fail-closed option; sockets through the tunnel's outbound
+- [ ] `Options.DNS` accepts `sdns://…`; `core/singbox` points the DNS server at the forwarder; routing rules for the resolver and relay addresses so DNS never leaks around the VPN; Tor profiles use TCP only
+- [ ] Bundled signed resolver list (`scripts/gen-resolvers.py` downloads `public-resolvers.md`, checks the minisign signature, writes a Dart/Go table with country and properties); refreshed through the VPN
+- [ ] App: Settings → DNS picker (system default, Cloudflare, Quad9, a few DNSCrypt resolvers, "Anonymized" switch, custom stamp), a "DNS: DNSCrypt · <resolver>" line in the connected details, a clear error when the stamp is invalid; strings in five languages
+- [ ] Server (optional, off by default): DNSCrypt resolver for the server's users (`omnitun-server proto enable dnscrypt`, key generation and rotation, `firewall` opens the port, `link --stamp`)
+- [ ] Tests: stamp parsing against the published examples; an in-process DNSCrypt server (the library's) answers through the forwarder; a wrong provider key is rejected; relay path; a leak test (with the VPN up, no plain DNS leaves the machine: capture in Docker with `tcpdump`); on the A30s a DNS leak check
+- [ ] Docs: `docs/app.md` (what the DNS setting does and does not protect) and `docs/server.md`
 
 ### Later
 - [ ] iOS / macOS (NetworkExtension), Linux desktop client
@@ -467,13 +526,20 @@ Step 3 — more protocols and setup
 - **Arti on Android**: size and battery cost; PT executables must ship as `lib*.so` in `jniLibs` to be executable.
 - **App stores**: Google Play's VpnService policy requires declaring VPN as core functionality; some protocols may be restricted in some regions' stores → also ship via GitHub Releases / F-Droid.
 - **Windows code signing**: the driver (Wintun) is already signed; our service and installer need an EV/OV certificate for SmartScreen.
-- **Binary size**: Go core with sing-box (all protocol tags) ≈ 30–50 MB; use build tags so add-ons stay optional.
+- **Binary size**: Go core with sing-box (all protocol tags) ≈ 30–50 MB; use build tags so add-ons stay optional. The Tailscale endpoint (Phase 10) adds a lot; measure first and keep it a build tag.
+- **Mesh and censorship**: Tailscale's control servers and DERP relays are blocked in some countries; layer 1 therefore also supports Headscale, and layer 2 exists so a mesh can run on the user's own server. UDP hole punching fails behind symmetric NAT and CGNAT, which is common on mobile networks: a relay is needed, and it costs the server's bandwidth.
+- **Mesh and battery**: keeping a path to peers alive on Android (doze, background limits) conflicts with the mobile-first goal; the mesh must be opt-in and idle cheaply.
+- **Sharing an exit** makes the owner liable for what guests do; opt-in, caps and clear text are required before layer 3 ships. Google Play policy on VPN apps that relay other users' traffic needs checking.
+- **DNSCrypt reachability**: its usual ports (443, 5353) and its resolver list (GitHub) may be blocked; always keep TCP/443 and a bundled list, and test from Iran before calling it done. Unlike DoH it is not disguised as web traffic.
 
 ---
 
 **Dependency note (2026-10-16):** every Go module is at its latest release except the `pion/*` family, which is pinned to the versions Snowflake v2.15.1 builds against (`webrtc` v4.2.18, `ice` v4.4.1, `transport/v4` v4.1.0, …); newer pion releases move to `transport/v5` and break the Snowflake client. Lift the pin when Snowflake releases for it (`go list -m -u all` shows what is held). Do not run a blind `go get -u ./...`; after upgrades run `scripts/go.ps1 test ./...` and an Android vet (`GOOS=android go vet ./core/mobile`).
 
 ## 9. References
+
+- DNSCrypt: https://www.dnscrypt.org/ · protocol v2 and DNS stamps: https://dnscrypt.info/protocol and https://dnscrypt.info/stamps-specifications · resolver list: https://github.com/DNSCrypt/dnscrypt-resolvers · Go library: https://github.com/ameshkov/dnscrypt · reference client/relay/server: https://github.com/DNSCrypt/dnscrypt-proxy
+- Mesh VPNs: Tailscale's NAT traversal write-up https://tailscale.com/blog/how-nat-traversal-works · Headscale (self-hosted control server) https://github.com/juanfont/headscale · Nebula https://github.com/slackhq/nebula · sing-box `tailscale` endpoint https://sing-box.sagernet.org/configuration/endpoint/tailscale/
 
 - Lightway (Rust, AGPL-3.0): https://github.com/expressvpn/lightway
 - Arti / pluggable transports: https://blog-7551d3.pages.torproject.net/arti_110_released/ · https://docs.rs/tor-ptmgr
