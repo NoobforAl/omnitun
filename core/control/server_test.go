@@ -2,6 +2,7 @@ package control
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -226,5 +227,32 @@ func TestProfileEditorMethods(t *testing.T) {
 	}
 	if err := c.Call(t.Context(), "export_link", ProfileParams{}, nil); !errors.As(err, &ce) || ce.Code != CodeBadRequest {
 		t.Fatalf("export without a profile: %v", err)
+	}
+}
+
+// Call runs a method like a client would, without a connection (Android's
+// always-on VPN restarts the tunnel this way).
+func TestCallRunsMethodsInProcess(t *testing.T) {
+	s, _ := newTestServer(t, ServerConfig{Grace: -1})
+	res, err := importer.Import("trojan://pw@example.com:443#t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(StartParams{Profiles: res.Profiles, ListenPort: freePort(t)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Call("start", raw); err != nil {
+		t.Fatal(err)
+	}
+	if st := s.Engine().State(); st.Status != engine.StatusRunning {
+		t.Fatalf("status = %s", st.Status)
+	}
+	var ce *Error
+	if _, err := s.Call("bogus", nil); !errors.As(err, &ce) || ce.Code != CodeUnknownMethod {
+		t.Fatalf("err = %v, want UNKNOWN_METHOD", err)
+	}
+	if _, err := s.Call("start", json.RawMessage(`{"profiles": 5}`)); !errors.As(err, &ce) || ce.Code != CodeBadRequest {
+		t.Fatalf("err = %v, want BAD_REQUEST", err)
 	}
 }

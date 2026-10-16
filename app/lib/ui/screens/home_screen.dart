@@ -188,20 +188,22 @@ class _HeroState extends ConsumerState<_Hero> {
             ),
           if (connected && active != null) ...[
             const SizedBox(height: 14),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CountryFlag(code, size: 28),
-                const SizedBox(width: 10),
-                Flexible(
-                  child: Text(
-                    code == null ? 'Unknown country' : countryNames[code] ?? code,
-                    style: text.titleMedium,
-                    overflow: TextOverflow.ellipsis,
+            // Where you exit: the country, or Tor; nothing when the country is not known.
+            if (code != null || active.protocol == 'tor')
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CountryFlag(code, size: 28, icon: Icons.security),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      active.protocol == 'tor' ? 'Tor network' : countryNames[code] ?? code!,
+                      style: text.titleMedium,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
             const SizedBox(height: 4),
             Text(
               active.name,
@@ -288,6 +290,7 @@ class _BottomPanel extends ConsumerWidget {
         : code != null
         ? (code, countryNames[code] ?? code, 'Any server in this country')
         : (null, 'Automatic', 'Fastest server, switches if one stops working');
+    final rowIcon = specific == null ? Icons.bolt : (specific.protocol == 'tor' ? Icons.security : Icons.public);
 
     return Container(
       decoration: BoxDecoration(
@@ -322,7 +325,7 @@ class _BottomPanel extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   child: Row(
                     children: [
-                      CountryFlag(flagCode, size: 36, icon: Icons.bolt),
+                      CountryFlag(flagCode, size: 36, icon: rowIcon, label: title),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(

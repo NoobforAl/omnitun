@@ -359,6 +359,13 @@ func decode[T any](raw json.RawMessage) (T, error) {
 	return v, nil
 }
 
+// Call runs a control method in this process, as if a client had sent it.
+// Android's always-on VPN uses it to reconnect with the saved "start" request
+// when the system starts the VPN service and no UI is running.
+func (s *Server) Call(method string, params json.RawMessage) (any, error) {
+	return s.dispatch(Request{Method: method, Params: params})
+}
+
 func (s *Server) dispatch(req Request) (any, error) {
 	switch req.Method {
 	case "ping":

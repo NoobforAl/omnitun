@@ -151,7 +151,7 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
                   children: [
                     if (query.isEmpty)
                       _Row(
-                        leading: const CountryFlag(null, icon: Icons.bolt),
+                        leading: const CountryFlag(null, icon: Icons.bolt, label: 'Automatic'),
                         title: 'Automatic',
                         subtitle: 'Fastest server, switches if one stops working',
                         selected:

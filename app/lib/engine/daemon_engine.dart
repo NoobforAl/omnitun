@@ -186,6 +186,20 @@ class DaemonEngine implements VpnEngine {
   @override
   Stream<String> get logs => _logs.stream;
 
+  /// The core's "start" request for a connection.
+  static Map<String, dynamic> startParams(ProfileInfo profile, List<ProfileInfo> fallbacks, ConnectOptions options) => {
+    'profiles': [profile.raw, for (final f in fallbacks) f.raw],
+    'selected': profile.id,
+    'mode': options.tunMode ? 'tun' : 'proxy',
+    'listen_port': options.listenPort,
+    'system_proxy': options.systemProxy,
+    if (options.dns.isNotEmpty) 'dns': options.dns,
+    'failover': options.autoFailover,
+    if (!options.bypassLan) 'proxy_private': true,
+    if (options.includePackages.isNotEmpty) 'include_packages': options.includePackages,
+    if (options.excludePackages.isNotEmpty) 'exclude_packages': options.excludePackages,
+  };
+
   @override
   Future<void> connect(
     ProfileInfo profile, {
@@ -194,18 +208,7 @@ class DaemonEngine implements VpnEngine {
   }) async {
     _emit(EngineState(status: ConnStatus.connecting, activeProfileId: profile.id));
     try {
-      await _call('start', {
-        'profiles': [profile.raw, for (final f in fallbacks) f.raw],
-        'selected': profile.id,
-        'mode': options.tunMode ? 'tun' : 'proxy',
-        'listen_port': options.listenPort,
-        'system_proxy': options.systemProxy,
-        if (options.dns.isNotEmpty) 'dns': options.dns,
-        'failover': options.autoFailover,
-        if (!options.bypassLan) 'proxy_private': true,
-        if (options.includePackages.isNotEmpty) 'include_packages': options.includePackages,
-        if (options.excludePackages.isNotEmpty) 'exclude_packages': options.excludePackages,
-      });
+      await _call('start', startParams(profile, fallbacks, options));
     } on EngineException catch (e) {
       _emit(EngineState(
         status: e.code == 'NO_NETWORK' ? ConnStatus.noInternet : ConnStatus.error,

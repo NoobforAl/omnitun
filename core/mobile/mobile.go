@@ -7,6 +7,7 @@ package mobile
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"sync"
 
@@ -114,6 +115,25 @@ func StopTunnel() {
 	if s != nil {
 		s.Engine().Stop()
 	}
+}
+
+// StartTunnelFromJSON starts the tunnel from a "start" request saved by the UI
+// (control.StartParams as JSON). Android's always-on VPN calls it when the
+// system starts the VPN service with no UI around. It does nothing when a
+// tunnel is already running or starting.
+func StartTunnelFromJSON(request string) error {
+	mu.Lock()
+	s := srv
+	mu.Unlock()
+	if s == nil {
+		return errors.New("the core is not running")
+	}
+	switch s.Engine().State().Status {
+	case engine.StatusRunning, engine.StatusStarting:
+		return nil
+	}
+	_, err := s.Call("start", json.RawMessage(request))
+	return err
 }
 
 // Stop shuts everything down.

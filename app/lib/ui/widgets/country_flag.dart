@@ -7,7 +7,7 @@ import '../theme.dart';
 /// A country's flag. Windows has no flag emoji, so there (and for an unknown
 /// country) a small round badge is drawn instead: the country code, or a globe.
 class CountryFlag extends StatelessWidget {
-  const CountryFlag(this.code, {super.key, this.size = 32, this.icon = Icons.public});
+  const CountryFlag(this.code, {super.key, this.size = 32, this.icon = Icons.public, this.label});
 
   /// ISO code, or null when the country is unknown.
   final String? code;
@@ -16,13 +16,16 @@ class CountryFlag extends StatelessWidget {
   /// Shown instead of a flag when [code] is null.
   final IconData icon;
 
+  /// What a screen reader says; defaults to the country's name.
+  final String? label;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final c = code;
     final emoji = c != null && defaultTargetPlatform != TargetPlatform.windows;
     return Semantics(
-      label: c == null ? 'Unknown country' : (countryNames[c] ?? c),
+      label: label ?? (c == null ? 'Unknown country' : (countryNames[c] ?? c)),
       excludeSemantics: true,
       child: Container(
         width: size,

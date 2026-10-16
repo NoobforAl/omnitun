@@ -35,6 +35,14 @@ class OmnitunVpnService : VpnService() {
                 Thread { Mobile.stopTunnel() }.start()
                 return START_NOT_STICKY
             }
+            SERVICE_INTERFACE -> {
+                // Started by Android itself: "Always-on VPN" (at boot, or after this app was
+                // killed). No UI is running, so reconnect with the last connect request.
+                startForegroundCompat(buildNotification(getString(R.string.vpn_connecting)))
+                instance = this
+                ready.countDown()
+                Thread { reconnectSaved() }.start()
+            }
             else -> {
                 startForegroundCompat(buildNotification(getString(R.string.vpn_connecting)))
                 instance = this
@@ -43,6 +51,27 @@ class OmnitunVpnService : VpnService() {
         }
         // Never restart on our own: a VPN must only run while the core asks for it.
         return START_NOT_STICKY
+    }
+
+    /** Always-on VPN: starts the core and the tunnel from the request the app saved when it last connected. */
+    private fun reconnectSaved() {
+        val request = lastConnect(this)
+        if (request == null) {
+            // Nothing to connect to. With "Block connections without VPN" on, Android keeps
+            // traffic blocked until the user connects from the app once.
+            Log.w(TAG, "always-on VPN: no saved connection, open the app and connect once")
+            stopVpn()
+            return
+        }
+        try {
+            CorePlatform.start(this)
+            Mobile.startTunnelFromJSON(request)
+            Log.i(TAG, "always-on VPN: reconnecting")
+        } catch (e: Exception) {
+            Log.w(TAG, "always-on VPN failed: ${e.message}")
+            Mobile.stopTunnel()
+            stopVpn()
+        }
     }
 
     /** Builds the VPN interface from the core's tun config JSON and returns its fd. */
@@ -196,6 +225,7 @@ class OmnitunVpnService : VpnService() {
 
         private const val PREFS = "omnitun"
         private const val KEY_STOP_ON_CLOSE = "stop_on_close"
+        private const val KEY_LAST_CONNECT = "last_connect"
 
         @Volatile
         var instance: OmnitunVpnService? = null
@@ -207,6 +237,14 @@ class OmnitunVpnService : VpnService() {
 
         fun setStopOnClose(context: Context, value: Boolean) {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_STOP_ON_CLOSE, value).apply()
+        }
+
+        /** The core's "start" request of the last connection (what always-on VPN reconnects with). */
+        fun lastConnect(context: Context): String? =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_LAST_CONNECT, null)
+
+        fun saveLastConnect(context: Context, request: String) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_LAST_CONNECT, request).apply()
         }
 
         @Volatile

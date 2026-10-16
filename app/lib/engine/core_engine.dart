@@ -168,6 +168,14 @@ class CoreEngine implements VpnEngine {
         return;
       }
     }
+    if (Platform.isAndroid && options.tunMode) {
+      // Android's "Always-on VPN" restarts the tunnel by itself, with this request.
+      try {
+        await _channel.invokeMethod<void>('saveLastConnect', jsonEncode(DaemonEngine.startParams(profile, fallbacks, options)));
+      } on PlatformException {
+        // Only always-on VPN loses out.
+      }
+    }
     return engine.connect(profile, fallbacks: fallbacks, options: options);
   }
 

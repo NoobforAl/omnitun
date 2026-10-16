@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../state/providers.dart';
@@ -52,12 +53,17 @@ class SettingsScreen extends ConsumerWidget {
             value: s.bypassLan,
             onChanged: (v) => ctrl.update((s) => s.copyWith(bypassLan: v)),
           ),
-          SwitchListTile(
-            title: const Text('Kill switch'),
-            subtitle: const Text('Block traffic while the VPN is reconnecting'),
-            value: s.killSwitch,
-            onChanged: (v) => ctrl.update((s) => s.copyWith(killSwitch: v)),
-          ),
+          if (Platform.isAndroid)
+            ListTile(
+              title: const Text('Always-on VPN and kill switch'),
+              subtitle: const Text(
+                'Android reconnects at boot and can block all traffic while the VPN is down. In the VPN settings '
+                'tap the gear next to Omnitun and turn on "Always-on VPN" and "Block connections without VPN". '
+                'Connect once from this app first.',
+              ),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () => _openVpnSettings(context),
+            ),
           if (Platform.isAndroid)
             ListTile(
               title: const Text('Split tunneling'),
@@ -109,6 +115,15 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+Future<void> _openVpnSettings(BuildContext context) async {
+  final opened = await const MethodChannel('omnitun/core').invokeMethod<bool>('openVpnSettings') ?? false;
+  if (!opened && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Open Android Settings → Network → VPN, then the gear next to Omnitun')),
     );
   }
 }

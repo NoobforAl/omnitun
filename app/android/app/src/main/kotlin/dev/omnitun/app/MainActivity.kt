@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.VpnService
 import android.os.Build
+import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -93,6 +94,15 @@ class MainActivity : FlutterActivity() {
                 "setStopOnClose" -> {
                     OmnitunVpnService.setStopOnClose(this, call.arguments as? Boolean ?: true)
                     result.success(null)
+                }
+                "saveLastConnect" -> {
+                    OmnitunVpnService.saveLastConnect(this, call.arguments as String)
+                    result.success(null)
+                }
+                "openVpnSettings" -> {
+                    // Where "Always-on VPN" and "Block connections without VPN" are switched on.
+                    val opened = runCatching { startActivity(Intent(Settings.ACTION_VPN_SETTINGS)) }.isSuccess
+                    result.success(opened)
                 }
                 "requestNotifications" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&

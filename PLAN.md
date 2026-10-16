@@ -322,7 +322,7 @@ omnitun/
 - [x] Release build: R8/minify with keep rules for the Go bindings, release signing (key.properties), per-ABI APKs with compressed native libs (~30 MB each, was 71 MB); verified on device
 - [ ] AAB for Google Play (needs a Play signing decision)
 - [x] Per-app split tunneling ("only selected" / "bypass selected", app picker with icons) — verified: bypassed Chrome showed the phone's own IP while the VPN was up
-- [ ] Always-on VPN / start on boot
+- [x] Always-on VPN / start on boot: the app saves its last "start" request when it connects in VPN mode; when Android starts the VPN service by itself (Always-on VPN at boot or after the app was killed) the service starts the core and reconnects with that request (`Mobile.StartTunnelFromJSON`, `OmnitunVpnService.reconnectSaved`). **Verified on the A30s:** with the app killed, switching "Always-on VPN" on in Android's VPN settings started the service without any UI and brought Tor (Snowflake) up; a manual Disconnect afterwards stays disconnected. Settings has a tile that opens Android's VPN settings for "Always-on VPN" and "Block connections without VPN" (that system switch is the kill switch; **not tested**; connect once from the app first or there is nothing to reconnect to). The old "Kill switch" toggle did nothing and is gone
 - [x] Notification shows profile name and live speed (verified on device)
 
 ### Phase 3 — Windows (deferred — after all other phases)
