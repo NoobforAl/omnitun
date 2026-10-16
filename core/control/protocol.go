@@ -69,6 +69,19 @@ type ImportParams struct {
 	Text string `json:"text"`
 }
 
+// BuildProfileParams creates a profile from an editor's values, or edits
+// Profile when it is given (fields the editor does not show are kept).
+type BuildProfileParams struct {
+	Protocol string            `json:"protocol,omitempty"`
+	Values   map[string]string `json:"values"`
+	Profile  *profile.Profile  `json:"profile,omitempty"`
+}
+
+// ProfileParams names one profile (for its editor values or share link).
+type ProfileParams struct {
+	Profile *profile.Profile `json:"profile"`
+}
+
 // StartParams starts the tunnel.
 type StartParams struct {
 	Profiles     []*profile.Profile `json:"profiles"`

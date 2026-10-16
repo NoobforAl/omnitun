@@ -2,6 +2,7 @@ package stats
 
 import (
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
@@ -141,4 +142,31 @@ func tempDir(t *testing.T) string {
 		}
 	})
 	return dir
+}
+
+// Saves from several goroutines (the collector's tick and a stop) must not
+// fight over the temporary file.
+func TestConcurrentSaves(t *testing.T) {
+	tr := NewTracker(tempDir(t))
+	var wg sync.WaitGroup
+	errs := make(chan error, 40)
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 5 {
+				if err := tr.Save(); err != nil {
+					errs <- err
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Error(err)
+	}
+	if _, err := Read(tr.dir); err != nil {
+		t.Fatal(err)
+	}
 }

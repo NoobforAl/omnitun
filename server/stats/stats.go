@@ -104,6 +104,10 @@ type Tracker struct {
 	mu      sync.Mutex
 	snap    Snapshot
 	stopped bool
+
+	// saveMu serialises Save: concurrent saves (the collector's tick and a
+	// stop) would otherwise write the same temporary file at once.
+	saveMu sync.Mutex
 }
 
 // NewTracker loads the counters saved in dir (so they survive restarts).
@@ -243,6 +247,8 @@ func (t *Tracker) Forget(keep func(name string) bool) {
 
 // Save writes the stats file atomically.
 func (t *Tracker) Save() error {
+	t.saveMu.Lock()
+	defer t.saveMu.Unlock()
 	t.mu.Lock()
 	t.snap.UpdatedAt = t.now().UTC()
 	if t.stopped {

@@ -5,11 +5,13 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/NoobforAl/omnitun/core/engine"
 	"github.com/NoobforAl/omnitun/core/importer"
+	"github.com/NoobforAl/omnitun/core/profile"
 	"github.com/NoobforAl/omnitun/core/subscription"
 )
 
@@ -175,5 +177,54 @@ func TestSubscribe(t *testing.T) {
 	}, nil)
 	if !errors.As(err, &ce) || ce.Code != CodeAuthFailed {
 		t.Fatalf("err = %v, want AUTH_FAILED", err)
+	}
+}
+
+// The profile editor: forms, building, editing and exporting go through the
+// same protocol as everything else, so every app edits profiles the same way.
+func TestProfileEditorMethods(t *testing.T) {
+	s, addr := newTestServer(t, ServerConfig{})
+	c, err := Dial(t.Context(), addr, s.Token())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+
+	var forms []profile.ProtocolForm
+	if err := c.Call(t.Context(), "forms", nil, &forms); err != nil {
+		t.Fatal(err)
+	}
+	if len(forms) < 10 || forms[0].Protocol != profile.VLESS || len(forms[0].Fields) == 0 {
+		t.Fatalf("forms: %d, first %+v", len(forms), forms[0])
+	}
+
+	var p profile.Profile
+	err = c.Call(t.Context(), "build_profile", BuildProfileParams{Protocol: profile.Trojan,
+		Values: map[string]string{"server": "vpn.example.com", "password": "pw", "name": "mine"}}, &p)
+	if err != nil || p.Name != "mine" || p.Port != 443 || p.ID == "" {
+		t.Fatalf("build: %v %+v", err, p)
+	}
+	var link string
+	if err := c.Call(t.Context(), "export_link", ProfileParams{Profile: &p}, &link); err != nil || !strings.HasPrefix(link, "trojan://pw@vpn.example.com:443") {
+		t.Fatalf("export: %v %q", err, link)
+	}
+	var values map[string]string
+	if err := c.Call(t.Context(), "profile_values", ProfileParams{Profile: &p}, &values); err != nil || values["server"] != "vpn.example.com" || values["password"] != "pw" {
+		t.Fatalf("values: %v %v", err, values)
+	}
+	var edited profile.Profile
+	if err := c.Call(t.Context(), "build_profile", BuildProfileParams{Profile: &p, Values: map[string]string{"port": "8443"}}, &edited); err != nil || edited.Port != 8443 || edited.Password != "pw" {
+		t.Fatalf("edit: %v %+v", err, edited)
+	}
+	if p.Port != 443 {
+		t.Fatal("editing changed the original")
+	}
+
+	var ce *Error
+	if err := c.Call(t.Context(), "build_profile", BuildProfileParams{Protocol: profile.Trojan, Values: map[string]string{"server": "x"}}, nil); !errors.As(err, &ce) || ce.Code != CodeBadRequest || !strings.Contains(ce.Message, "Password is required") {
+		t.Fatalf("missing field: %v", err)
+	}
+	if err := c.Call(t.Context(), "export_link", ProfileParams{}, nil); !errors.As(err, &ce) || ce.Code != CodeBadRequest {
+		t.Fatalf("export without a profile: %v", err)
 	}
 }

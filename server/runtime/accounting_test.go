@@ -24,6 +24,22 @@ import (
 	"github.com/NoobforAl/omnitun/server/store"
 )
 
+// loadState reads the state file, retrying: on Windows a read can fail for a
+// moment while the file is being replaced.
+func loadState(t *testing.T, s *store.Store) *store.State {
+	t.Helper()
+	var err error
+	for range 40 {
+		var st *store.State
+		if st, err = s.Load(); err == nil {
+			return st
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	t.Fatalf("load state: %v", err)
+	return nil
+}
+
 func waitFor(t *testing.T, what string, timeout time.Duration, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
@@ -44,7 +60,7 @@ func TestUserAccountingAndQuota(t *testing.T) {
 	defer func() { accountingInterval, enforceEvery = oldInterval, oldEvery }()
 
 	s, srv := setup(t)
-	st, _ := s.Load()
+	st := loadState(t, s)
 	// `run` watches the state file and reloads; do the same here.
 	watchCtx, stopWatch := context.WithCancel(context.Background())
 	defer stopWatch()
@@ -118,10 +134,10 @@ func TestUserAccountingAndQuota(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitFor(t, "quota block", 10*time.Second, func() bool {
-		st, _ := s.Load()
-		return st.User("alice").QuotaExceeded
+		st, err := s.Load()
+		return err == nil && st.User("alice").QuotaExceeded
 	})
-	if st, _ := s.Load(); st.User("alice").Status(time.Now()) != "over-quota" {
+	if st := loadState(t, s); st.User("alice").Status(time.Now()) != "over-quota" {
 		t.Fatalf("status = %s", st.User("alice").Status(time.Now()))
 	}
 	waitFor(t, "the server to drop the blocked user", 10*time.Second, func() bool {
@@ -141,7 +157,7 @@ func TestUserAccountingAndQuota(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitFor(t, "quota unblock", 10*time.Second, func() bool {
-		st, _ := s.Load()
+		st := loadState(t, s)
 		return !st.User("alice").QuotaExceeded
 	})
 
@@ -176,7 +192,7 @@ func TestWireGuardTrafficIsCountedForTheUser(t *testing.T) {
 	defer func() { accountingInterval, enforceEvery = oldInterval, oldEvery }()
 
 	s, srv := setup(t)
-	st, _ := s.Load()
+	st := loadState(t, s)
 
 	const payload = 200 << 10
 	web := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

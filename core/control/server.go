@@ -23,7 +23,9 @@ import (
 
 	"github.com/NoobforAl/omnitun/core/engine"
 	"github.com/NoobforAl/omnitun/core/importer"
+	"github.com/NoobforAl/omnitun/core/links"
 	"github.com/NoobforAl/omnitun/core/netcheck"
+	"github.com/NoobforAl/omnitun/core/profile"
 	"github.com/NoobforAl/omnitun/core/singbox"
 	"github.com/NoobforAl/omnitun/core/subscription"
 )
@@ -373,6 +375,45 @@ func (s *Server) dispatch(req Request) (any, error) {
 			return nil, &Error{Code: CodeImportFailed, Message: err.Error()}
 		}
 		return res, nil
+	case "forms":
+		return profile.Forms(), nil
+	case "build_profile":
+		p, err := decode[BuildProfileParams](req.Params)
+		if err != nil {
+			return nil, err
+		}
+		var built *profile.Profile
+		if p.Profile != nil {
+			// Editing: apply the values to a copy, then check the whole profile.
+			cp := *p.Profile
+			built = &cp
+			err = built.Apply(p.Values)
+			if err == nil {
+				err = built.Validate()
+			}
+		} else {
+			built, err = profile.FromValues(p.Protocol, p.Values)
+		}
+		if err != nil {
+			return nil, &Error{Code: CodeBadRequest, Message: err.Error()}
+		}
+		return built, nil
+	case "profile_values":
+		p, err := decode[ProfileParams](req.Params)
+		if err != nil || p.Profile == nil {
+			return nil, &Error{Code: CodeBadRequest, Message: "a profile is required"}
+		}
+		return p.Profile.Values(), nil
+	case "export_link":
+		p, err := decode[ProfileParams](req.Params)
+		if err != nil || p.Profile == nil {
+			return nil, &Error{Code: CodeBadRequest, Message: "a profile is required"}
+		}
+		link, err := links.Export(p.Profile)
+		if err != nil {
+			return nil, &Error{Code: CodeBadRequest, Message: err.Error()}
+		}
+		return link, nil
 	case "start":
 		p, err := decode[StartParams](req.Params)
 		if err != nil {

@@ -173,8 +173,9 @@ func (s *Server) startBoxLocked(st *store.State) error {
 func (s *Server) stopBoxLocked() {
 	// Count what the connections moved since the last tick before they close.
 	s.accMu.Lock()
-	if s.coll != nil {
-		s.coll.tick()
+	coll := s.coll
+	if coll != nil {
+		coll.tick()
 		s.coll = nil
 	}
 	s.accMu.Unlock()
@@ -182,6 +183,10 @@ func (s *Server) stopBoxLocked() {
 		s.instance.Close()
 		s.cancel()
 		s.instance, s.cancel = nil, nil
+	}
+	// Closing ended the connections; count their last bytes.
+	if coll != nil {
+		coll.finish()
 	}
 }
 

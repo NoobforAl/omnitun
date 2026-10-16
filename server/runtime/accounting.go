@@ -3,11 +3,13 @@ package runtime
 import (
 	"context"
 	"net/netip"
+	"sync"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/sagernet/sing-box/common/trafficcontrol"
 	"github.com/sagernet/sing-box/log"
+	"github.com/sagernet/sing/common/observable"
 
 	"github.com/NoobforAl/omnitun/server/logs"
 	"github.com/NoobforAl/omnitun/server/stats"
@@ -44,24 +46,107 @@ func protocolKey(inbound string) string {
 type seenConn struct {
 	user     string
 	up, down int64
+	at       time.Time // last tick that saw it live
 }
 
+// countedFor is how long a closed connection is remembered as counted, so
+// the closed-list pass and the close event never count it twice.
+const countedFor = 5 * time.Minute
+
 // collector turns sing-box's per-connection counters into per-user totals.
+//
+// Connections are polled while they live, and counted for good when they
+// close. sing-box's list of closed connections is not enough for that: it is
+// emptied at every garbage collection, so a connection that closed shortly
+// before one would be lost. The close events (delivered as they happen) are
+// the main source; the list is the fallback for events that were dropped.
 type collector struct {
 	tm *trafficcontrol.Manager
 	tr *stats.Tracker
 	// userByIP names the user behind a WireGuard tunnel address: the
 	// endpoint does not report users, but every user has a fixed address.
 	userByIP func(netip.Addr) string
-	seen     map[uuid.UUID]seenConn
-	done     map[uuid.UUID]bool // closed connections already counted
 	last     time.Time
 	started  time.Time
+
+	mu   sync.Mutex // guards seen and done; held by tick and by the event reader
+	seen map[uuid.UUID]seenConn
+	done map[uuid.UUID]time.Time // closed connections already counted, and when
+
+	events  observable.Subscription[trafficcontrol.ConnectionEvent]
+	stopped chan struct{}
+	drained chan struct{}
 }
 
 func newCollector(tm *trafficcontrol.Manager, tr *stats.Tracker, userByIP func(netip.Addr) string) *collector {
 	now := time.Now()
-	return &collector{tm: tm, tr: tr, userByIP: userByIP, seen: map[uuid.UUID]seenConn{}, done: map[uuid.UUID]bool{}, last: now, started: now}
+	c := &collector{
+		tm: tm, tr: tr, userByIP: userByIP, last: now, started: now,
+		seen: map[uuid.UUID]seenConn{}, done: map[uuid.UUID]time.Time{},
+		stopped: make(chan struct{}), drained: make(chan struct{}),
+	}
+	if events, _, err := tm.SubscribeEvents(); err == nil {
+		c.events = events
+		go c.readEvents()
+	} else {
+		close(c.drained)
+	}
+	return c
+}
+
+// readEvents counts every connection as it closes.
+func (c *collector) readEvents() {
+	defer close(c.drained)
+	for {
+		select {
+		case ev := <-c.events:
+			if ev.Type == trafficcontrol.ConnectionEventClosed && ev.Metadata != nil {
+				c.mu.Lock()
+				c.countClosedLocked(ev.Metadata)
+				c.mu.Unlock()
+			}
+		case <-c.stopped:
+			// Take what is already queued (the shutdown closes everything), then end.
+			for {
+				select {
+				case ev := <-c.events:
+					if ev.Type == trafficcontrol.ConnectionEventClosed && ev.Metadata != nil {
+						c.mu.Lock()
+						c.countClosedLocked(ev.Metadata)
+						c.mu.Unlock()
+					}
+				case <-time.After(100 * time.Millisecond):
+					return
+				}
+			}
+		}
+	}
+}
+
+// finish ends the event reader after sing-box has closed its connections.
+func (c *collector) finish() {
+	close(c.stopped)
+	<-c.drained
+	c.tm.UnSubscribeEvents(c.events)
+}
+
+// countClosedLocked counts what a closed connection moved since it was last
+// seen, once. It returns the user and the bytes (for the live speed).
+func (c *collector) countClosedLocked(md *trafficcontrol.TrackerMetadata) (user string, du, dd int64, counted bool) {
+	if _, ok := c.done[md.ID]; ok || md.ClosedAt.Before(c.started) {
+		return "", 0, 0, false
+	}
+	up, down := md.Upload.Load(), md.Download.Load()
+	prev := c.seen[md.ID] // zero when the connection opened and closed between ticks
+	du, dd = up-prev.up, down-prev.down
+	c.tr.AddProtocol(protocolKey(md.Metadata.Inbound), du, dd)
+	user = c.userOf(md)
+	if user != "" {
+		c.tr.Add(user, du, dd)
+	}
+	delete(c.seen, md.ID)
+	c.done[md.ID] = time.Now()
+	return user, du, dd, true
 }
 
 // userOf is the user a connection belongs to: the authenticated user the
@@ -78,6 +163,8 @@ func (c *collector) userOf(md *trafficcontrol.TrackerMetadata) string {
 
 // tick counts the traffic since the previous tick.
 func (c *collector) tick() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	now := time.Now()
 	dt := now.Sub(c.last).Seconds()
 	if dt < 0.5 {
@@ -98,7 +185,7 @@ func (c *collector) tick() {
 		prev := c.seen[md.ID]
 		du, dd := up-prev.up, down-prev.down
 		user, proto := c.userOf(md), protocolKey(md.Metadata.Inbound)
-		c.seen[md.ID] = seenConn{user: user, up: up, down: down}
+		c.seen[md.ID] = seenConn{user: user, up: up, down: down, at: now}
 		c.tr.AddProtocol(proto, du, dd)
 		if proto != "" {
 			liveProto[proto]++
@@ -114,37 +201,25 @@ func (c *collector) tick() {
 	}
 	c.tr.SetProtocolConnections(liveProto)
 
+	// The fallback: closed connections still in sing-box's list that no event
+	// counted (an event can be dropped when a burst fills its queue).
 	closedNow := map[uuid.UUID]bool{}
 	for _, md := range c.tm.ClosedConnections() {
 		closedNow[md.ID] = true
-		if c.done[md.ID] || md.ClosedAt.Before(c.started) {
-			continue
-		}
-		up, down := md.Upload.Load(), md.Download.Load()
-		prev := c.seen[md.ID] // zero when the connection opened and closed between ticks
-		du, dd := up-prev.up, down-prev.down
-		c.tr.AddProtocol(protocolKey(md.Metadata.Inbound), du, dd)
-		if user := c.userOf(md); user != "" {
-			c.tr.Add(user, du, dd)
+		if user, du, dd, counted := c.countClosedLocked(md); counted && user != "" {
 			speed(user, du, dd)
 		}
-		delete(c.seen, md.ID)
-		c.done[md.ID] = true
 	}
-	// Remember only closed connections that are still in sing-box's list.
-	for id := range c.done {
-		if !closedNow[id] {
+	for id, at := range c.done {
+		if now.Sub(at) > countedFor {
 			delete(c.done, id)
 		}
 	}
-	// A connection that vanished without a closed record (list overflow) is
-	// forgotten once it is no longer live.
-	liveIDs := map[uuid.UUID]bool{}
-	for _, md := range c.tm.Connections() {
-		liveIDs[md.ID] = true
-	}
-	for id := range c.seen {
-		if !liveIDs[id] && !closedNow[id] {
+	// A connection that vanished without a close event or record (both
+	// dropped) is forgotten after a while; the delay leaves time for a queued
+	// event to arrive, which needs what was seen of the connection.
+	for id, sc := range c.seen {
+		if !closedNow[id] && now.Sub(sc.at) > time.Minute {
 			delete(c.seen, id)
 		}
 	}

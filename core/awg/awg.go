@@ -25,6 +25,11 @@ import (
 // deviceKeys are the AmneziaWG 1.x device parameters amneziawg-go accepts, in UAPI order.
 var deviceKeys = []string{"jc", "jmin", "jmax", "s1", "s2", "h1", "h2", "h3", "h4", "itime"}
 
+// chainKeys are AmneziaWG 1.5's signature packets (i1-i5, sent before the
+// handshake to look like another protocol) and controlled junk (j1-j3). Their
+// values are tag chains such as "<b 0xc0ff><r 16><t>", passed on verbatim.
+var chainKeys = []string{"i1", "i2", "i3", "i4", "i5", "j1", "j2", "j3"}
+
 // ErrUnsupported is returned for parameters this AmneziaWG version can't apply.
 var ErrUnsupported = errors.New("unsupported AmneziaWG parameter")
 
@@ -55,13 +60,25 @@ func UAPI(p *profile.Profile, endpoint netip.AddrPort) (string, error) {
 	for _, k := range deviceKeys {
 		if v, ok := wg.Amnezia[k]; ok {
 			if _, err := strconv.ParseUint(strings.TrimSpace(v), 10, 32); err != nil {
+				// AmneziaWG 2.0 writes headers as ranges ("h1=100-200").
+				if strings.Contains(v, "-") {
+					return "", fmt.Errorf("%w %s=%q (AmneziaWG 2.0 header ranges)", ErrUnsupported, k, v)
+				}
 				return "", fmt.Errorf("invalid %s=%q", k, v)
 			}
 			fmt.Fprintf(&b, "%s=%s\n", k, strings.TrimSpace(v))
 		}
 	}
+	for _, k := range chainKeys {
+		if v, ok := wg.Amnezia[k]; ok && strings.TrimSpace(v) != "" {
+			if strings.ContainsAny(v, "\r\n") {
+				return "", fmt.Errorf("invalid %s: line break", k)
+			}
+			fmt.Fprintf(&b, "%s=%s\n", k, strings.TrimSpace(v))
+		}
+	}
 	for k := range wg.Amnezia {
-		if !isDeviceKey(k) {
+		if !isDeviceKey(k) && !slices.Contains(chainKeys, k) {
 			return "", fmt.Errorf("%w %q (AmneziaWG 2.0 options are not supported yet)", ErrUnsupported, k)
 		}
 	}
