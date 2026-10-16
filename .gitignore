@@ -35,3 +35,8 @@ cache.db
 /.dev/
 
 /tools/dockertest/build/
+
+# Secrets: signing passwords (see scripts/android-keystore.sh) and the previous local key
+.env
+.env.*
+app/android/old-key/

@@ -1,44 +1,35 @@
 name: Android
 
-# The app build pipeline. Android only for now: no Windows, macOS, Linux or iOS app is built.
-# (ci.yml runs the tests; this workflow turns the code into installable APKs.)
+# The app pipeline. Android only for now: no Windows, macOS, Linux or iOS app is built.
 #
-# What it builds, in order (the same scripts as a local release build):
+#   a tag (0.1.0, v0.1.0, 0.2.0-rc1)  →  build the signed release APKs and publish a GitHub Release
+#   anything else (push, pull request) →  only lint the code (flutter analyze)
+#
+# To release:  git tag 0.1.0 && git push origin 0.1.0
+#
+# What a release builds, in order (the same scripts as a local build):
 #   1. the Tor client (Rust, Arti) for every ABI        scripts/build-android-tor.sh
 #   2. the Go core as an Android library (gomobile)     scripts/build-android-core.sh
 #   3. the Flutter app, one release APK per ABI         flutter build apk --split-per-abi
 #
-# Signing: without secrets the APKs are signed with the debug key (fine to try, cannot update an
-# installed release build). To sign for real, add these repository secrets:
-#   ANDROID_KEYSTORE_BASE64    the keystore file, base64 (base64 -w0 omnitun-release.jks)
-#   ANDROID_KEYSTORE_PASSWORD  its store password
-#   ANDROID_KEY_PASSWORD       the key password (alias: omnitun)
-# Third-party actions are pinned to full commit SHAs (a moved tag cannot run new code with the
-# signing secrets); Dependabot (.github/dependabot.yml) proposes updates.
-# Keep the keystore backed up: updates to an installed app must be signed with the same key.
+# Signing: the release is signed with the key in these repository secrets (made by
+# scripts/android-keystore.sh, uploaded by scripts/android-github-secrets.sh). Without them the release
+# fails: a release is never signed with a debug key.
+#   ANDROID_KEYSTORE_BASE64    the keystore file, base64
+#   ANDROID_KEYSTORE_PASSWORD  its password (the key has the same one, alias omnitun)
+#   ANDROID_KEY_PASSWORD       the key password
+# Keep the keystore and .env backed up: an update of an installed app must be signed with the same key.
+#
+# Third-party actions are pinned to full commit SHAs (a moved tag cannot run new code with the signing
+# secrets); Dependabot (.github/dependabot.yml) proposes updates.
 
 on:
   push:
     branches: [main]
-    paths:
-      - "app/**"
-      - "core/**"
-      - "tor/**"
-      - "third_party/**"
-      - "go.mod"
-      - "go.sum"
-      - "scripts/build-android-*.sh"
-      - ".github/workflows/android.yml"
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+*"
+      - "v[0-9]+.[0-9]+.[0-9]+*"
   pull_request:
-    paths:
-      - "app/**"
-      - "core/**"
-      - "tor/**"
-      - "third_party/**"
-      - "go.mod"
-      - "go.sum"
-      - "scripts/build-android-*.sh"
-      - ".github/workflows/android.yml"
   workflow_dispatch:
 
 concurrency:
@@ -49,11 +40,63 @@ permissions:
   contents: read
 
 jobs:
-  apk:
+  # No tag: just lint.
+  lint:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: "3.47.7"
+          channel: stable
+          cache: true
+
+      - name: Lint the app
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter analyze
+
+  # A tag: build, sign and publish.
+  release:
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write # to create the release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version from the tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VER="${TAG#v}"          # 0.1.0 or 0.2.0-rc1
+          CORE="${VER%%-*}"       # 0.2.0
+          IFS=. read -r MA MI PA <<< "$CORE"
+          # Android's version code must grow with every release: 0.1.0 -> 100, 1.2.3 -> 10203
+          NUM=$((MA * 10000 + MI * 100 + PA))
+          echo "name=$VER" >> "$GITHUB_OUTPUT"
+          echo "core=$CORE" >> "$GITHUB_OUTPUT"
+          echo "number=$NUM" >> "$GITHUB_OUTPUT"
+          if [[ "$VER" == *-* ]]; then echo "pre=true" >> "$GITHUB_OUTPUT"; else echo "pre=false" >> "$GITHUB_OUTPUT"; fi
+          echo "release $VER (name $CORE, build number $NUM)"
+
+      - name: Signing secrets are present
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for v in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_PASSWORD; do
+            if [ -z "${!v}" ]; then
+              echo "::error::the repository secret for $v is missing (scripts/android-github-secrets.sh sets them)"
+              exit 1
+            fi
+          done
 
       - uses: actions/setup-java@v4
         with:
@@ -89,36 +132,47 @@ jobs:
       - name: Go core (gomobile)
         run: bash scripts/build-android-core.sh
 
-      - name: Release signing (only when the secrets exist)
+      - name: Release signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > app/android/omnitun-release.jks
-            printf 'storeFile=omnitun-release.jks\nstorePassword=%s\nkeyAlias=omnitun\nkeyPassword=%s\n' \
-              "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" > app/android/key.properties
-            echo "signing: release key"
-          else
-            echo "signing: debug key (no secrets)"
-          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > app/android/omnitun-release.jks
+          printf 'storeFile=omnitun-release.jks\nstorePassword=%s\nkeyAlias=omnitun\nkeyPassword=%s\n' \
+            "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" > app/android/key.properties
 
-      - name: App (one APK per ABI)
+      - name: Lint and build the app (one APK per ABI)
         working-directory: app
         run: |
           flutter pub get
-          flutter build apk --release --split-per-abi
+          flutter analyze
+          flutter build apk --release --split-per-abi \
+            --build-name="${{ steps.version.outputs.core }}" \
+            --build-number="${{ steps.version.outputs.number }}"
 
-      - name: Checksums
+      - name: Name the files, check the signature, checksums
         working-directory: app/build/app/outputs/flutter-apk
-        run: sha256sum *-release.apk | tee SHA256SUMS
+        env:
+          VER: ${{ steps.version.outputs.name }}
+        run: |
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            mv "app-$abi-release.apk" "omnitun-$VER-$abi.apk"
+          done
+          APKSIGNER="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
+          for f in omnitun-*.apk; do
+            "$APKSIGNER" verify --print-certs "$f" | grep -i "SHA-256 digest" | head -1 | sed "s|^|$f |"
+          done
+          sha256sum omnitun-*.apk | tee SHA256SUMS
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: omnitun-android-${{ github.sha }}
-          path: |
-            app/build/app/outputs/flutter-apk/*-release.apk
-            app/build/app/outputs/flutter-apk/SHA256SUMS
-          retention-days: 14
-          if-no-files-found: error
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VER: ${{ steps.version.outputs.name }}
+          PRE: ${{ steps.version.outputs.pre }}
+        run: |
+          cd app/build/app/outputs/flutter-apk
+          FLAGS=(--title "Omnitun $VER" --generate-notes --verify-tag)
+          if [ "$PRE" = "true" ]; then FLAGS+=(--prerelease); fi
+          gh release create "$TAG" "${FLAGS[@]}" omnitun-*.apk SHA256SUMS
