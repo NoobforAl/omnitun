@@ -41,6 +41,44 @@ class ProfilesScreen extends ConsumerWidget {
             onPressed: profiles.isEmpty ? null : () => testAllLatencies(ref),
             icon: const Icon(Icons.speed),
           ),
+          PopupMenuButton<String>(
+            tooltip: context.l10n.tooltipMore,
+            onSelected: (v) async {
+              if (v == 'restore_tor') {
+                await ref.read(defaultProfileIdProvider.notifier).ensureTorDefaults(force: true);
+              } else if (v == 'delete_all') {
+                final l = context.l10n;
+                final messenger = ScaffoldMessenger.of(context);
+                final sure = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(l.deleteAllTitle),
+                    content: Text(l.deleteAllBody),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l.actionCancel)),
+                      FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l.actionDelete)),
+                    ],
+                  ),
+                );
+                if (sure != true) return;
+                final subsNotifier = ref.read(subscriptionsProvider.notifier);
+                for (final sub in [...ref.read(subscriptionsProvider)]) {
+                  subsNotifier.remove(sub.id);
+                }
+                ref.read(profilesProvider.notifier).clearAll();
+                await ref.read(defaultProfileIdProvider.notifier).ensureTorDefaults(force: true);
+                messenger.showSnackBar(SnackBar(content: Text(l.deletedAllToast)));
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'delete_all',
+                enabled: profiles.any((p) => p.protocol != 'tor') || subs.isNotEmpty,
+                child: Text(context.l10n.menuDeleteAll),
+              ),
+              PopupMenuItem(value: 'restore_tor', child: Text(context.l10n.menuRestoreTor)),
+            ],
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -102,6 +140,7 @@ class _GroupList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final defaultId = ref.watch(defaultProfileProvider)?.id;
     return SliverReorderableList(
       itemCount: profiles.length,
       onReorderItem: (from, to) => ref.read(profilesProvider.notifier).reorderInGroup(group, from, to),
@@ -115,7 +154,18 @@ class _GroupList extends ConsumerWidget {
             child: ListTile(
               selected: p.id == selectedId,
               leading: Icon(p.id == selectedId ? Icons.radio_button_checked : Icons.radio_button_off),
-              title: Text(p.name, overflow: TextOverflow.ellipsis),
+              title: Row(
+                children: [
+                  Flexible(child: Text(p.name, overflow: TextOverflow.ellipsis)),
+                  if (p.id == defaultId) ...[
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: context.l10n.badgeDefault,
+                      child: Icon(Icons.star_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
+                    ),
+                  ],
+                ],
+              ),
               subtitle: Text(
                 p.needsCredentials && !p.hasCredentials
                     ? context.l10n.needsSignIn(profileAddress(context, p))
@@ -138,6 +188,10 @@ class _GroupList extends ConsumerWidget {
                         Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ShareScreen(profile: p)));
                       }
                       if (v == 'delete') ref.read(profilesProvider.notifier).remove(p.id);
+                      if (v == 'default') {
+                        ref.read(defaultProfileIdProvider.notifier).set(p.id);
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.defaultSetToast(p.name))));
+                      }
                       if (v == 'credentials') askCredentials(context, ref, p);
                     },
                     itemBuilder: (_) => [
@@ -147,6 +201,7 @@ class _GroupList extends ConsumerWidget {
                           child: Text(p.protocol == 'tor' ? context.l10n.menuBridgeSettings : context.l10n.menuEditServer),
                         ),
                       PopupMenuItem(value: 'share', child: Text(context.l10n.menuShare)),
+                      if (p.id != defaultId) PopupMenuItem(value: 'default', child: Text(context.l10n.menuSetDefault)),
                       if (p.needsCredentials)
                         PopupMenuItem(value: 'credentials', child: Text(context.l10n.menuCredentials)),
                       PopupMenuItem(value: 'delete', child: Text(context.l10n.actionDelete)),
@@ -356,77 +411,79 @@ class _ImportSheetState extends ConsumerState<_ImportSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(context.l10n.importTitle, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 4),
-          Text(context.l10n.importDescription),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (QrScanScreen.supported)
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(context.l10n.importTitle, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text(context.l10n.importDescription),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (QrScanScreen.supported)
+                  FilledButton.tonalIcon(
+                    onPressed: _busy ? null : _scanQr,
+                    icon: const Icon(Icons.qr_code_scanner),
+                    label: Text(context.l10n.importScanQr),
+                  ),
                 FilledButton.tonalIcon(
-                  onPressed: _busy ? null : _scanQr,
-                  icon: const Icon(Icons.qr_code_scanner),
-                  label: Text(context.l10n.importScanQr),
+                  onPressed: _busy ? null : _openFile,
+                  icon: const Icon(Icons.file_open_outlined),
+                  label: Text(context.l10n.importOpenFile),
                 ),
-              FilledButton.tonalIcon(
-                onPressed: _busy ? null : _openFile,
-                icon: const Icon(Icons.file_open_outlined),
-                label: Text(context.l10n.importOpenFile),
-              ),
-              FilledButton.tonalIcon(
-                onPressed: _busy ? null : _paste,
-                icon: const Icon(Icons.content_paste),
-                label: Text(context.l10n.importPaste),
-              ),
-              FilledButton.tonalIcon(
-                onPressed: _busy ? null : _openSubscription,
-                icon: const Icon(Icons.add_link),
-                label: Text(context.l10n.importSubscription),
-              ),
-              PopupMenuButton<String>(
-                enabled: !_busy,
-                tooltip: context.l10n.importAddTor,
-                onSelected: (kind) {
-                  _controller.text = 'tor://$kind';
-                  _import();
-                },
-                itemBuilder: (_) => [
-                  PopupMenuItem(value: '', child: Text(context.l10n.importTorDirect)),
-                  PopupMenuItem(value: 'snowflake', child: Text(context.l10n.importTorSnowflake)),
-                  PopupMenuItem(value: 'obfs4', child: Text(context.l10n.importTorObfs4)),
-                ],
-                child: IgnorePointer(
-                  child: FilledButton.tonalIcon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.security),
-                    label: Text(context.l10n.importTor),
+                FilledButton.tonalIcon(
+                  onPressed: _busy ? null : _paste,
+                  icon: const Icon(Icons.content_paste),
+                  label: Text(context.l10n.importPaste),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _busy ? null : _openSubscription,
+                  icon: const Icon(Icons.add_link),
+                  label: Text(context.l10n.importSubscription),
+                ),
+                PopupMenuButton<String>(
+                  enabled: !_busy,
+                  tooltip: context.l10n.importAddTor,
+                  onSelected: (kind) {
+                    _controller.text = 'tor://$kind';
+                    _import();
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(value: '', child: Text(context.l10n.importTorDirect)),
+                    PopupMenuItem(value: 'snowflake', child: Text(context.l10n.importTorSnowflake)),
+                    PopupMenuItem(value: 'obfs4', child: Text(context.l10n.importTorObfs4)),
+                  ],
+                  child: IgnorePointer(
+                    child: FilledButton.tonalIcon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.security),
+                      label: Text(context.l10n.importTor),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _controller,
-            minLines: 4,
-            maxLines: 8,
-            decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'vless://…'),
-          ),
-          if (_message != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_message!)),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton(onPressed: _busy ? null : _import, child: Text(context.l10n.actionImport)),
-          ),
-        ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _controller,
+              minLines: 4,
+              maxLines: 8,
+              decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'vless://…'),
+            ),
+            if (_message != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_message!)),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton(onPressed: _busy ? null : _import, child: Text(context.l10n.actionImport)),
+            ),
+          ],
+        ),
       ),
     );
   }

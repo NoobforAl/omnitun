@@ -51,7 +51,28 @@ class ProfilesController extends Notifier<List<ProfileInfo>> {
     return fresh.length;
   }
 
-  void remove(String id) => _save(state.where((p) => p.id != id).toList());
+  void remove(String id) {
+    _save(state.where((p) => p.id != id).toList());
+    _fixSelection();
+  }
+
+  /// Deletes every server (all subscriptions' too) except the built-in Tor ones, which are the
+  /// app's own default and never come from the user's files.
+  void clearAll() {
+    _save(state.where((p) => p.protocol == 'tor').toList());
+    _fixSelection();
+  }
+
+  /// When the chosen server is gone, or Auto has nothing left to start on, choose the default.
+  void _fixSelection() {
+    final choice = ref.read(selectedProfileIdProvider);
+    if (choice != null && countryOfChoice(choice) != null) return;
+    final gone = choice != null && !state.any((p) => p.id == choice);
+    final nothingAuto = choice == null && !state.any((p) => p.protocol != 'tor');
+    if (!gone && !nothingAuto) return;
+    final fallback = resolveDefault(state, ref.read(defaultProfileIdProvider));
+    if (fallback != null) ref.read(selectedProfileIdProvider.notifier).select(fallback.id);
+  }
 
   /// Puts an edited profile where [oldId] was (same group and place in the list). If
   /// the edit gave it a new ID, a selection of the old one follows.
@@ -97,7 +118,10 @@ class ProfilesController extends Notifier<List<ProfileInfo>> {
   void setCredentials(String id, String username, String password) =>
       _save([for (final p in state) p.id == id ? p.withCredentials(username, password) : p]);
 
-  void removeGroup(String group) => _save(state.where((p) => p.group != group).toList());
+  void removeGroup(String group) {
+    _save(state.where((p) => p.group != group).toList());
+    _fixSelection();
+  }
 
   /// Moves a profile within its group; [from]/[to] are positions inside the
   /// group ([to] already adjusted for the removed item).
@@ -144,6 +168,78 @@ class SelectedProfileController extends Notifier<String?> {
 
 final selectedProfileIdProvider =
     NotifierProvider<SelectedProfileController, String?>(SelectedProfileController.new);
+
+/// Tor with Snowflake bridges, obfs4 bridges and direct: the app's own default configuration. It
+/// needs nothing from the user and is always available; their servers come on top of it.
+const torDefaultLinks = ['tor://snowflake', 'tor://obfs4', 'tor://'];
+
+/// The kind of bridges a Tor profile uses ("snowflake", "obfs4"), or null (direct, or not Tor).
+String? torKind(ProfileInfo p) {
+  if (p.protocol != 'tor') return null;
+  return (p.raw['tor'] as Map?)?['builtin'] as String?;
+}
+
+/// The profile the user marked as default; null = the built-in default (Tor with Snowflake).
+class DefaultProfileController extends Notifier<String?> {
+  static const _key = 'default_profile';
+
+  /// Set when the app itself added the Tor defaults to an empty list: the introduction is still due.
+  static const freshInstall = 'fresh_install';
+
+  @override
+  String? build() => ref.read(storeProvider).read<String>(_key);
+
+  void set(String? id) {
+    state = id;
+    ref.read(storeProvider).write(_key, id);
+  }
+
+  /// Adds the Tor defaults on a brand new install (and whenever [force] asks, after the user deleted
+  /// them) and selects the default then. Returns how many were added.
+  Future<int> ensureTorDefaults({bool force = false}) async {
+    final store = ref.read(storeProvider);
+    const seeded = 'defaults_seeded';
+    if (!force && store.read<bool>(seeded) == true) return 0;
+    final fresh = ref.read(profilesProvider).isEmpty;
+    if (!force && !fresh) {
+      // Someone who already set the app up has their own list; Restore Tor defaults is in the menu.
+      store.write(seeded, true);
+      return 0;
+    }
+    final ImportResult result;
+    try {
+      result = await ref.read(engineProvider).importText(torDefaultLinks.join('\n'));
+    } catch (_) {
+      return 0; // the core is not ready; the next start tries again
+    }
+    final added = ref.read(profilesProvider.notifier).addAll(result.profiles);
+    store.write(seeded, true);
+    if (fresh && !force) store.write(freshInstall, true);
+    final choice = ref.read(selectedProfileIdProvider);
+    if ((fresh || force) && choice == null) {
+      final d = resolveDefault(ref.read(profilesProvider), state);
+      if (d != null) ref.read(selectedProfileIdProvider.notifier).select(d.id);
+    }
+    return added;
+  }
+}
+
+final defaultProfileIdProvider =
+    NotifierProvider<DefaultProfileController, String?>(DefaultProfileController.new);
+
+/// The default profile: the one the user chose, else Tor with Snowflake, else any Tor profile.
+/// What the app selects when it has no valid choice (first start, a deleted server).
+final defaultProfileProvider = Provider<ProfileInfo?>(
+  (ref) => resolveDefault(ref.watch(profilesProvider), ref.watch(defaultProfileIdProvider)),
+);
+
+/// [defaultProfileProvider] as a function, for the controllers that cannot depend on it.
+ProfileInfo? resolveDefault(List<ProfileInfo> profiles, String? chosen) {
+  final mine = profiles.where((p) => p.id == chosen).firstOrNull;
+  if (mine != null) return mine;
+  return profiles.where((p) => torKind(p) == 'snowflake').firstOrNull ??
+      profiles.where((p) => p.protocol == 'tor').firstOrNull;
+}
 
 /// Countries the user set by hand, by profile ID (they win over the guess).
 class CountryOverrides extends Notifier<Map<String, String>> {

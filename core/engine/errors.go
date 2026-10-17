@@ -18,6 +18,14 @@ const (
 	ErrNetworkUnreachable = "NETWORK_UNREACHABLE"
 	ErrDNS                = "DNS_FAILED"
 	ErrTLS                = "TLS_ERROR"
+	ErrCertDate           = "CERT_DATE"
+	ErrCertUntrusted      = "CERT_UNTRUSTED"
+	ErrCertName           = "CERT_NAME"
+	ErrTLSKeys            = "TLS_KEYS"
+	ErrReality            = "REALITY_REJECTED"
+	ErrNoHandshake        = "NO_HANDSHAKE"
+	ErrUDPBlocked         = "UDP_BLOCKED"
+	ErrPortInUse          = "PORT_IN_USE"
 	ErrAuth               = "AUTH_FAILED"
 	ErrClosed             = "CLOSED"
 	ErrTorTimeout         = "TOR_TIMEOUT"
@@ -33,6 +41,24 @@ type errorKind struct {
 }
 
 var errorKinds = [...]errorKind{
+	// First: a failed name lookup also says "connection refused" or "i/o timeout" (about the
+	// resolver), which would otherwise be blamed on the server.
+	{ErrDNS, "lookup ", "the server name could not be resolved"},
+	// A protocol can fail for several reasons that need different fixes, so the specific
+	// ones come before the general kind they belong to.
+	{ErrReality, "reality verification failed", "the server rejected the Reality handshake (check the public key, short ID and server name)"},
+	{ErrReality, "REALITY", "the server rejected the Reality handshake (check the public key, short ID and server name)"},
+	{ErrCertDate, "certificate has expired", "the server's certificate has expired or is not valid yet (also check this phone's date and time)"},
+	{ErrCertDate, "not yet valid", "the server's certificate has expired or is not valid yet (also check this phone's date and time)"},
+	{ErrCertUntrusted, "unknown authority", "the server's certificate is not signed by a trusted authority"},
+	{ErrCertName, "certificate is valid for", "the server's certificate is for a different name than the one you connect to"},
+	{ErrCertName, "certificate is not valid for", "the server's certificate is for a different name than the one you connect to"},
+	{ErrTLSKeys, "tls-crypt", "the shared key (tls-auth or tls-crypt) does not match the server's"},
+	{ErrTLSKeys, "tls-auth", "the shared key (tls-auth or tls-crypt) does not match the server's"},
+	{ErrTLSKeys, "HMAC verification failed", "the shared key (tls-auth or tls-crypt) does not match the server's"},
+	{ErrNoHandshake, "no handshake from", "the server did not answer the handshake (check the keys, the endpoint and that its UDP port is open)"},
+	{ErrUDPBlocked, "no recent network activity", "the server did not answer over UDP; this network may block it, try a TCP-based server"},
+	{ErrPortInUse, "address already in use", "the local port is already used by another app"},
 	{ErrTimeout, "context deadline exceeded", "the server did not answer in time"},
 	{ErrTimeout, "i/o timeout", "the server did not answer in time"},
 	{ErrRefused, "connection refused", "the server refused the connection"},
@@ -42,6 +68,8 @@ var errorKinds = [...]errorKind{
 	{ErrDNS, "no such host", "the server name could not be resolved"},
 	{ErrTLS, "certificate", "the server's security certificate was rejected"},
 	{ErrAuth, "authentication failed", "the username or password was rejected"},
+	{ErrAuth, "AUTH_FAILED", "the username or password was rejected"},
+	{ErrAuth, "401 Unauthorized", "the username or password was rejected"},
 	{ErrClosed, "EOF", "the server closed the connection"},
 }
 

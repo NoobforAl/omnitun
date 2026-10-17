@@ -182,6 +182,35 @@ class AppLocalizationsFa extends AppLocalizations {
   String get errClosed => 'سرور اتصال را بست';
 
   @override
+  String get errCertDate =>
+      'گواهی سرور منقضی شده یا هنوز معتبر نیست (تاریخ و ساعت گوشی را هم بررسی کنید)';
+
+  @override
+  String get errCertUntrusted => 'گواهی سرور را مرجع معتبری امضا نکرده است';
+
+  @override
+  String get errCertName => 'گواهی سرور برای نامی غیر از نام اتصال شماست';
+
+  @override
+  String get errTlsKeys =>
+      'کلید مشترک (tls-auth یا tls-crypt) با کلید سرور یکی نیست';
+
+  @override
+  String get errReality =>
+      'سرور دست‌دهی Reality را نپذیرفت (کلید عمومی، short ID و نام سرور را بررسی کنید)';
+
+  @override
+  String get errNoHandshake =>
+      'سرور به دست‌دهی پاسخ نداد (کلیدها، آدرس و باز بودن پورت UDP را بررسی کنید)';
+
+  @override
+  String get errUdpBlocked =>
+      'سرور از طریق UDP پاسخ نداد؛ این شبکه ممکن است UDP را مسدود کرده باشد، سرور مبتنی بر TCP را امتحان کنید';
+
+  @override
+  String get errPortInUse => 'پورت محلی را برنامه دیگری استفاده می‌کند';
+
+  @override
   String get errTorTimeout =>
       'Tor به‌موقع وصل نشد. ممکن است این شبکه Tor را مسدود کرده باشد؛ از پل (Snowflake یا obfs4) استفاده کنید';
 
@@ -222,6 +251,33 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get menuManage => 'مدیریت سرورها و اشتراک‌ها';
+
+  @override
+  String get menuSetDefault => 'پیش‌فرض شود';
+
+  @override
+  String get badgeDefault => 'پیش‌فرض';
+
+  @override
+  String get menuDeleteAll => 'حذف همه سرورها';
+
+  @override
+  String get deleteAllTitle => 'همه سرورها حذف شوند؟';
+
+  @override
+  String get deleteAllBody =>
+      'همه سرورها و اشتراک‌هایی که اضافه کرده‌اید حذف می‌شوند. اتصال Tor داخلی می‌ماند و برنامه به آن برمی‌گردد.';
+
+  @override
+  String get menuRestoreTor => 'بازگرداندن Tor پیش‌فرض';
+
+  @override
+  String get deletedAllToast => 'همه سرورها حذف شدند';
+
+  @override
+  String defaultSetToast(String name) {
+    return '$name اکنون پیش‌فرض است';
+  }
 
   @override
   String serversCount(int count) {

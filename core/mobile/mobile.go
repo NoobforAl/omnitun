@@ -72,12 +72,14 @@ func Start(dataDir string, platform Platform) (string, error) {
 	if srv != nil {
 		return info, nil
 	}
+	wrapper := newPlatformWrapper(platform)
+	installResolver(wrapper)
 	s, err := control.NewServer(control.ServerConfig{
 		DataDir: dataDir,
 		// Android pauses apps in the background, so a quiet UI connection means
 		// nothing; the VPN service stops the tunnel when the task is removed.
 		Grace:       -1,
-		Platform:    newPlatformWrapper(platform),
+		Platform:    wrapper,
 		Tun:         tunProvider{platform},
 		PlatformVPN: platform,
 		// Go cannot read the Android system CA store; use the embedded Mozilla bundle.

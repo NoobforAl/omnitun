@@ -76,6 +76,14 @@
   "errTls": "the server's security certificate was rejected",
   "errAuth": "the username or password was rejected",
   "errClosed": "the server closed the connection",
+  "errCertDate": "the server's certificate has expired or is not valid yet (also check this phone's date and time)",
+  "errCertUntrusted": "the server's certificate is not signed by a trusted authority",
+  "errCertName": "the server's certificate is for a different name than the one you connect to",
+  "errTlsKeys": "the shared key (tls-auth or tls-crypt) does not match the server's",
+  "errReality": "the server rejected the Reality handshake (check the public key, short ID and server name)",
+  "errNoHandshake": "the server did not answer the handshake (check the keys, the endpoint and that its UDP port is open)",
+  "errUdpBlocked": "the server did not answer over UDP; this network may block it, try a TCP-based server",
+  "errPortInUse": "the local port is already used by another app",
   "errTorTimeout": "Tor did not finish connecting in time. This network may block Tor; use a bridge (Snowflake or obfs4)",
   "errTorBridgeTimeout": "Tor did not finish connecting in time. The bridge may be blocked or overloaded; try another bridge type (Snowflake or obfs4)",
   "errTorBadBridge": "a Tor bridge line is not valid (it needs a transport, address and fingerprint)",
@@ -89,6 +97,21 @@
   "menuNewServer": "Add a server by hand",
   "menuSubscription": "Add a subscription",
   "menuManage": "Manage servers and subscriptions",
+  "menuSetDefault": "Make default",
+  "badgeDefault": "Default",
+  "menuDeleteAll": "Delete all servers",
+  "deleteAllTitle": "Delete all servers?",
+  "deleteAllBody": "Every server and subscription you added is removed. The built-in Tor connection stays, and the app goes back to it.",
+  "menuRestoreTor": "Restore Tor defaults",
+  "deletedAllToast": "All servers deleted",
+  "defaultSetToast": "{name} is the default now",
+  "@defaultSetToast": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "serversCount": "{count, plural, =1{1 server} other{{count} servers}}",
   "@serversCount": {
     "placeholders": {

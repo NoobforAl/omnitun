@@ -329,6 +329,8 @@ class _ServerRow extends ConsumerWidget {
                   askCredentials(context, ref, p);
                 case 'delete':
                   ref.read(profilesProvider.notifier).remove(p.id);
+                case 'default':
+                  ref.read(defaultProfileIdProvider.notifier).set(p.id);
               }
             },
             itemBuilder: (_) => [
@@ -338,6 +340,8 @@ class _ServerRow extends ConsumerWidget {
                   child: Text(tor ? context.l10n.menuBridgeSettings : context.l10n.menuEditServer),
                 ),
               PopupMenuItem(value: 'share', child: Text(context.l10n.menuShare)),
+              if (p.id != ref.read(defaultProfileProvider)?.id)
+                PopupMenuItem(value: 'default', child: Text(context.l10n.menuSetDefault)),
               if (!tor) PopupMenuItem(value: 'country', child: Text(context.l10n.menuSetCountry)),
               if (p.needsCredentials) PopupMenuItem(value: 'credentials', child: Text(context.l10n.menuCredentials)),
               PopupMenuItem(value: 'delete', child: Text(context.l10n.actionDelete)),

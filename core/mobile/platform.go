@@ -226,6 +226,48 @@ func (w *platformWrapper) NetworkInterfaces() ([]adapter.NetworkInterface, error
 	return out, nil
 }
 
+// SystemDNS returns the resolvers of the network the phone is online through
+// (IPv4 first). Go cannot read them itself on Android: there is no
+// /etc/resolv.conf, so sing-box's "local" resolver would ask [::1]:53.
+func (w *platformWrapper) SystemDNS() []string {
+	list, err := w.NetworkInterfaces()
+	if err != nil {
+		return nil
+	}
+	var v4, v6 []string
+	add := func(ni adapter.NetworkInterface) {
+		for _, s := range ni.DNSServers {
+			addr, err := netip.ParseAddr(s)
+			if err != nil || addr.IsUnspecified() || addr.IsLoopback() || addr.IsLinkLocalUnicast() {
+				continue
+			}
+			if addr.Is4() {
+				v4 = append(v4, s)
+			} else {
+				v6 = append(v6, s)
+			}
+		}
+	}
+	defaultIndex := -1
+	if m := w.monitor; m != nil {
+		m.mu.Lock()
+		if m.defaultInterface != nil {
+			defaultIndex = m.defaultInterface.Index
+		}
+		m.mu.Unlock()
+	}
+	// The default network when the monitor knows it, otherwise every real network.
+	for _, ni := range list {
+		if ni.Flags&net.FlagUp == 0 || ni.Type == C.InterfaceTypeOther {
+			continue
+		}
+		if defaultIndex < 0 || ni.Index == defaultIndex {
+			add(ni)
+		}
+	}
+	return append(v4, v6...)
+}
+
 // Unused platform features.
 
 func (w *platformWrapper) UnderNetworkExtension() bool              { return false }

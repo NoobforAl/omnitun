@@ -9,6 +9,7 @@ import (
 	"net"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -192,6 +193,29 @@ func (e *Engine) logf(level, format string, args ...any) {
 	}
 }
 
+// systemDNS names the operating system's resolver for sing-box's "local" DNS
+// when Go cannot find it alone (Android); "" keeps sing-box's own lookup.
+func (e *Engine) systemDNS() string {
+	p, ok := e.cfg.Platform.(interface{ SystemDNS() []string })
+	if !ok {
+		return ""
+	}
+	servers := p.SystemDNS()
+	if len(servers) == 0 {
+		// Never leave a phone with the resolver that cannot work (it asks [::1]:53 and every
+		// server name fails): a public one is better than none.
+		e.logf("warn", "the network reports no DNS server; using %s for server names", fallbackLocalDNS)
+		return fallbackLocalDNS
+	}
+	if strings.Contains(servers[0], ":") {
+		return "udp://[" + servers[0] + "]"
+	}
+	return "udp://" + servers[0]
+}
+
+// fallbackLocalDNS resolves server names on a phone whose network names no DNS server.
+const fallbackLocalDNS = "udp://1.1.1.1"
+
 // CheckConfig validates a generated config against sing-box's schema without starting it.
 func CheckConfig(cfg map[string]any) error {
 	_, err := parseOptions(include.Context(context.Background()), cfg)
@@ -314,6 +338,9 @@ func (e *Engine) startSingboxLocked(profiles []*profile.Profile, opts singbox.Op
 	if opts.TorSocks == "" {
 		// Tor profiles only run when selected (Tor must bootstrap first).
 		profiles = withoutTor(profiles)
+	}
+	if opts.LocalDNS == "" {
+		opts.LocalDNS = e.systemDNS()
 	}
 	cfg, skipped, err := singbox.Build(profiles, opts)
 	if err != nil {
@@ -542,13 +569,13 @@ type LatencyResult struct {
 // temporary sing-box instance that has no inbounds, so it works whether or
 // not a tunnel is running.
 func (e *Engine) TestLatency(ctx context.Context, profiles []*profile.Profile, testURL string) ([]LatencyResult, error) {
-	cfg, skipped, err := singbox.Build(profiles, singbox.Options{TestURL: testURL, LogLevel: "error"})
+	cfg, skipped, err := singbox.Build(profiles, singbox.Options{TestURL: testURL, LogLevel: "error", LocalDNS: e.systemDNS()})
 	if err != nil {
 		return nil, err
 	}
 	delete(cfg, "inbounds")
-	delete(cfg, "dns")
-	delete(cfg, "route")
+	// The servers' names still have to be resolved, so the DNS section stays.
+	cfg["route"] = map[string]any{"default_domain_resolver": "local"}
 	tmp := New(Config{
 		DataDir:          filepath.Join(e.dataDir(), "latency"),
 		Platform:         e.cfg.Platform,

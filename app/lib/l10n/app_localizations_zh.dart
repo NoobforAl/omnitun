@@ -182,6 +182,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get errClosed => '服务器关闭了连接';
 
   @override
+  String get errCertDate => '服务器证书已过期或尚未生效（也请检查手机的日期和时间）';
+
+  @override
+  String get errCertUntrusted => '服务器证书不是由受信任的机构签发的';
+
+  @override
+  String get errCertName => '服务器证书对应的名称与您连接的名称不一致';
+
+  @override
+  String get errTlsKeys => '共享密钥（tls-auth 或 tls-crypt）与服务器的不匹配';
+
+  @override
+  String get errReality => '服务器拒绝了 Reality 握手（请检查公钥、short ID 和服务器名称）';
+
+  @override
+  String get errNoHandshake => '服务器没有响应握手（请检查密钥、地址以及 UDP 端口是否开放）';
+
+  @override
+  String get errUdpBlocked => '服务器没有通过 UDP 响应；此网络可能屏蔽了 UDP，请尝试基于 TCP 的服务器';
+
+  @override
+  String get errPortInUse => '本地端口已被其他应用占用';
+
+  @override
   String get errTorTimeout =>
       'Tor 没有及时连接完成。此网络可能屏蔽了 Tor；请使用网桥（Snowflake 或 obfs4）';
 
@@ -221,6 +245,32 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get menuManage => '管理服务器和订阅';
+
+  @override
+  String get menuSetDefault => '设为默认';
+
+  @override
+  String get badgeDefault => '默认';
+
+  @override
+  String get menuDeleteAll => '删除所有服务器';
+
+  @override
+  String get deleteAllTitle => '删除所有服务器？';
+
+  @override
+  String get deleteAllBody => '您添加的所有服务器和订阅都将被删除。内置的 Tor 连接会保留，应用将回到它。';
+
+  @override
+  String get menuRestoreTor => '恢复默认 Tor';
+
+  @override
+  String get deletedAllToast => '所有服务器已删除';
+
+  @override
+  String defaultSetToast(String name) {
+    return '$name 现在是默认';
+  }
 
   @override
   String serversCount(int count) {

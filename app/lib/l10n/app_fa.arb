@@ -56,6 +56,14 @@
   "errTls": "گواهی امنیتی سرور پذیرفته نشد",
   "errAuth": "نام کاربری یا گذرواژه پذیرفته نشد",
   "errClosed": "سرور اتصال را بست",
+  "errCertDate": "گواهی سرور منقضی شده یا هنوز معتبر نیست (تاریخ و ساعت گوشی را هم بررسی کنید)",
+  "errCertUntrusted": "گواهی سرور را مرجع معتبری امضا نکرده است",
+  "errCertName": "گواهی سرور برای نامی غیر از نام اتصال شماست",
+  "errTlsKeys": "کلید مشترک (tls-auth یا tls-crypt) با کلید سرور یکی نیست",
+  "errReality": "سرور دست‌دهی Reality را نپذیرفت (کلید عمومی، short ID و نام سرور را بررسی کنید)",
+  "errNoHandshake": "سرور به دست‌دهی پاسخ نداد (کلیدها، آدرس و باز بودن پورت UDP را بررسی کنید)",
+  "errUdpBlocked": "سرور از طریق UDP پاسخ نداد؛ این شبکه ممکن است UDP را مسدود کرده باشد، سرور مبتنی بر TCP را امتحان کنید",
+  "errPortInUse": "پورت محلی را برنامه دیگری استفاده می‌کند",
   "errTorTimeout": "Tor به‌موقع وصل نشد. ممکن است این شبکه Tor را مسدود کرده باشد؛ از پل (Snowflake یا obfs4) استفاده کنید",
   "errTorBridgeTimeout": "Tor به‌موقع وصل نشد. ممکن است پل مسدود یا شلوغ باشد؛ نوع دیگری از پل (Snowflake یا obfs4) را امتحان کنید",
   "errTorBadBridge": "خط پل Tor معتبر نیست (باید نوع انتقال، نشانی و اثر انگشت داشته باشد)",
@@ -69,6 +77,21 @@
   "menuNewServer": "افزودن دستی سرور",
   "menuSubscription": "افزودن اشتراک",
   "menuManage": "مدیریت سرورها و اشتراک‌ها",
+  "menuSetDefault": "پیش‌فرض شود",
+  "badgeDefault": "پیش‌فرض",
+  "menuDeleteAll": "حذف همه سرورها",
+  "deleteAllTitle": "همه سرورها حذف شوند؟",
+  "deleteAllBody": "همه سرورها و اشتراک‌هایی که اضافه کرده‌اید حذف می‌شوند. اتصال Tor داخلی می‌ماند و برنامه به آن برمی‌گردد.",
+  "menuRestoreTor": "بازگرداندن Tor پیش‌فرض",
+  "deletedAllToast": "همه سرورها حذف شدند",
+  "defaultSetToast": "{name} اکنون پیش‌فرض است",
+  "@defaultSetToast": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "serversCount": "{count, plural, =1{1 سرور} other{{count} سرور}}",
   "otherGroup": "سایر",
   "torGroup": "Tor",

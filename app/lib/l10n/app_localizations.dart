@@ -440,6 +440,54 @@ abstract class AppLocalizations {
   /// **'the server closed the connection'**
   String get errClosed;
 
+  /// No description provided for @errCertDate.
+  ///
+  /// In en, this message translates to:
+  /// **'the server\'s certificate has expired or is not valid yet (also check this phone\'s date and time)'**
+  String get errCertDate;
+
+  /// No description provided for @errCertUntrusted.
+  ///
+  /// In en, this message translates to:
+  /// **'the server\'s certificate is not signed by a trusted authority'**
+  String get errCertUntrusted;
+
+  /// No description provided for @errCertName.
+  ///
+  /// In en, this message translates to:
+  /// **'the server\'s certificate is for a different name than the one you connect to'**
+  String get errCertName;
+
+  /// No description provided for @errTlsKeys.
+  ///
+  /// In en, this message translates to:
+  /// **'the shared key (tls-auth or tls-crypt) does not match the server\'s'**
+  String get errTlsKeys;
+
+  /// No description provided for @errReality.
+  ///
+  /// In en, this message translates to:
+  /// **'the server rejected the Reality handshake (check the public key, short ID and server name)'**
+  String get errReality;
+
+  /// No description provided for @errNoHandshake.
+  ///
+  /// In en, this message translates to:
+  /// **'the server did not answer the handshake (check the keys, the endpoint and that its UDP port is open)'**
+  String get errNoHandshake;
+
+  /// No description provided for @errUdpBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'the server did not answer over UDP; this network may block it, try a TCP-based server'**
+  String get errUdpBlocked;
+
+  /// No description provided for @errPortInUse.
+  ///
+  /// In en, this message translates to:
+  /// **'the local port is already used by another app'**
+  String get errPortInUse;
+
   /// No description provided for @errTorTimeout.
   ///
   /// In en, this message translates to:
@@ -517,6 +565,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manage servers and subscriptions'**
   String get menuManage;
+
+  /// No description provided for @menuSetDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Make default'**
+  String get menuSetDefault;
+
+  /// No description provided for @badgeDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get badgeDefault;
+
+  /// No description provided for @menuDeleteAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all servers'**
+  String get menuDeleteAll;
+
+  /// No description provided for @deleteAllTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all servers?'**
+  String get deleteAllTitle;
+
+  /// No description provided for @deleteAllBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Every server and subscription you added is removed. The built-in Tor connection stays, and the app goes back to it.'**
+  String get deleteAllBody;
+
+  /// No description provided for @menuRestoreTor.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Tor defaults'**
+  String get menuRestoreTor;
+
+  /// No description provided for @deletedAllToast.
+  ///
+  /// In en, this message translates to:
+  /// **'All servers deleted'**
+  String get deletedAllToast;
+
+  /// No description provided for @defaultSetToast.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is the default now'**
+  String defaultSetToast(String name);
 
   /// No description provided for @serversCount.
   ///

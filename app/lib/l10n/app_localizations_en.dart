@@ -182,6 +182,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errClosed => 'the server closed the connection';
 
   @override
+  String get errCertDate =>
+      'the server\'s certificate has expired or is not valid yet (also check this phone\'s date and time)';
+
+  @override
+  String get errCertUntrusted =>
+      'the server\'s certificate is not signed by a trusted authority';
+
+  @override
+  String get errCertName =>
+      'the server\'s certificate is for a different name than the one you connect to';
+
+  @override
+  String get errTlsKeys =>
+      'the shared key (tls-auth or tls-crypt) does not match the server\'s';
+
+  @override
+  String get errReality =>
+      'the server rejected the Reality handshake (check the public key, short ID and server name)';
+
+  @override
+  String get errNoHandshake =>
+      'the server did not answer the handshake (check the keys, the endpoint and that its UDP port is open)';
+
+  @override
+  String get errUdpBlocked =>
+      'the server did not answer over UDP; this network may block it, try a TCP-based server';
+
+  @override
+  String get errPortInUse => 'the local port is already used by another app';
+
+  @override
   String get errTorTimeout =>
       'Tor did not finish connecting in time. This network may block Tor; use a bridge (Snowflake or obfs4)';
 
@@ -222,6 +253,33 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get menuManage => 'Manage servers and subscriptions';
+
+  @override
+  String get menuSetDefault => 'Make default';
+
+  @override
+  String get badgeDefault => 'Default';
+
+  @override
+  String get menuDeleteAll => 'Delete all servers';
+
+  @override
+  String get deleteAllTitle => 'Delete all servers?';
+
+  @override
+  String get deleteAllBody =>
+      'Every server and subscription you added is removed. The built-in Tor connection stays, and the app goes back to it.';
+
+  @override
+  String get menuRestoreTor => 'Restore Tor defaults';
+
+  @override
+  String get deletedAllToast => 'All servers deleted';
+
+  @override
+  String defaultSetToast(String name) {
+    return '$name is the default now';
+  }
 
   @override
   String serversCount(int count) {

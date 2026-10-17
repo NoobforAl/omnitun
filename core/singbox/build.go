@@ -50,6 +50,10 @@ type Options struct {
 	// https://host/path (DoH), tls://host (DoT), tcp://host, udp://host or a bare IP (UDP).
 	// Default https://1.1.1.1/dns-query.
 	DNS string
+	// LocalDNS is the resolver used outside the tunnel (the proxy servers' own
+	// names, and bypassed sites), as a resolver URL. Empty uses the operating
+	// system's resolver, which phones need the engine to name (see engine.systemDNS).
+	LocalDNS string
 	// ProxyPrivate also sends local addresses (LocalPrefixes) through the
 	// tunnel; by default they bypass it and aren't routed into the VPN.
 	ProxyPrivate bool
@@ -293,12 +297,20 @@ func Build(profiles []*profile.Profile, opts Options) (obj, []error, error) {
 		}
 	}
 
+	localDNS := obj{"type": "local"}
+	if opts.LocalDNS != "" {
+		if localDNS, err = dnsServer(opts.LocalDNS); err != nil {
+			return nil, skipped, err
+		}
+	}
+	localDNS["tag"] = "local"
+
 	cfg := obj{
 		"log": obj{"level": opts.LogLevel, "timestamp": true},
 		"dns": obj{
 			"servers": []any{
 				remoteDNS,
-				obj{"type": "local", "tag": "local"},
+				localDNS,
 			},
 			"final":    dnsFinal,
 			"strategy": "prefer_ipv4",

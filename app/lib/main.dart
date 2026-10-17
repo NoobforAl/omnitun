@@ -44,6 +44,8 @@ class _OmnitunAppState extends ConsumerState<OmnitunApp> {
         (text) => importShared(_navigator, ref, text),
         startup: ref.read(startupSharesProvider),
       );
+      // The app's own default configuration (Tor) is there from the first start.
+      await ref.read(defaultProfileIdProvider.notifier).ensureTorDefaults();
       if (!shared) _introduction();
     });
   }
@@ -51,7 +53,11 @@ class _OmnitunAppState extends ConsumerState<OmnitunApp> {
   /// The first start, with no servers yet, begins with a short introduction.
   Future<void> _introduction() async {
     if (ref.read(onboardedProvider)) return;
-    if (ref.read(profilesProvider).isNotEmpty) return; // an existing user needs no introduction
+    // An existing user needs no introduction. The Tor defaults are the app's, not theirs: a list
+    // that is only those, on an install the app seeded itself, is still a new user's.
+    final profiles = ref.read(profilesProvider);
+    final fresh = ref.read(storeProvider).read<bool>(DefaultProfileController.freshInstall) == true;
+    if (profiles.any((p) => p.protocol != 'tor') || (profiles.isNotEmpty && !fresh)) return;
     final navigator = _navigator.currentState;
     if (navigator == null) return;
     final addServer = await navigator.push<bool>(

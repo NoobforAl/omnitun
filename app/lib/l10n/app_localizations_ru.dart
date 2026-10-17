@@ -182,6 +182,37 @@ class AppLocalizationsRu extends AppLocalizations {
   String get errClosed => 'сервер закрыл соединение';
 
   @override
+  String get errCertDate =>
+      'сертификат сервера просрочен или ещё не действует (проверьте также дату и время на телефоне)';
+
+  @override
+  String get errCertUntrusted =>
+      'сертификат сервера подписан недоверенным центром';
+
+  @override
+  String get errCertName =>
+      'сертификат сервера выдан для другого имени, чем то, к которому вы подключаетесь';
+
+  @override
+  String get errTlsKeys =>
+      'общий ключ (tls-auth или tls-crypt) не совпадает с ключом сервера';
+
+  @override
+  String get errReality =>
+      'сервер отклонил рукопожатие Reality (проверьте публичный ключ, short ID и имя сервера)';
+
+  @override
+  String get errNoHandshake =>
+      'сервер не ответил на рукопожатие (проверьте ключи, адрес и открыт ли UDP-порт)';
+
+  @override
+  String get errUdpBlocked =>
+      'сервер не ответил по UDP; сеть может блокировать его, попробуйте сервер на TCP';
+
+  @override
+  String get errPortInUse => 'локальный порт занят другим приложением';
+
+  @override
   String get errTorTimeout =>
       'Tor не успел подключиться. Возможно, эта сеть блокирует Tor; используйте мост (Snowflake или obfs4)';
 
@@ -222,6 +253,33 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get menuManage => 'Серверы и подписки';
+
+  @override
+  String get menuSetDefault => 'Сделать основным';
+
+  @override
+  String get badgeDefault => 'Основной';
+
+  @override
+  String get menuDeleteAll => 'Удалить все серверы';
+
+  @override
+  String get deleteAllTitle => 'Удалить все серверы?';
+
+  @override
+  String get deleteAllBody =>
+      'Все добавленные вами серверы и подписки будут удалены. Встроенное подключение Tor останется, и приложение вернётся к нему.';
+
+  @override
+  String get menuRestoreTor => 'Восстановить Tor по умолчанию';
+
+  @override
+  String get deletedAllToast => 'Все серверы удалены';
+
+  @override
+  String defaultSetToast(String name) {
+    return '$name теперь основной';
+  }
 
   @override
   String serversCount(int count) {

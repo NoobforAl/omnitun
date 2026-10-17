@@ -76,6 +76,18 @@ class MockEngine implements VpnEngine {
     final profiles = <ProfileInfo>[];
     final errors = <String>[];
     for (final line in text.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty)) {
+      if (line.startsWith('tor://')) {
+        final kind = line.substring(6).replaceAll('/', '');
+        profiles.add(ProfileInfo.fromJson({
+          'id': 'tor-$kind',
+          'name': kind.isEmpty ? 'Tor' : 'Tor ($kind)',
+          'protocol': 'tor',
+          'server': '',
+          'port': 0,
+          'tor': {'builtin': kind},
+        }));
+        continue;
+      }
       final uri = Uri.tryParse(line);
       if (uri == null || uri.host.isEmpty || !uri.hasPort) {
         errors.add(line);

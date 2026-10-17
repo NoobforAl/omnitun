@@ -67,29 +67,41 @@ class HomeScreen extends ConsumerWidget {
           painter: const StarFieldPainter(),
           child: LayoutBuilder(
             builder: (context, box) {
-              final g = _Geometry(box, MediaQuery.paddingOf(context).top);
-              return Stack(
-                children: [
-                  // The Earth is the picture; the status hangs under it.
-                  Positioned(
-                    left: g.left,
-                    top: g.top,
-                    width: g.d,
-                    height: g.d,
-                    child: _Earth(state: conn),
-                  ),
-                  Positioned(
-                    top: g.contentTop,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: ConstrainedBox(
-                        // On a wide window the same screen stays one narrow column.
-                        constraints: const BoxConstraints(maxWidth: _columnWidth),
-                        child: _Hero(state: conn),
+              final g = _Geometry(box, MediaQuery.paddingOf(context).top, MediaQuery.textScalerOf(context),
+                  connected: conn.status == ConnStatus.connected);
+              // The globe and the status sit at fixed places. Where they do not fit (a short screen,
+              // a landscape phone, large text) the page scrolls instead of hiding behind the panel.
+              final page = SizedBox(
+                width: box.maxWidth,
+                height: math.max(box.maxHeight, g.bottom),
+                child: Stack(
+                  children: [
+                    // The Earth is the picture; the status hangs under it.
+                    Positioned(
+                      left: g.left,
+                      top: g.top,
+                      width: g.d,
+                      height: g.d,
+                      child: _Earth(state: conn),
+                    ),
+                    Positioned(
+                      top: g.contentTop,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: ConstrainedBox(
+                          // On a wide window the same screen stays one narrow column.
+                          constraints: const BoxConstraints(maxWidth: _columnWidth),
+                          child: _Hero(state: conn),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
+                ),
+              );
+              return Stack(
+                children: [
+                  SingleChildScrollView(child: page),
                   SafeArea(
                     bottom: false,
                     child: Align(
@@ -113,7 +125,12 @@ class HomeScreen extends ConsumerWidget {
           heightFactor: 1,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: _columnWidth),
-            child: _BottomPanel(state: conn, scheme: scheme),
+            // A long error, large text or a small screen must not push the page off: the panel
+            // takes at most half the height and scrolls.
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.5),
+              child: SingleChildScrollView(child: _BottomPanel(state: conn, scheme: scheme)),
+            ),
           ),
         ),
       ),
@@ -153,18 +170,25 @@ String? _exitCode(WidgetRef ref, EngineState s) {
 /// Where things sit: the globe and the status block under it form one group, centred (a little
 /// above the middle) between the top bar and the bottom panel.
 class _Geometry {
-  factory _Geometry(BoxConstraints box, double safeTop) {
-    const topBar = 54.0, gap = 22.0, status = 176.0;
+  factory _Geometry(BoxConstraints box, double safeTop, TextScaler text, {required bool connected}) {
+    // The status block: a title and a chip, or (connected) also the clock and the speed; as large as the text is.
+    const topBar = 54.0, minGlobe = 56.0;
+    final status = (connected ? 192.0 : 100.0) * math.min(text.scale(1), 1.6);
     final region = box.maxHeight - safeTop - topBar;
-    final d = math.max(150.0, math.min(math.min(box.maxWidth * 0.74, 400.0), region - gap - status));
+    final gap = region < 330 ? 10.0 : 22.0; // on a short screen the globe and its status huddle
+    final d = math.max(minGlobe, math.min(math.min(box.maxWidth * 0.74, 400.0), region - gap - status));
     final free = math.max(0.0, region - (d + gap + status));
-    return _Geometry._(d, (box.maxWidth - d) / 2, safeTop + topBar + free * 0.38, gap);
+    final top = safeTop + topBar + free * 0.38;
+    return _Geometry._(d, (box.maxWidth - d) / 2, top, gap, top + d + gap + status + 12);
   }
 
-  _Geometry._(this.d, this.left, this.top, this._gap);
+  _Geometry._(this.d, this.left, this.top, this._gap, this.bottom);
 
   final double d, left, top;
   final double _gap;
+
+  /// Where the status block ends: the page is at least this tall.
+  final double bottom;
 
   /// Below the globe: nothing is written on the Earth.
   double get contentTop => top + d + _gap;
@@ -459,11 +483,13 @@ class _TrafficRow extends StatelessWidget {
         ],
       ),
     );
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    // Wraps onto two lines where the two pills do not fit side by side (narrow screen, large text).
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 10,
+      runSpacing: 6,
       children: [
         pill(Icons.south_rounded, down),
-        const SizedBox(width: 10),
         pill(Icons.north_rounded, up),
       ],
     );
@@ -480,6 +506,8 @@ class _BottomPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final text = Theme.of(context).textTheme;
+    // On a short screen the panel keeps only what is needed to connect: the choice and the button.
+    final compact = MediaQuery.sizeOf(context).height < 560;
     final profiles = ref.watch(profilesProvider);
     final plan = ref.watch(connectionPlanProvider);
     final choice = ref.watch(selectedProfileIdProvider);
@@ -520,7 +548,7 @@ class _BottomPanel extends ConsumerWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         border: Border(top: BorderSide(color: scheme.outlineVariant)),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: EdgeInsets.fromLTRB(16, compact ? 10 : 14, 16, compact ? 10 : 14),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -565,24 +593,26 @@ class _BottomPanel extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              context.l10n.locationLabel,
-                              style: text.labelSmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
+                            if (!compact)
+                              Text(
+                                context.l10n.locationLabel,
+                                style: text.labelSmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
                               ),
-                            ),
                             Text(
                               title,
                               style: text.titleSmall?.copyWith(letterSpacing: 0, fontWeight: FontWeight.w600),
                               overflow: TextOverflow.ellipsis,
                             ),
-                            Text(
-                              subtitle,
-                              style: text.bodySmall?.copyWith(
-                                color: scheme.onSurfaceVariant,
+                            if (!compact)
+                              Text(
+                                subtitle,
+                                style: text.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
                           ],
                         ),
                       ),

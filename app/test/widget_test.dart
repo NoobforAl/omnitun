@@ -20,27 +20,37 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Not connected'), findsOneWidget);
-    expect(find.text('No profiles yet'), findsOneWidget);
+    // The app's own default configuration is Tor, there from the first start.
+    expect(find.text('No profiles yet'), findsNothing);
+    expect(find.text('Tor (snowflake)'), findsOneWidget);
 
     // The home screen has no footer to switch pages with.
     expect(find.byType(NavigationBar), findsNothing);
     expect(find.byType(NavigationRail), findsNothing);
 
-    await tester.tap(find.text('Import config'));
+    await tester.tap(find.text('Location'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Import a config, link or QR'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'trojan://pw@example.com:443#Test%20Server');
     await tester.tap(find.widgetWithText(FilledButton, 'Import'));
     await tester.pumpAndSettle();
-    expect(find.text('Automatic'), findsOneWidget); // the location row of the home screen
     final container = ProviderScope.containerOf(tester.element(find.byType(OmnitunApp)));
-    expect(container.read(profilesProvider).single.name, 'Test Server');
+    final imported = container.read(profilesProvider).firstWhere((p) => p.name == 'Test Server');
+    // Importing does not move the user off the default; choosing the server does.
+    expect(container.read(selectedProfileProvider)?.protocol, 'tor');
+    container.read(selectedProfileIdProvider.notifier).select(imported.id);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Connect'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 10));
     expect(container.read(connectionProvider).status, ConnStatus.connected);
     expect(find.textContaining('Connected'), findsOneWidget); // "Connected to <country>" once the exit is known
-    expect(find.text('Test Server'), findsOneWidget); // where you exit
+    expect(find.text('Test Server'), findsNWidgets(2)); // where you exit, and the chosen location
 
     await tester.tap(find.text('Disconnect'));
     await tester.pump(const Duration(milliseconds: 400));

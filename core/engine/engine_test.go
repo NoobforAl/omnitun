@@ -70,6 +70,29 @@ func TestDNSVariantsPassSchema(t *testing.T) {
 	}
 }
 
+// A phone has no /etc/resolv.conf, so the engine names the network's resolver for the
+// "local" DNS server; the proxy server's own hostname is looked up through it.
+func TestLocalDNSNamesTheSystemResolver(t *testing.T) {
+	p, err := importer.ParseLink("trojan://pw@example.com:443#t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, local := range []string{"udp://192.168.1.1", "udp://[2001:db8::1]"} {
+		cfg, _, err := singbox.Build(p.AsSlice(), singbox.Options{LocalDNS: local})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := CheckConfig(cfg); err != nil {
+			t.Errorf("%q: sing-box rejected config: %v", local, err)
+		}
+		servers := cfg["dns"].(map[string]any)["servers"].([]any)
+		got := servers[1].(map[string]any)
+		if got["tag"] != "local" || got["type"] != "udp" {
+			t.Errorf("%q: local server is %v", local, got)
+		}
+	}
+}
+
 func TestSplitTunnelPassesSchema(t *testing.T) {
 	p, err := importer.ParseLink("trojan://pw@example.com:443#t")
 	if err != nil {

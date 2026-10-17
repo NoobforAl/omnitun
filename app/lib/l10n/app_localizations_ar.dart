@@ -182,6 +182,35 @@ class AppLocalizationsAr extends AppLocalizations {
   String get errClosed => 'أغلق الخادم الاتصال';
 
   @override
+  String get errCertDate =>
+      'شهادة الخادم منتهية أو غير سارية بعد (تحقق أيضًا من تاريخ الهاتف ووقته)';
+
+  @override
+  String get errCertUntrusted => 'شهادة الخادم غير موقّعة من جهة موثوقة';
+
+  @override
+  String get errCertName => 'شهادة الخادم صادرة لاسم مختلف عن الذي تتصل به';
+
+  @override
+  String get errTlsKeys =>
+      'المفتاح المشترك (tls-auth أو tls-crypt) لا يطابق مفتاح الخادم';
+
+  @override
+  String get errReality =>
+      'رفض الخادم مصافحة Reality (تحقق من المفتاح العام وshort ID واسم الخادم)';
+
+  @override
+  String get errNoHandshake =>
+      'لم يردّ الخادم على المصافحة (تحقق من المفاتيح والعنوان وأن منفذ UDP مفتوح)';
+
+  @override
+  String get errUdpBlocked =>
+      'لم يردّ الخادم عبر UDP؛ قد تحجبه هذه الشبكة، جرّب خادمًا يعمل عبر TCP';
+
+  @override
+  String get errPortInUse => 'المنفذ المحلي مستخدم من تطبيق آخر';
+
+  @override
   String get errTorTimeout =>
       'لم يكتمل اتصال Tor في الوقت المناسب. قد تحجب هذه الشبكة Tor؛ استخدم جسرًا (Snowflake أو obfs4)';
 
@@ -222,6 +251,33 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get menuManage => 'إدارة الخوادم والاشتراكات';
+
+  @override
+  String get menuSetDefault => 'اجعله الافتراضي';
+
+  @override
+  String get badgeDefault => 'افتراضي';
+
+  @override
+  String get menuDeleteAll => 'حذف كل الخوادم';
+
+  @override
+  String get deleteAllTitle => 'حذف كل الخوادم؟';
+
+  @override
+  String get deleteAllBody =>
+      'ستُحذف كل الخوادم والاشتراكات التي أضفتها. يبقى اتصال Tor المدمج ويعود التطبيق إليه.';
+
+  @override
+  String get menuRestoreTor => 'استعادة Tor الافتراضي';
+
+  @override
+  String get deletedAllToast => 'حُذفت كل الخوادم';
+
+  @override
+  String defaultSetToast(String name) {
+    return '$name هو الافتراضي الآن';
+  }
 
   @override
   String serversCount(int count) {
